@@ -3,25 +3,69 @@
 {% block title %}AccessPath AI — Keyboard journey evaluation{% endblock %}
 
 {% block content %}
-  <section aria-labelledby="page-title" class="card">
-    <p class="tag">Current implementation: keyboard-only motor accessibility</p>
-    <h1 id="page-title">Evaluate whether a keyboard user can complete a real journey.</h1>
-    <p>AccessPath AI will use bounded AI planning, deterministic keyboard policy checks, and browser evidence to evaluate a declared task.</p>
-    <p><a href="{% url 'runs:list' %}">View evaluation runs</a></p>
-  </section>
+  <div class="page-head">
+    <div>
+      <h1 id="page-title">Can a keyboard user finish the journey?</h1>
+      <p class="muted">Current implementation: keyboard-only motor accessibility. AccessPath AI uses bounded AI planning, deterministic keyboard policy checks, and browser evidence to evaluate a declared task.</p>
+    </div>
+  </div>
 
-  <section aria-labelledby="how-it-works" class="card">
-    <h2 id="how-it-works">How the evaluation works</h2>
-    <ol>
-      <li>A configured journey defines an approved target, goal, keyboard profile, and completion policy.</li>
-      <li>A separate worker opens a browser and observes the target state.</li>
-      <li>The planner proposes one keyboard action; deterministic policy either rejects or authorizes it.</li>
-      <li>The system records focus, state changes, and evidence before reporting a verified outcome or uncertainty.</li>
-    </ol>
-  </section>
+  <div class="workspace">
+    <div>
+      <section class="panel" aria-labelledby="get-started">
+        <div class="panel-section">
+          <h2 id="get-started">Get started</h2>
+          <div class="tile-grid">
+            <a class="tile" href="{% url 'runs:list' %}#journeys-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              <strong>Run a journey</strong>
+              <span class="muted">Start a reference or website journey.</span>
+            </a>
+            <a class="tile" href="{% url 'runs:list' %}#add-website">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+              <strong>Add a real website</strong>
+              <span class="muted">Evaluate a live public site, read-only.</span>
+            </a>
+            <a class="tile" href="{% url 'runs:list' %}#recent-runs-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>
+              <strong>Review evidence</strong>
+              <span class="muted">Steps, focus path, and screenshots.</span>
+            </a>
+          </div>
+        </div>
 
-  <section aria-labelledby="scope" class="card">
-    <h2 id="scope">Current safety boundary</h2>
-    <p>Only approved, non-destructive fixture journeys are enabled during the initial build. The system does not log in, submit public forms, send messages, make payments, or claim complete WCAG conformance.</p>
-  </section>
+        <div class="panel-section">
+          <h2 id="how-it-works">How the evaluation works</h2>
+          <ol class="steps-list">
+            <li>A configured journey defines an approved target, goal, keyboard profile, and completion policy.</li>
+            <li>A separate worker opens a browser and observes the target state.</li>
+            <li>The planner proposes one keyboard action; deterministic policy either rejects or authorizes it.</li>
+            <li>The system records focus, state changes, and evidence before reporting a verified outcome or uncertainty.</li>
+          </ol>
+        </div>
+
+        <div class="panel-section">
+          <h2>Planners you can use</h2>
+          <div class="tile-grid">
+            <div class="tile"><strong>Gemini</strong><span class="muted">Google structured-action planning.</span></div>
+            <div class="tile"><strong>OpenRouter</strong><span class="muted">Many hosted models; pin one for reliable runs.</span></div>
+            <div class="tile"><strong>Groq</strong><span class="muted">Fast responses on a free tier with per-minute limits.</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="panel" aria-labelledby="scope">
+      <div class="feature-art">{% include "runs/_illustration.html" %}</div>
+      <div class="feature-copy">
+        <h2>Focus you can audit</h2>
+        <p>Every key press is approved by policy first, then recorded with the focused control, the address, and before-and-after screenshots.</p>
+      </div>
+      <div class="promo">
+        <h2 id="scope">Current safety boundary</h2>
+        <p>Evaluations never log in, submit forms, send messages, or make payments. Real-website runs are read-only, and results do not claim complete WCAG conformance.</p>
+        <a class="pill-button" href="{% url 'runs:list' %}">Open the workspace</a>
+      </div>
+    </aside>
+  </div>
 {% endblock %}

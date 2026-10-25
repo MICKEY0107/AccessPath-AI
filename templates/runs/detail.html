@@ -2,74 +2,70 @@
 
 {% block title %}Run {{ run.id }} — AccessPath AI{% endblock %}
 
+{% block extra_tabs %}
+  <li>
+    <a class="tab" href="{% url 'runs:detail' run.id %}" aria-current="page">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg>
+      <span class="tab-text"><small>Run</small><span>{{ run.journey.name }}</span></span>
+    </a>
+  </li>
+{% endblock %}
+
 {% block content %}
-  <section aria-labelledby="run-title" class="card">
-    <p><a href="{% url 'runs:list' %}">Back to evaluation runs</a></p>
-    <h1 id="run-title">{{ run.journey.name }}</h1>
-    <p class="run-brief">{{ run_brief }}</p>
-    <dl class="run-summary">
-      <div><dt>Run ID</dt><dd><code>{{ run.id }}</code></dd></div>
-      <div><dt>Status</dt><dd><span class="tag {% if run.outcome == 'completed' %}tag-success{% elif run.outcome == 'blocked' or run.status == 'failed' %}tag-issue{% endif %}">{{ run.get_status_display }}</span></dd></div>
-      <div><dt>Outcome</dt><dd>{{ run.get_outcome_display }}</dd></div>
-      <div>
-        <dt>Planner</dt>
-        <dd>
-          {% if run.planner_metadata.fallback_used %}
-            <span class="tag tag-issue">Deterministic contingency used</span>
-            <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}{% if run.planner_model %} · tried {{ run.planner_model }}{% endif %}</span>
-            {% if run.planner_metadata.fallback_detail %}<span class="muted">· Why: {{ run.planner_metadata.fallback_detail }}</span>{% endif %}
-          {% elif run.planner_provider == "fixture" %}
-            <span class="tag">Deterministic fixture planner</span>
-          {% else %}
-            <span class="tag tag-success">Live {{ run.planner_metadata.provider_label|default:run.get_planner_provider_display }}</span>
-            <span class="muted">{{ run.planner_metadata.model|default:run.planner_model }} · {{ run.planner_metadata.calls|default:"0" }} calls</span>
-          {% endif %}
-          {% if run.planner_metadata.credential_source == "user_supplied" %}
-            <span class="muted">· Your API key{% if run.planner_metadata.credential_hint %} ({{ run.planner_metadata.credential_hint }}){% endif %}</span>
-          {% elif run.planner_metadata.credential_source == "environment" %}
-            <span class="muted">· Server API key</span>
-          {% endif %}
-        </dd>
-      </div>
-      <div><dt>Terminal reason</dt><dd>{{ run.terminal_reason|default:"Pending" }}</dd></div>
-      <div><dt>Started</dt><dd>{{ run.started_at|default:"Not started" }}</dd></div>
-      <div><dt>Finished</dt><dd>{{ run.finished_at|default:"Not finished" }}</dd></div>
-    </dl>
-    {% if run.status == "queued" or run.status == "starting" or run.status == "running" %}
-      <p class="muted">This page refreshes while the worker is evaluating the journey.</p>
-      <meta http-equiv="refresh" content="3">
-    {% endif %}
-    {% if run.error_detail %}<p class="error"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
-  </section>
+  <div class="page-head">
+    <div>
+      <h1 id="run-title">{{ run.journey.name }}</h1>
+      <p class="run-brief">{{ run_brief }}</p>
+    </div>
+    <a class="secondary" href="{% url 'runs:list' %}">Back to evaluation runs</a>
+  </div>
 
-  <section aria-labelledby="steps-title" class="card">
-    <h2 id="steps-title">Keyboard evidence</h2>
-    <p class="evidence-intro">Each entry records the action requested, whether policy allowed it, and the observed focus and page state after the action.</p>
-    {% if run.steps.all %}
-      <ol class="steps">
-        {% for step in run.steps.all %}
-          <li>
-            <h3>Step {{ step.step_number }} — {{ step.evidence.proposed_action.action|upper }}</h3>
-            <p>{{ step.evidence.proposed_action.purpose }}</p>
-            <dl class="step-details">
-              <div><dt>Policy</dt><dd>{{ step.evidence.policy_decision.outcome }} ({{ step.evidence.policy_decision.code }})</dd></div>
-              <div><dt>Result</dt><dd>{{ step.evidence.action_result.status }}</dd></div>
-              <div><dt>Focus before</dt><dd>{{ step.evidence.focus_before.name|default:"Document body" }}</dd></div>
-              <div><dt>Focus after</dt><dd>{{ step.evidence.focus_after.name|default:"Document body" }}</dd></div>
-              <div><dt>URL after</dt><dd><code>{{ step.evidence.url_after }}</code></dd></div>
-              {% if step.evidence.completion_signals %}<div><dt>Completion signals</dt><dd>{{ step.evidence.completion_signals }}</dd></div>{% endif %}
-                {% if step.evidence.policy_events %}<div><dt>Blocked policy events</dt><dd>{{ step.evidence.policy_events|join:"; " }}</dd></div>{% endif %}
-                {% if step.evidence.evidence_events %}<div><dt>Evidence events</dt><dd>{{ step.evidence.evidence_events|join:"; " }}</dd></div>{% endif %}
-            </dl>
-          </li>
-        {% endfor %}
-      </ol>
-    {% else %}
-      <p>No step evidence has been recorded yet.</p>
-    {% endif %}
-  </section>
+  <div class="workspace">
+    <div>
+      <section class="panel" aria-labelledby="result-title">
+        <h2 id="result-title">Result</h2>
+        <div class="stat-grid">
+          <div class="stat"><small>Status</small><strong><span class="tag {% if run.outcome == 'completed' %}tag-success{% elif run.outcome == 'blocked' or run.status == 'failed' %}tag-issue{% else %}tag-neutral{% endif %}">{{ run.get_status_display }}</span></strong></div>
+          <div class="stat"><small>Outcome</small><strong>{{ run.get_outcome_display }}</strong></div>
+          <div class="stat"><small>Keyboard steps</small><strong>{{ run.steps.all|length }}</strong></div>
+        </div>
+        {% if run.status == "queued" or run.status == "starting" or run.status == "running" %}
+          <p class="muted small" style="margin-top: .9rem">This page refreshes while the worker is evaluating the journey.</p>
+          <meta http-equiv="refresh" content="3">
+        {% endif %}
+        {% if run.error_detail %}<p class="error" style="margin-top: .9rem"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
+      </section>
 
-  <section aria-labelledby="artifacts-title" class="card">
+      <section class="panel" aria-labelledby="steps-title">
+        <h2 id="steps-title">Keyboard evidence</h2>
+        <p class="evidence-intro">Each entry records the action requested, whether policy allowed it, and the observed focus and page state after the action.</p>
+        {% if run.steps.all %}
+          <ol class="steps">
+            {% for step in run.steps.all %}
+              <li>
+                <h3>Step {{ step.step_number }} — {{ step.evidence.proposed_action.action|upper }}
+                  <span class="tag {% if step.evidence.action_result.meaningful_progress %}tag-success{% elif step.evidence.policy_decision.outcome == 'rejected' %}tag-issue{% else %}tag-neutral{% endif %}">{% if step.evidence.action_result.meaningful_progress %}Progress{% elif step.evidence.policy_decision.outcome == 'rejected' %}Rejected{% else %}No progress{% endif %}</span>
+                </h3>
+                {% if step.evidence.proposed_action.purpose %}<p>{{ step.evidence.proposed_action.purpose }}</p>{% endif %}
+                <dl class="step-details">
+                  <div><dt>Policy</dt><dd>{{ step.evidence.policy_decision.outcome }} ({{ step.evidence.policy_decision.code }})</dd></div>
+                  <div><dt>Result</dt><dd>{{ step.evidence.action_result.status }}</dd></div>
+                  <div><dt>Focus before</dt><dd>{{ step.evidence.focus_before.name|default:"Document body" }}</dd></div>
+                  <div><dt>Focus after</dt><dd>{{ step.evidence.focus_after.name|default:"Document body" }}</dd></div>
+                  <div><dt>URL after</dt><dd><code>{{ step.evidence.url_after }}</code></dd></div>
+                  {% if step.evidence.completion_signals %}<div><dt>Completion signals</dt><dd>{{ step.evidence.completion_signals }}</dd></div>{% endif %}
+                  {% if step.evidence.policy_events %}<div><dt>Blocked policy events</dt><dd>{{ step.evidence.policy_events|join:"; " }}</dd></div>{% endif %}
+                  {% if step.evidence.evidence_events %}<div><dt>Evidence events</dt><dd>{{ step.evidence.evidence_events|join:"; " }}</dd></div>{% endif %}
+                </dl>
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          <p class="muted">No step evidence has been recorded yet.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel" aria-labelledby="artifacts-title">
     <h2 id="artifacts-title">Captured screenshots</h2>
     <p class="evidence-intro">Select any screenshot to review it in place. Use <kbd>←</kbd> and <kbd>→</kbd> to move through the evidence, or <kbd>Escape</kbd> to return to this run.</p>
     {% if evidence_artifacts %}
@@ -98,6 +94,49 @@
       <p>No screenshots have been captured yet.</p>
     {% endif %}
   </section>
+
+    </div>
+
+    <aside>
+      <section class="panel" aria-labelledby="facts-title">
+        <h2 id="facts-title">Run details</h2>
+        <dl class="run-summary">
+          <div><dt>Run ID</dt><dd><code>{{ run.id }}</code></dd></div>
+          <div>
+            <dt>Planner</dt>
+            <dd>
+              {% if run.planner_metadata.fallback_used %}
+                <span class="tag tag-issue">Deterministic contingency used</span>
+                <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}{% if run.planner_model %} · tried {{ run.planner_model }}{% endif %}</span>
+                {% if run.planner_metadata.fallback_detail %}<span class="muted">· Why: {{ run.planner_metadata.fallback_detail }}</span>{% endif %}
+              {% elif run.planner_provider == "fixture" %}
+                <span class="tag">Deterministic fixture planner</span>
+              {% else %}
+                <span class="tag tag-success">Live {{ run.planner_metadata.provider_label|default:run.get_planner_provider_display }}</span>
+                <span class="muted">{{ run.planner_metadata.model|default:run.planner_model }} · {{ run.planner_metadata.calls|default:"0" }} calls</span>
+              {% endif %}
+              {% if run.planner_metadata.credential_source == "user_supplied" %}
+                <span class="muted">· Your API key{% if run.planner_metadata.credential_hint %} ({{ run.planner_metadata.credential_hint }}){% endif %}</span>
+              {% elif run.planner_metadata.credential_source == "environment" %}
+                <span class="muted">· Server API key</span>
+              {% endif %}
+            </dd>
+          </div>
+          <div><dt>Terminal reason</dt><dd>{{ run.terminal_reason|default:"Pending" }}</dd></div>
+          <div><dt>Started</dt><dd>{{ run.started_at|default:"Not started" }}</dd></div>
+          <div><dt>Finished</dt><dd>{{ run.finished_at|default:"Not finished" }}</dd></div>
+          <div><dt>Start page</dt><dd><code>{{ run.journey.start_url }}</code></dd></div>
+        </dl>
+      </section>
+      <div class="promo">
+        <h2>Run it again</h2>
+        <p>Compare planners or models on the same journey. Each run keeps its own evidence.</p>
+        <a class="pill-button" href="{% url 'runs:list' %}#journey-{{ run.journey.id }}">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Open this journey
+        </a>
+      </div>
+    </aside>
+  </div>
 
   {% if evidence_artifacts %}
     <dialog id="evidence-viewer" aria-labelledby="evidence-viewer-title">

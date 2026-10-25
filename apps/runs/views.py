@@ -126,13 +126,19 @@ def run_list(
     else:
         selected_filters["outcome"] = ""
 
+    planner_options = _planner_options()
     return render(
         request,
         "runs/list.html",
         {
             "journeys": Journey.objects.filter(is_active=True),
             "runs": runs[:20],
-            "planner_options": _planner_options(),
+            "planner_options": planner_options,
+            "stats": {
+                "total_runs": Run.objects.count(),
+                "completed_runs": Run.objects.filter(outcome=JourneyOutcome.COMPLETED).count(),
+                "server_planners": sum(1 for option in planner_options if option["has_server_key"]),
+            },
             "run_filter_journeys": Journey.objects.filter(
                 pk__in=Run.objects.values("journey_id")
             )

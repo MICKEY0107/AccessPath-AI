@@ -3,64 +3,237 @@
 {% block title %}Evaluation runs — AccessPath AI{% endblock %}
 
 {% block content %}
-  <section aria-labelledby="runs-title" class="card">
-    <h1 id="runs-title">Evaluation runs</h1>
-    <p>An evaluation run checks one approved digital journey from start to its declared completion point using only keyboard actions. It records the focus path, action results, screenshots, and a verified outcome so the result can be reviewed afterward.</p>
-    <h2>Available journeys</h2>
-    {% if journeys %}
-      <ul class="journey-list">
-        {% for journey in journeys %}
-          <li class="journey" id="journey-{{ journey.id }}">
-            <h3>{{ journey.name }}{% if journey.is_real_site %} <span class="tag">Real website</span>{% endif %}</h3>
-            <p>{{ journey.goal }}</p>
-            <p class="muted">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
-            <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}" autocomplete="off">
-              {% csrf_token %}
-              <label for="planner-provider-{{ journey.id }}">Planner provider</label>
-              <select id="planner-provider-{{ journey.id }}" name="planner_provider" required data-journey="{{ journey.id }}">
-                <option value="" selected disabled>Choose a provider</option>
-                {% for option in planner_options %}
-                  <option value="{{ option.value }}"{% if not option.live and not journey.has_fixture_plan %} disabled{% endif %}
-                    data-live="{{ option.live|yesno:'true,false' }}"
-                    data-server-key="{{ option.has_server_key|yesno:'true,false' }}"
-                    data-model="{{ option.model }}"
-                    data-model-example="{{ option.model_example }}">
-                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.live and not journey.has_fixture_plan %} (no scripted plan for this site){% endif %}
-                  </option>
-                {% endfor %}
-              </select>
-              <div class="live-planner-fields" id="live-fields-{{ journey.id }}" hidden>
-                <label for="planner-model-{{ journey.id }}">Model</label>
-                <input id="planner-model-{{ journey.id }}" name="planner_model" type="text" maxlength="255" spellcheck="false" aria-describedby="planner-model-help-{{ journey.id }}">
-                <p class="muted" id="planner-model-help-{{ journey.id }}">The exact model id for this run. Leave blank to use the server default.</p>
-                <p class="model-warning" id="planner-model-warning-{{ journey.id }}" role="status" hidden>This sends each step to a random free model, and many of them cannot answer in the required format, so runs often stop early or fall back. Pick a specific model for reliable live evidence.</p>
-                <label for="api-key-{{ journey.id }}">API key</label>
-                <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
-                <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
-              </div>
-              <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
-              <button type="submit">Start keyboard evaluation</button>
-            </form>
-            {% if journey.is_real_site %}
-              <form class="remove-journey" method="post" action="{% url 'runs:remove_journey' journey.id %}">
-                {% csrf_token %}
-                <button type="submit" class="secondary">Remove this website journey</button>
-              </form>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No configured journeys are available. Run <code>seed_fixture_journeys</code> and <code>seed_public_journeys</code> after migrations.</p>
-    {% endif %}
-  </section>
+  <div class="page-head">
+    <div>
+      <h1 id="runs-title">Evaluation workspace</h1>
+      <p class="muted">An evaluation run checks one approved digital journey from start to its declared completion point using only keyboard actions.</p>
+    </div>
+    <div class="icon-links">
+      <a class="icon-button" href="{% url 'core:home' %}#how-it-works" title="How evaluations work">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/></svg>
+        <span class="visually-hidden">How evaluations work</span>
+      </a>
+      <a class="icon-button" href="{% url 'admin:index' %}" title="Admin settings">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        <span class="visually-hidden">Admin settings</span>
+      </a>
+    </div>
+  </div>
 
-  <section aria-labelledby="real-site-title" class="card">
-    <h2 id="real-site-title">Evaluate a real website</h2>
-    <p>Add a journey on a live public website. A live planner moves through it with the keyboard only, and the run records the same evidence as the reference journeys.</p>
-    <p class="muted">For safety these runs are read-only. They never submit forms or send data, and they never open popups, downloads, or other websites. Searching, browsing, and finding a page work; signing in or checking out stops safely at the first submit.</p>
-    <details class="real-site-details"{% if real_site_form_open %} open{% endif %}>
-      <summary>Add a website journey</summary>
+  <div class="workspace">
+    <div>
+      <section class="panel" aria-labelledby="journeys-title">
+        <div class="panel-section">
+          <h2>Start an evaluation</h2>
+          <div class="tile-grid">
+            <a class="tile" href="#journeys-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              <strong>Run a journey</strong>
+              <span class="muted">Pick a journey below and choose a planner.</span>
+              <span class="kbd-chip">{{ journeys|length }} ready</span>
+            </a>
+            <button class="tile" type="button" data-open-add-website>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+              <strong>Add a real website</strong>
+              <span class="muted">Evaluate a live public site, read-only.</span>
+              <span class="kbd-chip">Live</span>
+            </button>
+            <a class="tile" href="#recent-runs-title">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>
+              <strong>Review evidence</strong>
+              <span class="muted">Open a run for steps and screenshots.</span>
+              <span class="kbd-chip">{{ stats.total_runs }} runs</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-head">
+            <h2 id="journeys-title">Available journeys</h2>
+            <div class="search-box">
+              <label class="visually-hidden" for="journey-search">Search journeys</label>
+              <input id="journey-search" type="search" placeholder="Search journeys" autocomplete="off">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </div>
+          </div>
+          {% if journeys %}
+            <ul class="row-list" id="journey-list">
+              {% for journey in journeys %}
+                <li id="journey-{{ journey.id }}" data-journey-name="{{ journey.name|lower }} {{ journey.start_url|lower }}">
+                  <details class="journey">
+                    <summary class="row">
+                      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/><path d="M4 10h16"/></svg>
+                      <span>
+                        <span class="row-title">{{ journey.name }}</span>
+                        <span class="row-sub">{{ journey.start_url }}</span>
+                      </span>
+                      <span>
+                        {% if journey.is_real_site %}<span class="tag">Real website</span>{% else %}<span class="tag tag-neutral">{{ journey.get_execution_mode_display }}</span>{% endif %}
+                        <span class="run-cta run-cta-closed">Run ›</span><span class="run-cta run-cta-open">Close</span>
+                      </span>
+                    </summary>
+                    <div class="journey-body">
+                      <p>{{ journey.goal }}</p>
+                      <p class="muted small">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
+                      <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}" autocomplete="off">
+                        {% csrf_token %}
+                        <label for="planner-provider-{{ journey.id }}">Planner provider</label>
+                        <select id="planner-provider-{{ journey.id }}" name="planner_provider" required data-journey="{{ journey.id }}">
+                          <option value="" selected disabled>Choose a provider</option>
+                          {% for option in planner_options %}
+                            <option value="{{ option.value }}"{% if not option.live and not journey.has_fixture_plan %} disabled{% endif %}
+                              data-live="{{ option.live|yesno:'true,false' }}"
+                              data-server-key="{{ option.has_server_key|yesno:'true,false' }}"
+                              data-model="{{ option.model }}"
+                              data-model-example="{{ option.model_example }}">
+                              {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.live and not journey.has_fixture_plan %} (no scripted plan for this site){% endif %}
+                            </option>
+                          {% endfor %}
+                        </select>
+                        <div class="live-planner-fields" id="live-fields-{{ journey.id }}" hidden>
+                          <label for="planner-model-{{ journey.id }}">Model</label>
+                          <input id="planner-model-{{ journey.id }}" name="planner_model" type="text" maxlength="255" spellcheck="false" aria-describedby="planner-model-help-{{ journey.id }}">
+                          <p class="muted" id="planner-model-help-{{ journey.id }}">The exact model id for this run. Leave blank to use the server default.</p>
+                          <p class="model-warning" id="planner-model-warning-{{ journey.id }}" role="status" hidden>This sends each step to a random free model, and many of them cannot answer in the required format, so runs often stop early or fall back. Pick a specific model for reliable live evidence.</p>
+                          <label for="api-key-{{ journey.id }}">API key</label>
+                          <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
+                          <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
+                        </div>
+                        <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
+                        <div><button type="submit">Start keyboard evaluation</button></div>
+                      </form>
+                      {% if journey.is_real_site %}
+                        <form class="remove-journey" method="post" action="{% url 'runs:remove_journey' journey.id %}">
+                          {% csrf_token %}
+                          <button type="submit" class="secondary">Remove this website journey</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </details>
+                </li>
+              {% endfor %}
+            </ul>
+            <p class="muted small" id="journey-search-empty" hidden>No journeys match that search.</p>
+          {% else %}
+            <p>No configured journeys are available. Run <code>seed_fixture_journeys</code> and <code>seed_public_journeys</code> after migrations, or add a real website.</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="recent-runs-title">
+        <div class="section-head">
+          <h2 id="recent-runs-title">Recent evaluation runs</h2>
+          {% if filters_active %}<a class="secondary" href="{% url 'runs:list' %}">Clear filters</a>{% endif %}
+        </div>
+        <form id="run-filters" class="run-filters" method="get" aria-label="Filter recent evaluation runs">
+          <div>
+            <label for="filter-journey">Journey</label>
+            <select id="filter-journey" name="journey">
+              <option value="">All journeys</option>
+              {% for journey in run_filter_journeys %}
+                <option value="{{ journey.id }}"{% if selected_journey_id == journey.id %} selected{% endif %}>{{ journey.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="filter-provider">Planner used</label>
+            <select id="filter-provider" name="provider">
+              <option value="">All planners</option>
+              {% for value, label in provider_filter_options %}
+                <option value="{{ value }}"{% if selected_filters.provider == value %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="filter-status">Status</label>
+            <select id="filter-status" name="status">
+              <option value="">All statuses</option>
+              {% for value, label in status_filter_options %}
+                <option value="{{ value }}"{% if selected_filters.status == value %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="filter-outcome">Outcome</label>
+            <select id="filter-outcome" name="outcome">
+              <option value="">All outcomes</option>
+              {% for value, label in outcome_filter_options %}
+                <option value="{{ value }}"{% if selected_filters.outcome == value %} selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <noscript><div class="filter-actions"><button type="submit">Apply filters</button></div></noscript>
+        </form>
+        <div id="recent-runs-results" aria-live="polite">
+          {% if runs %}
+            <table>
+              <caption>Most recent evaluation runs</caption>
+              <thead><tr><th scope="col">Journey</th><th scope="col">Planner used</th><th scope="col">Status</th><th scope="col">Outcome</th><th scope="col">Created</th></tr></thead>
+              <tbody>
+                {% for run in runs %}
+                  <tr>
+                    <td><a href="{% url 'runs:detail' run.id %}">{{ run.journey.name }}</a></td>
+                    <td>
+                      {% if run.planner_metadata.fallback_used %}
+                        Deterministic contingency
+                        <span class="muted">({{ run.get_planner_provider_display }} fallback)</span>
+                      {% elif run.planner_provider == "fixture" %}
+                        Deterministic fixture
+                      {% else %}
+                        {{ run.get_planner_provider_display }}
+                        {% if run.planner_model %}<span class="muted">— {{ run.planner_model }}</span>{% endif %}
+                      {% endif %}
+                    </td>
+                    <td><span class="tag {% if run.status == 'succeeded' %}tag-success{% elif run.status == 'failed' %}tag-issue{% else %}tag-neutral{% endif %}">{{ run.get_status_display }}</span></td>
+                    <td>{{ run.get_outcome_display }}</td>
+                    <td class="muted">{{ run.created_at|date:"M j, H:i" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p class="muted">No runs exist yet.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+
+    <aside class="panel" aria-labelledby="guide-title">
+      <div class="feature-art">{% include "runs/_illustration.html" %}</div>
+      <div class="feature-copy">
+        <h2 id="guide-title">Keyboard-only, evidence first</h2>
+        <p>A live model proposes one keyboard action at a time. Deterministic policy approves it before the browser presses a key, and every step is recorded with screenshots.</p>
+      </div>
+      <p class="explore-label">At a glance</p>
+      <div class="mini-grid">
+        <div class="mini-card">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+          <strong>{{ stats.completed_runs }} completed</strong>
+          <span>of {{ stats.total_runs }} runs reached their verified goal.</span>
+        </div>
+        <div class="mini-card">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/></svg>
+          <strong>{{ stats.server_planners }} server planners</strong>
+          <span>have a key in .env. Any provider works with your own key.</span>
+        </div>
+      </div>
+      <div class="promo" id="add-website-promo">
+        <h2>Evaluating your own site?</h2>
+        <p>Add a public website, a goal, and a success check. Runs stay read-only: nothing is submitted.</p>
+        <button class="pill-button" type="button" data-open-add-website>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Add a website
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <dialog id="add-website" class="form-dialog" aria-labelledby="real-site-title"{% if real_site_form_open %} data-open-on-load{% endif %}>
+    <div class="viewer-shell">
+      <div class="viewer-header">
+        <h2 id="real-site-title">Evaluate a real website</h2>
+        <button class="secondary" type="button" data-close-add-website>Close</button>
+      </div>
+      <p class="muted small">A live planner moves through the site with the keyboard only. For safety these runs are read-only. They never submit forms or send data, and they never open popups, downloads, or other websites. Searching, browsing, and finding a page work; signing in or checking out stops safely at the first submit.</p>
       <form class="real-site-form" method="post" action="{% url 'runs:create_journey' %}" novalidate>
         {% csrf_token %}
         {% if real_site_form.non_field_errors %}
@@ -74,88 +247,39 @@
             {% for error in field.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
           </div>
         {% endfor %}
-        <button type="submit">Add website journey</button>
+        <div><button type="submit">Add website journey</button></div>
       </form>
-    </details>
-  </section>
-
-  <section aria-labelledby="recent-runs-title" class="card">
-    <h2 id="recent-runs-title">Recent evaluation runs</h2>
-    <p class="muted">Open any run to review its outcome, step-by-step keyboard evidence, and captured screenshots.</p>
-    <form id="run-filters" class="run-filters" method="get" aria-label="Filter recent evaluation runs">
-      <div>
-        <label for="filter-journey">Journey</label>
-        <select id="filter-journey" name="journey">
-          <option value="">All journeys</option>
-          {% for journey in run_filter_journeys %}
-            <option value="{{ journey.id }}"{% if selected_journey_id == journey.id %} selected{% endif %}>{{ journey.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label for="filter-provider">Planner used</label>
-        <select id="filter-provider" name="provider">
-          <option value="">All planners</option>
-          {% for value, label in provider_filter_options %}
-            <option value="{{ value }}"{% if selected_filters.provider == value %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label for="filter-status">Status</label>
-        <select id="filter-status" name="status">
-          <option value="">All statuses</option>
-          {% for value, label in status_filter_options %}
-            <option value="{{ value }}"{% if selected_filters.status == value %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label for="filter-outcome">Outcome</label>
-        <select id="filter-outcome" name="outcome">
-          <option value="">All outcomes</option>
-          {% for value, label in outcome_filter_options %}
-            <option value="{{ value }}"{% if selected_filters.outcome == value %} selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="filter-actions">
-        {% if filters_active %}<a class="secondary" href="{% url 'runs:list' %}">Clear filters</a>{% endif %}
-      </div>
-    </form>
-    <div id="recent-runs-results" aria-live="polite">
-      {% if runs %}
-        <table>
-        <caption>Most recent evaluation runs</caption>
-        <thead><tr><th scope="col">Journey</th><th scope="col">Planner used</th><th scope="col">Status</th><th scope="col">Outcome</th><th scope="col">Created</th></tr></thead>
-        <tbody>
-          {% for run in runs %}
-            <tr>
-              <td><a href="{% url 'runs:detail' run.id %}">{{ run.journey.name }}</a></td>
-              <td>
-                {% if run.planner_metadata.fallback_used %}
-                  Deterministic contingency
-                  <span class="muted">({{ run.get_planner_provider_display }} fallback)</span>
-                {% elif run.planner_provider == "fixture" %}
-                  Deterministic fixture
-                {% else %}
-                  {{ run.get_planner_provider_display }}
-                  {% if run.planner_model %}<span class="muted">— {{ run.planner_model }}</span>{% endif %}
-                {% endif %}
-              </td>
-              <td>{{ run.get_status_display }}</td>
-              <td>{{ run.get_outcome_display }}</td>
-              <td>{{ run.created_at }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-        </table>
-      {% else %}
-        <p>No runs exist yet.</p>
-      {% endif %}
     </div>
-  </section>
+  </dialog>
+
   <script>
+    (() => {
+      const dialog = document.getElementById("add-website");
+      const open = () => { if (!dialog.open) dialog.showModal(); };
+      document.querySelectorAll("[data-open-add-website]").forEach((button) => button.addEventListener("click", open));
+      dialog.querySelector("[data-close-add-website]").addEventListener("click", () => dialog.close());
+      dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+      if (dialog.hasAttribute("data-open-on-load") || window.location.hash === "#add-website") open();
+      window.addEventListener("hashchange", () => { if (window.location.hash === "#add-website") open(); });
+
+      // Open the journey a link points at, such as #journey-3 after adding a site.
+      const target = window.location.hash.startsWith("#journey-") && document.querySelector(window.location.hash);
+      if (target) target.querySelector("details").open = true;
+
+      const search = document.getElementById("journey-search");
+      const empty = document.getElementById("journey-search-empty");
+      search.addEventListener("input", () => {
+        const query = search.value.trim().toLowerCase();
+        let shown = 0;
+        document.querySelectorAll("#journey-list > li").forEach((item) => {
+          const match = !query || item.dataset.journeyName.includes(query);
+          item.hidden = !match;
+          if (match) shown += 1;
+        });
+        if (empty) empty.hidden = shown > 0;
+      });
+    })();
+
     document.querySelectorAll(".planner-picker select[name=planner_provider]").forEach((select) => {
       const journey = select.dataset.journey;
       const fields = document.getElementById(`live-fields-${journey}`);
@@ -187,13 +311,13 @@
       select.addEventListener("change", update);
       update();
     });
-  </script>
-  <script>
+
     document.getElementById("run-filters").addEventListener("change", async (event) => {
       if (event.target.tagName !== "SELECT") return;
       const form = event.currentTarget;
       const results = document.getElementById("recent-runs-results");
       const url = new URL(window.location.href);
+      url.hash = "";
       new FormData(form).forEach((value, key) => {
         if (value) url.searchParams.set(key, value);
         else url.searchParams.delete(key);
