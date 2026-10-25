@@ -58,7 +58,8 @@
       /* App frame, like a browser window floating on the backdrop */
       .skip-link { position: absolute; z-index: 30; top: .6rem; left: 50%; transform: translate(-50%, -200%); border-radius: .5rem; background: var(--navy); color: #fff; padding: .6rem .9rem; text-decoration: none; transition: transform .15s ease; }
       .skip-link:focus { transform: translate(-50%, 0); }
-      .app-frame { max-width: 78rem; margin: clamp(.75rem, 3vw, 2.25rem) auto; background: var(--surface); border: 1px solid rgb(255 255 255 / 70%); border-radius: 1.4rem; box-shadow: 0 1.5rem 3.5rem rgb(49 40 140 / 18%); overflow: hidden; }
+      .app-frame { max-width: 120rem; margin: clamp(.75rem, 2vw, 1.75rem) clamp(.75rem, 2.5vw, 2.5rem); background: var(--surface); border: 1px solid rgb(255 255 255 / 70%); border-radius: 1.4rem; box-shadow: 0 1.5rem 3.5rem rgb(49 40 140 / 18%); overflow: hidden; }
+      @media (min-width: 125rem) { .app-frame { margin-inline: auto; } }
       .app-top { background: linear-gradient(180deg, #f6f5ff, #f0efff); border-bottom: 1px solid var(--line); padding: 1rem clamp(1rem, 3vw, 1.75rem) 0; }
       .top-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
       .brand { display: inline-flex; align-items: baseline; gap: .35rem; color: var(--accent); font-size: 1.65rem; font-weight: 700; letter-spacing: -.04em; text-decoration: none; }
@@ -79,14 +80,14 @@
       .tab-text span { font-size: .84rem; font-weight: 500; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .icon { width: 1.05rem; height: 1.05rem; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-      main { padding: clamp(1.1rem, 3vw, 2rem) clamp(1rem, 4vw, 3.25rem) clamp(1.5rem, 4vw, 2.75rem); background: var(--surface); }
+      main { padding: clamp(1.1rem, 2.5vw, 2rem) clamp(1rem, 2.5vw, 2.25rem) clamp(1.5rem, 3vw, 2.5rem); background: var(--surface); }
       .page-head { display: flex; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
       .page-head p { margin: .3rem 0 0; }
       .icon-links { display: flex; gap: .4rem; }
       .icon-button { display: inline-grid; place-items: center; width: 2.1rem; height: 2.1rem; border: 1px solid var(--line-strong); border-radius: .55rem; background: var(--surface); color: var(--ink-soft); }
       .icon-button:hover { border-color: var(--accent); color: var(--accent); }
       .workspace > *, .row > * { min-width: 0; }
-      .workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(17rem, 1fr); gap: 1.1rem; align-items: start; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(19rem, 1fr); gap: 1.1rem; align-items: start; }
       .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(1rem, 2.5vw, 1.4rem); }
       .panel + .panel { margin-top: 1.1rem; }
       .panel-section + .panel-section { margin-top: 1.6rem; }
@@ -228,7 +229,7 @@
       .steps-list li { position: relative; border: 1px solid var(--line); border-radius: .7rem; background: var(--surface-soft); padding: .75rem .85rem .75rem 2.9rem; font-size: .88rem; }
       .steps-list li::before { counter-increment: how; content: counter(how); position: absolute; left: .85rem; top: .75rem; display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); font-size: .75rem; font-weight: 700; }
 
-      .app-footer { border-top: 1px solid var(--line); background: var(--surface-soft); color: var(--muted); font-size: .78rem; padding: .9rem clamp(1rem, 4vw, 3.25rem); }
+      .app-footer { border-top: 1px solid var(--line); background: var(--surface-soft); color: var(--muted); font-size: .78rem; padding: .9rem clamp(1rem, 2.5vw, 2.25rem); }
       .app-footer p { margin: 0; }
 
       @media (min-width: 60.01rem) { .workspace > aside { position: sticky; top: 1rem; } }
