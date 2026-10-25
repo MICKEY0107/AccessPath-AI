@@ -11,6 +11,8 @@ It is a 5-credit college project (three-member team per the progress log). First
 
 Plan doc (goal, phases, gates, risks, sources): https://claude.ai/artifact/HkebUHk6XuC9GTY29r9XQm
 
+Full list of every idea, suggestion and warning with status, effort and code locations: [`IMPROVEMENTS_BACKLOG.md`](IMPROVEMENTS_BACKLOG.md).
+
 ## 2. Decisions the owner has made (do not re-ask)
 
 | Decision | Why |
