@@ -85,6 +85,9 @@ class PlannerHistoryEntryV1(BaseModel):
     # that repeated Tabs are cycling through the same controls.
     focus_after: str | None = Field(default=None, max_length=120)
     target_hint: str = Field(default="", max_length=120)
+    # The permitted value a Type action entered, so the planner can see which items
+    # it already added and move on to the next one.
+    typed_value: str | None = Field(default=None, max_length=256)
 
 
 class PlannerInteractiveElementV1(BaseModel):
@@ -124,6 +127,8 @@ class PlannerObservationV1(BaseModel):
     visible_text: str = Field(default="", max_length=4000)
     history: list[PlannerHistoryEntryV1] = Field(default_factory=list, max_length=8)
     permitted_inputs: dict[str, str] = Field(default_factory=dict, max_length=10)
+    # Every value typed so far in this run, in order; history alone keeps only 8 turns.
+    typed_values: list[str] = Field(default_factory=list, max_length=20)
     remaining_steps: int = Field(ge=0, le=100)
     elements_truncated: bool = False
     visible_text_truncated: bool = False

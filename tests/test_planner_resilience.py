@@ -268,3 +268,16 @@ def test_retry_after_hint_allows_a_few_patient_quota_retries() -> None:
 
     assert action.action == ActionKind.TAB
     assert waits == [3, 3, 3]
+
+
+def test_groq_uses_strict_schema_for_gpt_oss_and_json_mode_otherwise() -> None:
+    from engine.groq import STRICT_ACTION_SCHEMA, response_format_for
+
+    strict = response_format_for("openai/gpt-oss-20b")
+    loose = response_format_for("llama-3.3-70b-versatile")
+
+    assert strict["type"] == "json_schema"
+    assert strict["json_schema"]["strict"] is True
+    assert set(STRICT_ACTION_SCHEMA["required"]) == set(STRICT_ACTION_SCHEMA["properties"])
+    assert STRICT_ACTION_SCHEMA["additionalProperties"] is False
+    assert loose == {"type": "json_object"}

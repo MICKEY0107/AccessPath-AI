@@ -41,6 +41,13 @@ class EvaluationResult:
     detail: str = ""
 
 
+# Observation budget per planner turn. Free model tiers cap tokens per minute, so a
+# smaller observation means more turns before a rate limit.
+OBSERVATION_ELEMENTS_AFTER_FOCUS = 18
+OBSERVATION_ELEMENTS_BEFORE_FOCUS = 4
+OBSERVATION_VISIBLE_TEXT_CHARS = 1500
+
+
 class KeyboardExecutor:
     """Executes only approved keyboard actions against an approved origin."""
 
@@ -168,9 +175,7 @@ class KeyboardExecutor:
         self._started_monotonic = time.monotonic()
 
     def _new_context(self, browser) -> BrowserContext:
-        service_workers = (
-            "block" if self.target_policy.config.block_service_workers else "allow"
-        )
+        service_workers = "block" if self.target_policy.config.block_service_workers else "allow"
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
             locale="en-US",
@@ -276,9 +281,7 @@ class KeyboardExecutor:
             observation: PlannerObservationV1 | None = None
             if planner is not None:
                 if steps_run >= self.max_steps:
-                    return EvaluationResult(
-                        "agent_error", "MAX_STEP_BUDGET_EXCEEDED", steps_run
-                    )
+                    return EvaluationResult("agent_error", "MAX_STEP_BUDGET_EXCEEDED", steps_run)
                 observation = self._planner_observation(
                     page,
                     goal=goal,
@@ -314,10 +317,19 @@ class KeyboardExecutor:
             before_url = page.url
             before_focus = self._focus_evidence(page)
             before_fingerprint = self._state_fingerprint(page, before_focus)
+            last = history[-1] if history else None
             decision = self.policy.decide(
                 action,
                 before_focus,
                 rejection_counts.get("TYPE_TARGET_NOT_EDITABLE", 0),
+                typed_into_focus_last=bool(
+                    last
+                    and last.action == ActionKind.TYPE
+                    and last.result_status == "effect_observed"
+                    and before_focus is not None
+                    and last.focus_after
+                    == (before_focus.name or before_focus.role or before_focus.tag or "")[:120]
+                ),
             )
             artifacts: list[StoredArtifact] = []
             before_artifact = self._capture_screenshot(page, step_number, "before")
@@ -331,9 +343,7 @@ class KeyboardExecutor:
                     self._perform_action(page, action)
                     executed_action = action
                     self._wait_for_stability(page)
-                    meaningful_progress = self._state_changed(
-                        page, before_url, before_fingerprint
-                    )
+                    meaningful_progress = self._state_changed(page, before_url, before_fingerprint)
                     action_result = ActionResultV1(
                         status="effect_observed" if meaningful_progress else "no_effect",
                         meaningful_progress=meaningful_progress,
@@ -356,12 +366,9 @@ class KeyboardExecutor:
             after_focus = self._focus_evidence(page)
             after_url = page.url
             after_fingerprint = self._state_fingerprint(page, after_focus)
-            state_visit_counts[after_fingerprint] = (
-                state_visit_counts.get(after_fingerprint, 0) + 1
-            )
+            state_visit_counts[after_fingerprint] = state_visit_counts.get(after_fingerprint, 0) + 1
             repeated_focus_cycle = (
-                state_visit_counts[after_fingerprint]
-                >= self.target_policy.config.no_progress_limit
+                state_visit_counts[after_fingerprint] >= self.target_policy.config.no_progress_limit
             )
             if decision.outcome == "approved" and self._safety_violation_code:
                 action_result = ActionResultV1(
@@ -396,9 +403,7 @@ class KeyboardExecutor:
                 observed_at=started_at,
                 url_before=before_url,  # pyright: ignore[reportArgumentType]
                 url_after=(
-                    after_url
-                    if urlparse(after_url).scheme in {"http", "https"}
-                    else before_url
+                    after_url if urlparse(after_url).scheme in {"http", "https"} else before_url
                 ),  # pyright: ignore[reportArgumentType]
                 focus_before=before_focus,
                 focus_after=after_focus,
@@ -428,6 +433,7 @@ class KeyboardExecutor:
                         else None
                     ),
                     target_hint=action.target_hint[:120],
+                    typed_value=action.value if action.action == ActionKind.TYPE else None,
                 )
             )
             barrier = self.barrier_check
@@ -445,9 +451,7 @@ class KeyboardExecutor:
                     self._safety_violation_detail,
                 )
             if repeated_focus_cycle:
-                return EvaluationResult(
-                    "agent_error", "REPEATED_FOCUS_CYCLE", step_number
-                )
+                return EvaluationResult("agent_error", "REPEATED_FOCUS_CYCLE", step_number)
             if not self._origin_is_allowed(page.url):
                 return EvaluationResult(
                     "safety_stopped", "NAVIGATION_ORIGIN_NOT_ALLOWED", step_number
@@ -480,7 +484,7 @@ class KeyboardExecutor:
         remaining_steps: int,
     ) -> PlannerObservationV1:
         data = page.evaluate(
-            """() => {
+            """(limits) => {
                 const selector = [
                   'a[href]', 'button', 'input:not([type=hidden])', 'textarea', 'select',
                   '[contenteditable=true]', '[tabindex]:not([tabindex="-1"])'
@@ -493,10 +497,14 @@ class KeyboardExecutor:
                 };
                 const all = Array.from(document.querySelectorAll(selector)).filter(isVisible);
                 const active = document.activeElement;
-                if (active && all.includes(active)) {
-                  all.splice(all.indexOf(active), 1);
-                  all.unshift(active);
-                }
+                // Keyboard planning needs the controls Tab reaches next, so send the
+                // focused control, the next stops after it, and a few before it.
+                const at = all.indexOf(active);
+                const nearby = at < 0 ? all.slice(0, limits.after + limits.before) : [
+                  active,
+                  ...all.slice(at + 1, at + 1 + limits.after),
+                  ...all.slice(Math.max(0, at - limits.before), at),
+                ];
                 const accessibleName = (element) => {
                   const labelledBy = (element.getAttribute('aria-labelledby') || '')
                     .split(/\\s+/).filter(Boolean)
@@ -564,12 +572,17 @@ class KeyboardExecutor:
                 };
                 const visibleText = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim();
                 return {
-                  elements: all.slice(0, 40).map(describe),
-                  elements_truncated: all.length > 40,
-                  visible_text: visibleText.slice(0, 4000),
-                  visible_text_truncated: visibleText.length > 4000
+                  elements: nearby.map(describe),
+                  elements_truncated: all.length > nearby.length,
+                  visible_text: visibleText.slice(0, limits.text),
+                  visible_text_truncated: visibleText.length > limits.text
                 };
-            }"""
+            }""",
+            {
+                "after": OBSERVATION_ELEMENTS_AFTER_FOCUS,
+                "before": OBSERVATION_ELEMENTS_BEFORE_FOCUS,
+                "text": OBSERVATION_VISIBLE_TEXT_CHARS,
+            },
         )
         bounded_history = history[-8:]
         return PlannerObservationV1(
@@ -581,6 +594,9 @@ class KeyboardExecutor:
             ],
             visible_text=data["visible_text"],
             history=bounded_history,
+            typed_values=[entry.typed_value for entry in history if entry.typed_value is not None][
+                -20:
+            ],
             remaining_steps=remaining_steps,
             elements_truncated=data["elements_truncated"],
             visible_text_truncated=data["visible_text_truncated"],
@@ -684,9 +700,7 @@ class KeyboardExecutor:
                   ? element.selectedIndex : null
             })))"""
         )
-        raw = (
-            f"{page.url}|{focus.model_dump_json() if focus else ''}|{text}|{form_state}"
-        )
+        raw = f"{page.url}|{focus.model_dump_json() if focus else ''}|{text}|{form_state}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
     def _state_changed(self, page: Page, before_url: str, before_fingerprint: str) -> bool:

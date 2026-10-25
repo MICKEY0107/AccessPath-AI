@@ -128,4 +128,4 @@ PLANNER_TRANSIENT_BACKOFF_SECONDS = float(
     os.environ.get("PLANNER_TRANSIENT_BACKOFF_SECONDS", "15")
 )
 # Retries for a one-off bad answer (empty, truncated, or unroutable) before fallback.
-PLANNER_MAX_INVALID_RETRIES = int(os.environ.get("PLANNER_MAX_INVALID_RETRIES", "2"))
+PLANNER_MAX_INVALID_RETRIES = int(os.environ.get("PLANNER_MAX_INVALID_RETRIES", "3"))

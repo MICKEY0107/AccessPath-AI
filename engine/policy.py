@@ -18,7 +18,12 @@ class KeyboardActionPolicy:
         action: ProposedActionV1,
         focused_element: ElementEvidenceV1 | None,
         prior_same_code_rejections: int,
+        typed_into_focus_last: bool = False,
     ) -> PolicyDecisionV1:
+        # Typing replaces the field's text, so typing again before Enter or Tab would
+        # silently discard the value just entered.
+        if action.action == ActionKind.TYPE and typed_into_focus_last:
+            return PolicyDecisionV1(outcome="rejected", code="COMMIT_TYPED_VALUE_FIRST")
         if action.action == ActionKind.TYPE and (
             focused_element is None
             or not focused_element.enabled

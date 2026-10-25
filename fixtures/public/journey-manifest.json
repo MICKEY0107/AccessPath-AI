@@ -1,6 +1,6 @@
 {
   "schema_version": "public-journey-manifest.v1",
-  "manifest_version": "public-pilot-1.0.0",
+  "manifest_version": "public-pilot-1.1.0",
   "journeys": [
     {
       "key": "wikipedia-web-accessibility-search",
@@ -10,14 +10,23 @@
       "start_url": "https://en.wikipedia.org/wiki/Main_Page",
       "target_policy": {
         "schema_version": "target_policy.v1",
-        "navigation_origins": ["https://en.wikipedia.org"],
+        "navigation_origins": [
+          "https://en.wikipedia.org"
+        ],
         "resource_origins": [
           "https://en.wikipedia.org",
           "https://upload.wikimedia.org",
           "https://thumb.wikimedia.org"
         ],
-        "navigation_path_prefixes": ["/wiki/", "/w/index.php"],
-        "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+        "navigation_path_prefixes": [
+          "/wiki/",
+          "/w/index.php"
+        ],
+        "allowed_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS"
+        ],
         "allow_popups": false,
         "allow_downloads": false,
         "block_service_workers": true,
@@ -60,13 +69,37 @@
               "search_query": "Web accessibility"
             },
             "actions": [
-              {"action": "tab", "purpose": "move from the document to the first keyboard control"},
-              {"action": "tab", "purpose": "advance toward the site search"},
-              {"action": "tab", "purpose": "advance toward the site search"},
-              {"action": "tab", "purpose": "focus the Wikipedia search field"},
-              {"action": "type", "value": "{search_query}", "target_hint": "Search Wikipedia", "purpose": "enter the approved article title"},
-              {"action": "tab", "purpose": "focus the search submit control"},
-              {"action": "enter", "target_hint": "Search", "purpose": "open the requested article"}
+              {
+                "action": "tab",
+                "purpose": "move from the document to the first keyboard control"
+              },
+              {
+                "action": "tab",
+                "purpose": "advance toward the site search"
+              },
+              {
+                "action": "tab",
+                "purpose": "advance toward the site search"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus the Wikipedia search field"
+              },
+              {
+                "action": "type",
+                "value": "{search_query}",
+                "target_hint": "Search Wikipedia",
+                "purpose": "enter the approved article title"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus the search submit control"
+              },
+              {
+                "action": "enter",
+                "target_hint": "Search",
+                "purpose": "open the requested article"
+              }
             ]
           }
         }
@@ -80,10 +113,20 @@
       "start_url": "https://www.w3.org/WAI/demos/bad/after/home.html",
       "target_policy": {
         "schema_version": "target_policy.v1",
-        "navigation_origins": ["https://www.w3.org"],
-        "resource_origins": ["https://www.w3.org"],
-        "navigation_path_prefixes": ["/WAI/demos/bad/after/"],
-        "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+        "navigation_origins": [
+          "https://www.w3.org"
+        ],
+        "resource_origins": [
+          "https://www.w3.org"
+        ],
+        "navigation_path_prefixes": [
+          "/WAI/demos/bad/after/"
+        ],
+        "allowed_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS"
+        ],
         "allow_popups": false,
         "allow_downloads": false,
         "block_service_workers": true,
@@ -123,8 +166,132 @@
           "fallback": {
             "kind": "fixture_plan.v1",
             "actions": [
-              {"action": "tab", "purpose": "move focus to the first keyboard control"}
+              {
+                "action": "tab",
+                "purpose": "move focus to the first keyboard control"
+              }
             ]
+          }
+        }
+      }
+    },
+    {
+      "key": "demo-simple-wikipedia-search",
+      "name": "Demo (simple) — Wikipedia article search, live AI",
+      "goal": "Starting from the Wikipedia Main Page, use the site search to find and open the Web accessibility article, using only the keyboard.",
+      "execution_mode": "public_read_only",
+      "start_url": "https://en.wikipedia.org/wiki/Main_Page",
+      "target_policy": {
+        "schema_version": "target_policy.v1",
+        "navigation_origins": [
+          "https://en.wikipedia.org"
+        ],
+        "resource_origins": [
+          "https://en.wikipedia.org"
+        ],
+        "navigation_path_prefixes": [
+          "/"
+        ],
+        "allowed_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS"
+        ],
+        "allow_popups": false,
+        "allow_downloads": false,
+        "allow_any_resource_origin": true,
+        "block_service_workers": true,
+        "max_pages": 1,
+        "max_actions": 30,
+        "total_timeout_ms": 600000,
+        "no_progress_limit": 6,
+        "user_agent": "AccessPathAI-local/0.2 keyboard-accessibility-evaluator"
+      },
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "article_address",
+            "type": "url_contains",
+            "expected": "/wiki/Web_accessibility",
+            "case_sensitive": false
+          }
+        ]
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "allow_no_fallback": true,
+          "synthetic_values": {
+            "search_query": "Web accessibility"
+          }
+        }
+      }
+    },
+    {
+      "key": "demo-complex-todomvc",
+      "name": "Demo (complex) — TodoMVC add and complete to-dos, live AI",
+      "goal": "In the TodoMVC app, use only the keyboard to add two to-do items, 'Buy milk' and 'Call the clinic', then mark 'Buy milk' as completed so exactly one item is left.",
+      "execution_mode": "public_read_only",
+      "start_url": "https://todomvc.com/examples/react/dist/",
+      "target_policy": {
+        "schema_version": "target_policy.v1",
+        "navigation_origins": [
+          "https://todomvc.com"
+        ],
+        "resource_origins": [
+          "https://todomvc.com"
+        ],
+        "navigation_path_prefixes": [
+          "/"
+        ],
+        "allowed_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS"
+        ],
+        "allow_popups": false,
+        "allow_downloads": false,
+        "allow_any_resource_origin": true,
+        "block_service_workers": true,
+        "max_pages": 1,
+        "max_actions": 40,
+        "total_timeout_ms": 900000,
+        "no_progress_limit": 6,
+        "user_agent": "AccessPathAI-local/0.2 keyboard-accessibility-evaluator"
+      },
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "second_item",
+            "type": "text_present",
+            "expected": "Call the clinic",
+            "case_sensitive": false
+          },
+          {
+            "id": "first_item",
+            "type": "text_present",
+            "expected": "Buy milk",
+            "case_sensitive": false
+          },
+          {
+            "id": "one_left",
+            "type": "text_present",
+            "expected": "1 item left",
+            "case_sensitive": false
+          }
+        ]
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "allow_no_fallback": true,
+          "synthetic_values": {
+            "first_todo": "Buy milk",
+            "second_todo": "Call the clinic"
           }
         }
       }

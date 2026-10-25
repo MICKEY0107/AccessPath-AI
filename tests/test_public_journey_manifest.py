@@ -37,6 +37,6 @@ def test_seed_public_journeys_is_idempotent() -> None:
     assert journey.start_url == "https://en.wikipedia.org/wiki/Main_Page"
     assert journey.allowed_origins == ["https://en.wikipedia.org"]
     assert journey.evaluation_config["target_policy"]["schema_version"] == "target_policy.v1"
-    assert journey.evaluation_config["manifest_version"] == "public-pilot-1.0.0"
+    assert journey.evaluation_config["manifest_version"] == "public-pilot-1.1.0"
     assert journey.evaluation_config["journey_key"] == "wikipedia-web-accessibility-search"
     assert len(journey.completion_policy["signals"]) == 2

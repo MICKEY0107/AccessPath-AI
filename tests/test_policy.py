@@ -13,3 +13,17 @@ def test_policy_rejects_typing_when_focused_element_is_not_editable():
 
     assert decision.outcome == "rejected"
     assert decision.code == "TYPE_TARGET_NOT_EDITABLE"
+
+
+def test_policy_rejects_typing_again_before_the_value_is_committed() -> None:
+    from engine.contracts import ActionKind, ElementEvidenceV1, ProposedActionV1
+
+    field = ElementEvidenceV1(fingerprint="input#new", name="New Todo Input", editable=True)
+    retype = ProposedActionV1(action=ActionKind.TYPE, value="Call the clinic")
+
+    blocked = KeyboardActionPolicy().decide(retype, field, 0, typed_into_focus_last=True)
+    allowed = KeyboardActionPolicy().decide(retype, field, 0, typed_into_focus_last=False)
+
+    assert blocked.outcome == "rejected"
+    assert blocked.code == "COMMIT_TYPED_VALUE_FIRST"
+    assert allowed.outcome == "approved"
