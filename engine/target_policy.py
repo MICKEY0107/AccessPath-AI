@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -13,6 +14,17 @@ class TargetPolicyDecision:
     allowed: bool
     code: str
     fatal: bool = False
+
+
+def is_local_or_private_host(hostname: str) -> bool:
+    """Flag localhost names and non-public IP literals without a DNS lookup."""
+    host = hostname.strip("[]").lower()
+    if not host or host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
+        return True
+    try:
+        return not ipaddress.ip_address(host).is_global
+    except ValueError:
+        return False
 
 
 class TargetPolicy:
@@ -58,9 +70,13 @@ class TargetPolicy:
                 return TargetPolicyDecision(False, "NAVIGATION_PATH_NOT_ALLOWED", fatal=True)
             return TargetPolicyDecision(True, "REQUEST_ALLOWED")
 
-        if origin not in self._resource_origins:
-            return TargetPolicyDecision(False, "RESOURCE_ORIGIN_NOT_ALLOWED", fatal=False)
-        return TargetPolicyDecision(True, "REQUEST_ALLOWED")
+        if origin in self._resource_origins:
+            return TargetPolicyDecision(True, "REQUEST_ALLOWED")
+        if self.config.allow_any_resource_origin and parsed.scheme in {"http", "https"}:
+            if is_local_or_private_host(parsed.hostname or ""):
+                return TargetPolicyDecision(False, "RESOURCE_PRIVATE_HOST_BLOCKED", fatal=False)
+            return TargetPolicyDecision(True, "REQUEST_ALLOWED")
+        return TargetPolicyDecision(False, "RESOURCE_ORIGIN_NOT_ALLOWED", fatal=False)
 
     def decide_popup(self) -> TargetPolicyDecision:
         if self.config.allow_popups:

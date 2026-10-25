@@ -10,8 +10,8 @@
     {% if journeys %}
       <ul class="journey-list">
         {% for journey in journeys %}
-          <li class="journey">
-            <h3>{{ journey.name }}</h3>
+          <li class="journey" id="journey-{{ journey.id }}">
+            <h3>{{ journey.name }}{% if journey.is_real_site %} <span class="tag">Real website</span>{% endif %}</h3>
             <p>{{ journey.goal }}</p>
             <p class="muted">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
             <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}" autocomplete="off">
@@ -20,12 +20,12 @@
               <select id="planner-provider-{{ journey.id }}" name="planner_provider" required data-journey="{{ journey.id }}">
                 <option value="" selected disabled>Choose a provider</option>
                 {% for option in planner_options %}
-                  <option value="{{ option.value }}"
+                  <option value="{{ option.value }}"{% if not option.live and not journey.has_fixture_plan %} disabled{% endif %}
                     data-live="{{ option.live|yesno:'true,false' }}"
                     data-server-key="{{ option.has_server_key|yesno:'true,false' }}"
                     data-model="{{ option.model }}"
                     data-model-example="{{ option.model_example }}">
-                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}
+                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.live and not journey.has_fixture_plan %} (no scripted plan for this site){% endif %}
                   </option>
                 {% endfor %}
               </select>
@@ -33,6 +33,7 @@
                 <label for="planner-model-{{ journey.id }}">Model</label>
                 <input id="planner-model-{{ journey.id }}" name="planner_model" type="text" maxlength="255" spellcheck="false" aria-describedby="planner-model-help-{{ journey.id }}">
                 <p class="muted" id="planner-model-help-{{ journey.id }}">The exact model id for this run. Leave blank to use the server default.</p>
+                <p class="model-warning" id="planner-model-warning-{{ journey.id }}" role="status" hidden>This sends each step to a random free model, and many of them cannot answer in the required format, so runs often stop early or fall back. Pick a specific model for reliable live evidence.</p>
                 <label for="api-key-{{ journey.id }}">API key</label>
                 <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
                 <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
@@ -40,12 +41,42 @@
               <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
               <button type="submit">Start keyboard evaluation</button>
             </form>
+            {% if journey.is_real_site %}
+              <form class="remove-journey" method="post" action="{% url 'runs:remove_journey' journey.id %}">
+                {% csrf_token %}
+                <button type="submit" class="secondary">Remove this website journey</button>
+              </form>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
     {% else %}
       <p>No configured journeys are available. Run <code>seed_fixture_journeys</code> and <code>seed_public_journeys</code> after migrations.</p>
     {% endif %}
+  </section>
+
+  <section aria-labelledby="real-site-title" class="card">
+    <h2 id="real-site-title">Evaluate a real website</h2>
+    <p>Add a journey on a live public website. A live planner moves through it with the keyboard only, and the run records the same evidence as the reference journeys.</p>
+    <p class="muted">For safety these runs are read-only. They never submit forms or send data, and they never open popups, downloads, or other websites. Searching, browsing, and finding a page work; signing in or checking out stops safely at the first submit.</p>
+    <details class="real-site-details"{% if real_site_form_open %} open{% endif %}>
+      <summary>Add a website journey</summary>
+      <form class="real-site-form" method="post" action="{% url 'runs:create_journey' %}" novalidate>
+        {% csrf_token %}
+        {% if real_site_form.non_field_errors %}
+          <div class="error" role="alert">{% for error in real_site_form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+        {% endif %}
+        {% for field in real_site_form %}
+          <div class="form-field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if not field.field.required %} <span class="muted">(optional)</span>{% endif %}</label>
+            {{ field }}
+            {% if field.help_text %}<p class="muted" id="{{ field.id_for_label }}-help">{{ field.help_text }}</p>{% endif %}
+            {% for error in field.errors %}<p class="error" role="alert">{{ error }}</p>{% endfor %}
+          </div>
+        {% endfor %}
+        <button type="submit">Add website journey</button>
+      </form>
+    </details>
   </section>
 
   <section aria-labelledby="recent-runs-title" class="card">
@@ -132,11 +163,19 @@
       const keyHelp = document.getElementById(`api-key-help-${journey}`);
       const modelHelp = document.getElementById(`planner-model-help-${journey}`);
       const keyNote = keyHelp.textContent;
+      const warning = document.getElementById(`planner-model-warning-${journey}`);
+      const warnForRouter = () => {
+        const option = select.selectedOptions[0];
+        const chosen = (model.value.trim() || (option && option.dataset.model) || "").toLowerCase();
+        warning.hidden = !(chosen === "openrouter/free" || chosen.endsWith(":free"));
+      };
+      model.addEventListener("input", warnForRouter);
       const update = () => {
         const option = select.selectedOptions[0];
         const live = option && option.dataset.live === "true";
         fields.hidden = !live;
         if (!live) return;
+        warnForRouter();
         model.placeholder = option.dataset.modelExample;
         modelHelp.textContent = option.dataset.model
           ? `Leave blank to use the server default, ${option.dataset.model}.`

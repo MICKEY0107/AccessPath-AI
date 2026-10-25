@@ -19,6 +19,7 @@ from .planner import (
     OpenRouterTransientError,
     OpenRouterUnavailableError,
 )
+from .provider_http import completion_hint, provider_error_message, retry_after_seconds
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -62,7 +63,7 @@ class OpenRouterActionClient:
             "temperature": 0,
             # Free-router selections can spend part of the completion budget on
             # provider-side reasoning before emitting the strict JSON action.
-            "max_tokens": 768,
+            "max_tokens": 2048,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -112,11 +113,16 @@ class OpenRouterActionClient:
                 raise TypeError("OpenRouter response content is not text")
             return json.loads(content)
         except (KeyError, IndexError, TypeError, json.JSONDecodeError) as error:
-            detail = self._response_error_detail(document if "document" in locals() else None)
-            shape = self._response_shape(document if "document" in locals() else None)
-            raise OpenRouterUnavailableError(
-                f"OpenRouter returned an invalid completion{detail}; response_shape={shape}"
-            ) from error
+            parsed = document if "document" in locals() else None
+            detail = self._response_error_detail(parsed)
+            shape = self._response_shape(parsed)
+            invalid = OpenRouterUnavailableError(
+                f"OpenRouter returned an invalid completion{completion_hint(parsed)}{detail}; "
+                f"model={self.last_response_model or 'unknown'}; response_shape={shape}"
+            )
+            # The free router picks a new upstream model per call, so a retry can succeed.
+            invalid.retryable = True
+            raise invalid from error
 
     def _response_error_detail(self, document: object) -> str:
         """Return a short credential-redacted provider error for safe operator diagnosis."""
@@ -165,10 +171,21 @@ class OpenRouterActionClient:
             f"message_keys={','.join(sorted(message.keys()))}"
         )
 
-    @staticmethod
-    def _raise_http_error(error: HTTPError) -> None:
+    def _raise_http_error(self, error: HTTPError) -> None:
+        text = f"OpenRouter HTTP {error.code}{provider_error_message(error, self.api_key)}"
         if error.code in {402, 429}:
-            raise OpenRouterQuotaError("OpenRouter credit or rate limit unavailable") from error
+            quota = OpenRouterQuotaError(f"OpenRouter credit or rate limit unavailable ({text})")
+            quota.retry_after = retry_after_seconds(error, text)
+            raise quota from error
         if error.code in {500, 502, 503, 504}:
-            raise OpenRouterTransientError("OpenRouter service temporarily unavailable") from error
-        raise OpenRouterUnavailableError("OpenRouter rejected the request") from error
+            raise OpenRouterTransientError(
+                f"OpenRouter service temporarily unavailable ({text})"
+            ) from error
+        rejected = OpenRouterUnavailableError(f"OpenRouter rejected the request ({text})")
+        if error.code in {401, 403}:
+            rejected.code = "OPENROUTER_AUTH_FAILED"
+        elif error.code in {400, 404, 408, 409, 422}:
+            # 404 here usually means "no endpoint supports these parameters" for the
+            # upstream model the router picked this time; another pick may work.
+            rejected.retryable = True
+        raise rejected from error

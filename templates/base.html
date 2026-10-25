@@ -38,7 +38,15 @@
       .planner-picker label { color: #263550; font-weight: 700; }
     .planner-picker input { width: 100%; box-sizing: border-box; border: 1px solid #bfcadd; border-radius: .5rem; background: #fff; color: #172033; font: inherit; padding: .65rem .75rem; }
       .live-planner-fields { display: grid; gap: .55rem; }
-      .live-planner-fields[hidden] { display: none; }
+      .live-planner-fields[hidden], .model-warning[hidden] { display: none; }
+      .real-site-form { display: grid; gap: .9rem; margin-top: 1rem; max-width: 44rem; }
+      .real-site-form .form-field { display: grid; gap: .35rem; }
+      .real-site-form label { color: #263550; font-weight: 700; }
+      .real-site-form p { margin: 0; }
+      .real-site-form input, .real-site-form textarea { width: 100%; box-sizing: border-box; border: 1px solid #bfcadd; border-radius: .5rem; background: #fff; color: #172033; font: inherit; padding: .65rem .75rem; }
+      .real-site-details summary { cursor: pointer; font-weight: 700; color: #4527a0; }
+      .remove-journey { margin-top: .6rem; }
+      .model-warning { margin: 0; border-left: 4px solid #b45309; background: #fff7ed; color: #7c2d12; padding: .55rem .75rem; border-radius: .35rem; }
     .planner-picker select { width: 100%; border: 1px solid #bfcadd; border-radius: .5rem; background: #fff; color: #172033; font: inherit; padding: .65rem .75rem; }
     .run-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; align-items: end; margin: 1rem 0; }
     .run-filters > div { display: grid; gap: .35rem; }

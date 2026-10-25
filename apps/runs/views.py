@@ -1,11 +1,13 @@
 from django.conf import settings
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.debug import sensitive_post_parameters
 
 from apps.journeys.models import Journey
+from apps.journeys.real_sites import RealSiteJourneyForm
 
 from .credentials import scrub, seal_api_key, validate_api_key, validate_model
 from .models import JourneyOutcome, PlannerProvider, Run
@@ -92,7 +94,9 @@ def build_evidence_artifacts(run: Run) -> list[dict[str, object]]:
     ]
 
 
-def run_list(request: HttpRequest) -> HttpResponse:
+def run_list(
+    request: HttpRequest, real_site_form: RealSiteJourneyForm | None = None
+) -> HttpResponse:
     """Show active configured journeys and recent durable runs."""
     runs = Run.objects.select_related("journey")
     selected_filters = {
@@ -140,8 +144,41 @@ def run_list(request: HttpRequest) -> HttpResponse:
             "selected_filters": selected_filters,
             "selected_journey_id": selected_journey_id,
             "filters_active": selected_journey_id is not None or any(selected_filters.values()),
+            "real_site_form": real_site_form or RealSiteJourneyForm(),
+            "real_site_form_open": real_site_form is not None,
         },
+        status=400 if real_site_form is not None else 200,
     )
+
+
+def create_real_site_journey(request: HttpRequest) -> HttpResponse:
+    """Add a read-only journey on a live public website from the dashboard."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    form = RealSiteJourneyForm(request.POST)
+    if not form.is_valid():
+        return run_list(request, real_site_form=form)
+    try:
+        journey = form.create_journey()
+    except ValidationError as error:
+        form.add_error(None, error)
+        return run_list(request, real_site_form=form)
+    messages.success(request, f"Added {journey.name}. Choose a live planner below to evaluate it.")
+    return redirect(f"{reverse('runs:list')}#journey-{journey.id}")
+
+
+def remove_real_site_journey(request: HttpRequest, journey_id: int) -> HttpResponse:
+    """Hide a dashboard-added journey; its past runs and evidence are kept."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    journey = get_object_or_404(Journey, pk=journey_id, is_active=True)
+    if not journey.is_real_site:
+        messages.error(request, "Only journeys you added for a real website can be removed here.")
+        return redirect(reverse("runs:list"))
+    journey.is_active = False
+    journey.save(update_fields=["is_active", "updated_at"])
+    messages.success(request, f"Removed {journey.name}. Its past runs are still listed.")
+    return redirect(reverse("runs:list"))
 
 
 @sensitive_post_parameters("api_key")
@@ -154,6 +191,12 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
     selected_option = options.get(selected_provider)
     if selected_option is None:
         messages.error(request, "Select a supported planner provider.")
+        return redirect(reverse("runs:list"))
+    if selected_provider == PlannerProvider.FIXTURE and not journey.has_fixture_plan:
+        messages.error(
+            request,
+            "This journey has no scripted plan to replay. Choose Gemini, OpenRouter, or Groq.",
+        )
         return redirect(reverse("runs:list"))
 
     user_api_key = ""

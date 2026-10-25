@@ -25,6 +25,11 @@ from .contracts import (
 
 class PlannerError(RuntimeError):
     code = "PLANNER_ERROR"
+    # A retryable error is a one-off bad answer (empty, truncated, unroutable) that a
+    # fresh call can fix; a non-retryable one (bad key, unknown model) cannot.
+    retryable = False
+    # Seconds the provider asked us to wait (HTTP Retry-After), when it said so.
+    retry_after: float | None = None
 
 
 class GeminiTimeoutError(PlannerError):
@@ -77,6 +82,7 @@ class GroqTransientError(GeminiTransientError):
 
 class MalformedModelOutputError(PlannerError):
     code = "MALFORMED_MODEL_OUTPUT"
+    retryable = True
 
 
 class PlannerCallLimitError(PlannerError):
@@ -157,6 +163,7 @@ class GeminiPlanner:
         quota_backoff_seconds: float = 0,
         max_transient_retries: int = 0,
         transient_backoff_seconds: float = 0,
+        max_invalid_retries: int = 2,
         synthetic_values: dict[str, str] | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
@@ -171,41 +178,72 @@ class GeminiPlanner:
         self.quota_backoff_seconds = quota_backoff_seconds
         self.max_transient_retries = max_transient_retries
         self.transient_backoff_seconds = transient_backoff_seconds
+        self.max_invalid_retries = max_invalid_retries
         self.synthetic_values = synthetic_values or {}
         self.sleep = sleep
         self.calls = 0
         self.successful_proposals = 0
         self.quota_failures = 0
         self.transient_failures = 0
+        self.invalid_responses = 0
+        self.last_error = ""
+
+    # Provider-specific error family, so a Groq failure is never labelled as Gemini.
+    provider_label = "Gemini"
+    unavailable_error: type[PlannerError] = GeminiUnavailableError
+    timeout_error: type[PlannerError] = GeminiTimeoutError
+    quota_error: type[PlannerError] = GeminiQuotaError
+    # Cap on a provider-requested Retry-After wait, so one run cannot stall for long.
+    max_retry_after_seconds = 120.0
+
+    def _note_error(self, error: PlannerError) -> None:
+        self.last_error = f"{error.code}: {error}"[:300]
+
+    # A provider that says exactly when to retry (per-minute token limits) gets a few
+    # more patient retries than the configured blind backoff allows.
+    min_quota_retries_with_retry_after = 3
+
+    def _quota_wait_seconds(self, error: PlannerError) -> float:
+        if error.retry_after is not None:
+            return min(error.retry_after + 1, self.max_retry_after_seconds)
+        return self.quota_backoff_seconds
+
+    def _quota_retry_budget(self, error: PlannerError) -> int:
+        if error.retry_after is not None and error.retry_after < self.max_retry_after_seconds:
+            return max(self.max_quota_retries, self.min_quota_retries_with_retry_after)
+        return self.max_quota_retries
 
     def propose_next_action(self, observation: PlannerObservationV1) -> ProposedActionV1:
         if self.calls >= self.max_calls:
-            raise PlannerCallLimitError("Gemini planner call budget exhausted")
+            raise PlannerCallLimitError(f"{self.provider_label} planner call budget exhausted")
 
-        attempts = 0
+        bounded_observation = PlannerObservationV1.model_validate(
+            {
+                **observation.model_dump(mode="json"),
+                "permitted_inputs": self.synthetic_values,
+            }
+        )
+        quota_attempts = 0
         transient_attempts = 0
+        invalid_attempts = 0
         while True:
             self.calls += 1
             try:
-                bounded_observation = PlannerObservationV1.model_validate(
-                    {
-                        **observation.model_dump(mode="json"),
-                        "permitted_inputs": self.synthetic_values,
-                    }
-                )
-                raw_action = self.client.generate_action(
-                    model=self.model,
-                    observation=bounded_observation,
-                )
+                action = self._request_action(bounded_observation)
                 break
-            except GeminiQuotaError:
+            except GeminiQuotaError as error:
                 self.quota_failures += 1
-                if attempts >= self.max_quota_retries or self.calls >= self.max_calls:
+                self._note_error(error)
+                if (
+                    quota_attempts >= self._quota_retry_budget(error)
+                    or self.calls >= self.max_calls
+                ):
                     raise
-                attempts += 1
-                self.sleep(self.quota_backoff_seconds)
-            except (GeminiTransientError, GeminiTimeoutError):
+                quota_attempts += 1
+                self.sleep(self._quota_wait_seconds(error))
+            except (GeminiTransientError, GeminiTimeoutError) as error:
                 self.transient_failures += 1
+                self._note_error(error)
                 if (
                     transient_attempts >= self.max_transient_retries
                     or self.calls >= self.max_calls
@@ -213,23 +251,42 @@ class GeminiPlanner:
                     raise
                 transient_attempts += 1
                 self.sleep(self.transient_backoff_seconds)
-            except PlannerError:
-                raise
-            except TimeoutError as error:
-                raise GeminiTimeoutError("Gemini request timed out") from error
-            except Exception as error:
-                if getattr(error, "code", None) == 429:
-                    raise GeminiQuotaError("Gemini quota unavailable") from error
-                if "timeout" in type(error).__name__.lower():
-                    raise GeminiTimeoutError("Gemini request timed out") from error
-                raise GeminiUnavailableError("Gemini request failed") from error
-
-        try:
-            action = ProposedActionV1.model_validate(raw_action)
-        except (ValidationError, TypeError, ValueError) as error:
-            raise MalformedModelOutputError("Gemini returned an invalid action") from error
+            except PlannerError as error:
+                self._note_error(error)
+                if not error.retryable:
+                    raise
+                self.invalid_responses += 1
+                if invalid_attempts >= self.max_invalid_retries or self.calls >= self.max_calls:
+                    raise
+                # The process-wide pacer already spaces the next call out.
+                invalid_attempts += 1
         self.successful_proposals += 1
         return action
+
+    def _request_action(self, observation: PlannerObservationV1) -> ProposedActionV1:
+        """Make one provider call and turn every failure into a labelled PlannerError."""
+        label = self.provider_label
+        try:
+            raw_action = self.client.generate_action(model=self.model, observation=observation)
+        except PlannerError:
+            raise
+        except TimeoutError as error:
+            raise self.timeout_error(f"{label} request timed out") from error
+        except Exception as error:
+            if getattr(error, "code", None) == 429:
+                raise self.quota_error(f"{label} quota unavailable") from error
+            if "timeout" in type(error).__name__.lower():
+                raise self.timeout_error(f"{label} request timed out") from error
+            message = " ".join(str(error).split())[:200]
+            raise self.unavailable_error(
+                f"{label} request failed: {type(error).__name__}: {message}"
+            ) from error
+        try:
+            return ProposedActionV1.model_validate(raw_action)
+        except (ValidationError, TypeError, ValueError) as error:
+            raise MalformedModelOutputError(
+                f"{label} returned an action that does not match the schema"
+            ) from error
 
     def record_outcome(
         self,
@@ -250,12 +307,19 @@ class GeminiPlanner:
             "successful_proposals": self.successful_proposals,
             "quota_failures": self.quota_failures,
             "transient_failures": self.transient_failures,
+            "invalid_responses": self.invalid_responses,
+            "last_error": self.last_error,
             "fallback_used": False,
         }
 
 
 class OpenRouterPlanner(GeminiPlanner):
     """Reuse bounded structured-action planning with OpenRouter-specific evidence labels."""
+
+    provider_label = "OpenRouter"
+    unavailable_error = OpenRouterUnavailableError
+    timeout_error = OpenRouterTimeoutError
+    quota_error = OpenRouterQuotaError
 
     def __init__(self, **kwargs: Any) -> None:
         if not kwargs.get("model"):
@@ -278,13 +342,20 @@ class OpenRouterPlanner(GeminiPlanner):
 
 
 class ResilientPlanner:
-    """Use an explicitly labeled deterministic contingency after a safe planner stop."""
+    """Use an explicitly labeled deterministic contingency after a safe planner stop.
 
-    def __init__(self, *, primary: Planner, fallback: Planner) -> None:
+    Journeys on real sites have no scripted contingency (``fallback`` is None). There a
+    provider failure ends the run with the provider's reason instead of a replay.
+    """
+
+    def __init__(self, *, primary: Planner, fallback: Planner | None) -> None:
         self.primary = primary
         self.fallback = fallback
         self._fallback_used = False
         self._fallback_reason = ""
+        self._fallback_detail = ""
+        self.stop_reason = ""
+        self.stop_detail = ""
         self._reset_requested = False
         self._fallback_restarted = False
         self._policy_rejections = 0
@@ -307,12 +378,20 @@ class ResilientPlanner:
     def propose_next_action(
         self, observation: PlannerObservationV1
     ) -> ProposedActionV1 | None:
-        if self._fallback_used:
+        if self.stop_reason:
+            return None
+        if self._fallback_used and self.fallback is not None:
             return self.fallback.propose_next_action(observation)
         try:
             return self.primary.propose_next_action(observation)
         except PlannerError as error:
+            detail = " ".join(str(error).split())[:300]
+            if self.fallback is None:
+                self.stop_reason = error.code
+                self.stop_detail = detail
+                return None
             self._activate_fallback(error.code)
+            self._fallback_detail = detail
             return self.fallback.propose_next_action(observation)
 
     def record_outcome(
@@ -322,7 +401,7 @@ class ResilientPlanner:
         decision: PolicyDecisionV1,
         result: ActionResultV1,
     ) -> None:
-        if self._fallback_used:
+        if self._fallback_used and self.fallback is not None:
             self.fallback.record_outcome(observation, action, decision, result)
             return
 
@@ -336,7 +415,11 @@ class ResilientPlanner:
             {
                 "fallback_used": self._fallback_used,
                 "fallback_reason": self._fallback_reason,
-                "fallback_kind": self.fallback.runtime_metadata().get("kind"),
+                "fallback_detail": self._fallback_detail,
+                "fallback_kind": (
+                    self.fallback.runtime_metadata().get("kind") if self.fallback else None
+                ),
+                "planner_stop_reason": self.stop_reason,
                 "fallback_restarted": self._fallback_restarted,
                 "policy_rejections": self._policy_rejections,
             }
@@ -401,6 +484,11 @@ class UnavailableOpenRouterPlanner(UnavailableGeminiPlanner):
 class GroqPlanner(OpenRouterPlanner):
     """Groq-specific metadata labels on top of identical structured-action logic."""
 
+    provider_label = "Groq"
+    unavailable_error = GroqUnavailableError
+    timeout_error = GroqTimeoutError
+    quota_error = GroqQuotaError
+
     def runtime_metadata(self) -> dict[str, object]:
         metadata = super().runtime_metadata()
         metadata.update(
@@ -451,6 +539,7 @@ def planner_from_config(
     quota_backoff_seconds: float = 30,
     max_transient_retries: int = 2,
     transient_backoff_seconds: float = 15,
+    max_invalid_retries: int = 2,
 ) -> Planner:
     planner = config.get("planner", {})
     kind = planner.get("kind")
@@ -458,12 +547,17 @@ def planner_from_config(
         return FixturePlanPlanner(planner)
     if kind in {"gemini.v1", "openrouter.v1", "groq.v1"}:
         fallback_config = planner.get("fallback")
-        if (
+        fallback: Planner | None = None
+        if fallback_config is None and planner.get("allow_no_fallback"):
+            # Real-site journeys: values the model may type live on the planner itself.
+            fallback_config = {"synthetic_values": planner.get("synthetic_values", {})}
+        elif (
             not isinstance(fallback_config, dict)
             or fallback_config.get("kind") != "fixture_plan.v1"
         ):
             raise ValueError("MODEL_FALLBACK_PLAN_REQUIRED")
-        fallback = FixturePlanPlanner(fallback_config)
+        else:
+            fallback = FixturePlanPlanner(fallback_config)
         if kind == "openrouter.v1":
             if openrouter_client is None or not openrouter_model:
                 primary = UnavailableOpenRouterPlanner(
@@ -479,6 +573,7 @@ def planner_from_config(
                     quota_backoff_seconds=quota_backoff_seconds,
                     max_transient_retries=max_transient_retries,
                     transient_backoff_seconds=transient_backoff_seconds,
+                    max_invalid_retries=max_invalid_retries,
                     synthetic_values=fallback_config.get("synthetic_values", {}),
                 )
         elif kind == "groq.v1":
@@ -496,6 +591,7 @@ def planner_from_config(
                     quota_backoff_seconds=quota_backoff_seconds,
                     max_transient_retries=max_transient_retries,
                     transient_backoff_seconds=transient_backoff_seconds,
+                    max_invalid_retries=max_invalid_retries,
                     synthetic_values=fallback_config.get("synthetic_values", {}),
                 )
         else:
@@ -513,6 +609,7 @@ def planner_from_config(
                     quota_backoff_seconds=quota_backoff_seconds,
                     max_transient_retries=max_transient_retries,
                     transient_backoff_seconds=transient_backoff_seconds,
+                    max_invalid_retries=max_invalid_retries,
                     synthetic_values=fallback_config.get("synthetic_values", {}),
                 )
         return ResilientPlanner(primary=primary, fallback=fallback)

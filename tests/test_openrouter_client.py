@@ -69,7 +69,7 @@ def test_openrouter_client_requests_strict_schema_and_labels_observation_untrust
     assert captured["timeout"] == 12
     assert request.get_header("Authorization") == "Bearer test-key"
     payload = json.loads(request.data.decode("utf-8"))
-    assert payload["max_tokens"] == 768
+    assert payload["max_tokens"] == 2048
     assert payload["response_format"]["type"] == "json_schema"
     assert (
         payload["response_format"]["json_schema"]["schema"]

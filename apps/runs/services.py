@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db import transaction
 
+from apps.journeys.real_sites import host_is_public
 from engine.artifacts import LocalArtifactStore, StoredArtifact
 from engine.contracts import StepEvidenceV1
 from engine.executor import EvaluationResult, KeyboardExecutor
@@ -37,6 +39,12 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
     """
     if run.status not in {RunStatus.QUEUED, RunStatus.STARTING}:
         raise ValueError("RUN_IS_NOT_READY")
+
+    if run.journey.is_real_site and not settings.ALLOW_PRIVATE_NETWORKS:
+        # Re-check at run time: a public name can be re-pointed at a private address.
+        host = urlparse(run.journey.start_url).hostname or ""
+        if not host_is_public(host):
+            raise ValueError(f"REAL_SITE_HOST_NOT_PUBLIC:{host}")
 
     run.status = RunStatus.RUNNING
     run.started_at = datetime.now(UTC)
@@ -130,6 +138,7 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         quota_backoff_seconds=settings.PLANNER_429_BACKOFF_SECONDS,
         max_transient_retries=settings.PLANNER_MAX_TRANSIENT_RETRIES,
         transient_backoff_seconds=settings.PLANNER_TRANSIENT_BACKOFF_SECONDS,
+        max_invalid_retries=settings.PLANNER_MAX_INVALID_RETRIES,
     )
     executor = KeyboardExecutor(
         run_id=run.id,

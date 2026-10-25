@@ -25,6 +25,7 @@ from .planner import (
     GeminiTransientError,
     GeminiUnavailableError,
 )
+from .provider_http import completion_hint, provider_error_message, retry_after_seconds
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -92,6 +93,8 @@ class GroqActionClient:
                 },
             ],
             "temperature": 0,
+            # Groq counts max_tokens against its per-minute token limit (8,000 TPM on
+            # the free tier), so a larger budget here causes rate limiting.
             "max_tokens": 1024,
             "response_format": {
                 "type": "json_object",
@@ -139,15 +142,29 @@ class GroqActionClient:
             logging.getLogger(__name__).error(
                 "Groq JSON parse error: %s. Response: %s", error, response_body
             )
-            response_shape = type(document).__name__ if "document" in dir() else "unknown"
-            raise GroqUnavailableError(
-                f"Groq returned an invalid completion; response_shape={response_shape}"
-            ) from error
+            parsed = document if "document" in locals() else None
+            response_shape = type(parsed).__name__ if parsed is not None else "unknown"
+            invalid = GroqUnavailableError(
+                f"Groq returned an invalid completion{completion_hint(parsed)}; "
+                f"response_shape={response_shape}"
+            )
+            invalid.retryable = True
+            raise invalid from error
 
-    @staticmethod
-    def _raise_http_error(error: HTTPError) -> None:
+    def _raise_http_error(self, error: HTTPError) -> None:
+        text = f"Groq HTTP {error.code}{provider_error_message(error, self.api_key)}"
         if error.code in {429}:
-            raise GroqQuotaError("Groq rate limit exceeded") from error
+            quota = GroqQuotaError(f"Groq rate limit exceeded ({text})")
+            quota.retry_after = retry_after_seconds(error, text)
+            raise quota from error
         if error.code in {500, 502, 503, 504}:
-            raise GroqTransientError("Groq service temporarily unavailable") from error
-        raise GroqUnavailableError("Groq rejected the request") from error
+            raise GroqTransientError(f"Groq service temporarily unavailable ({text})") from error
+        rejected = GroqUnavailableError(f"Groq rejected the request ({text})")
+        if error.code in {401, 403}:
+            rejected.code = "GROQ_AUTH_FAILED"
+        elif error.code == 404:
+            rejected.code = "GROQ_MODEL_NOT_FOUND"
+        elif error.code == 400:
+            # Groq answers 400 json_validate_failed when one completion is not valid JSON.
+            rejected.retryable = True
+        raise rejected from error

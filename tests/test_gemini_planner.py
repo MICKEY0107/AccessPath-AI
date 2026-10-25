@@ -81,9 +81,10 @@ def test_gemini_planner_returns_only_a_typed_keyboard_action() -> None:
 def test_malformed_or_unsafe_gemini_output_uses_labeled_fixture_fallback(
     response: object,
 ) -> None:
+    # A bad answer is retried twice before the labelled contingency takes over.
     planner = ResilientPlanner(
         primary=GeminiPlanner(
-            client=StubGeminiClient([response]),
+            client=StubGeminiClient([response] * 3),
             model="models/account-verified",
             max_calls=4,
         ),
@@ -96,6 +97,8 @@ def test_malformed_or_unsafe_gemini_output_uses_labeled_fixture_fallback(
     assert action.action == ActionKind.TAB
     assert planner.runtime_metadata()["fallback_used"] is True
     assert planner.runtime_metadata()["fallback_reason"] == "MALFORMED_MODEL_OUTPUT"
+    assert planner.runtime_metadata()["calls"] == 3
+    assert planner.runtime_metadata()["invalid_responses"] == 3
 
 
 def test_quota_failure_uses_labeled_fixture_fallback() -> None:

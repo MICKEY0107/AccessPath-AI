@@ -26,6 +26,11 @@ The target_hint describes intent but does not move focus. Use this decision sequ
 5. If the correct control is focused and not editable, Enter or Space may activate it.
 After a successful Type action, propose Tab instead of typing the same field again. After no_effect,
 change focus with Tab or Shift+Tab instead of repeating the action.
+Read history before choosing. Each entry shows the action, its result, and focus_after (the control
+focused afterwards). If focus_after names repeat, you are cycling: stop repeating that key. Use
+Shift+Tab to go back if the needed control was passed, or activate the focused control if it is the
+closest match to the goal. Never propose the same activation (Enter or Space) on the same control
+twice in a row when the last one had no_effect.
 """
 
 
@@ -79,7 +84,8 @@ class GoogleGeminiActionClient:
                     system_instruction=SYSTEM_INSTRUCTION,
                     temperature=0,
                     candidate_count=1,
-                    max_output_tokens=256,
+                    # Thinking models spend output tokens before the JSON answer.
+                    max_output_tokens=1024,
                     response_mime_type="application/json",
                     response_json_schema=ProposedActionV1.model_json_schema(),
                 ),

@@ -37,3 +37,17 @@ class Journey(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def is_real_site(self) -> bool:
+        """Added from the dashboard for a live website, not seeded from a manifest."""
+        return self.evaluation_config.get("source") == "user"
+
+    @property
+    def has_fixture_plan(self) -> bool:
+        """Whether the deterministic fixture planner has a scripted plan to replay."""
+        planner = self.evaluation_config.get("planner") or {}
+        if planner.get("kind") == "fixture_plan.v1":
+            return True
+        fallback = planner.get("fallback")
+        return isinstance(fallback, dict) and fallback.get("kind") == "fixture_plan.v1"

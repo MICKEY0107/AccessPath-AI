@@ -81,6 +81,10 @@ class PlannerHistoryEntryV1(BaseModel):
         "execution_error",
     ]
     meaningful_progress: bool
+    # Accessible name of the element focused after the action, so a planner can see
+    # that repeated Tabs are cycling through the same controls.
+    focus_after: str | None = Field(default=None, max_length=120)
+    target_hint: str = Field(default="", max_length=120)
 
 
 class PlannerInteractiveElementV1(BaseModel):
@@ -228,6 +232,8 @@ class CompletionSignalV1(BaseModel):
     id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
     type: Literal[
         "url_path_equals",
+        "url_contains",
+        "text_present",
         "element_present",
         "element_text_equals",
         "element_attribute_equals",
@@ -277,6 +283,10 @@ class TargetPolicyV1(BaseModel):
     )
     allow_popups: Literal[False] = False
     allow_downloads: Literal[False] = False
+    # Real sites load images, fonts, and scripts from many CDNs. When true, read-only
+    # (GET/HEAD/OPTIONS) subresources may come from any public origin; navigation stays
+    # limited to navigation_origins and private or local hosts stay blocked.
+    allow_any_resource_origin: bool = False
     block_service_workers: bool = True
     max_pages: int = Field(default=1, ge=1, le=5)
     total_timeout_ms: int = Field(default=300_000, ge=1_000, le=900_000)

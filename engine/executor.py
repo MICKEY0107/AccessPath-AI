@@ -287,6 +287,15 @@ class KeyboardExecutor:
                 )
                 action = planner.propose_next_action(observation)
                 if action is None:
+                    stop_reason = getattr(planner, "stop_reason", "")
+                    if stop_reason:
+                        # A live planner failed and the journey has no scripted contingency.
+                        return EvaluationResult(
+                            "agent_error",
+                            stop_reason,
+                            steps_run,
+                            getattr(planner, "stop_detail", ""),
+                        )
                     break
                 consume_reset = getattr(planner, "consume_reset_request", None)
                 if callable(consume_reset) and consume_reset():
@@ -413,6 +422,12 @@ class KeyboardExecutor:
                     policy_code=decision.code,
                     result_status=action_result.status,
                     meaningful_progress=action_result.meaningful_progress,
+                    focus_after=(
+                        (after_focus.name or after_focus.role or after_focus.tag or "")[:120]
+                        if after_focus
+                        else None
+                    ),
+                    target_hint=action.target_hint[:120],
                 )
             )
             barrier = self.barrier_check
@@ -706,8 +721,22 @@ class KeyboardExecutor:
     def _completion_signal_matches(self, page: Page, signal: dict[str, Any]) -> bool:
         try:
             signal_type = signal["type"]
+            case_sensitive = signal.get("case_sensitive", True)
+
+            def contains(haystack: str, needle: str) -> bool:
+                if not case_sensitive:
+                    haystack, needle = haystack.lower(), needle.lower()
+                return bool(needle) and needle in haystack
+
             if signal_type == "url_path_equals":
                 return urlparse(page.url).path == signal.get("expected")
+            if signal_type == "url_contains":
+                parsed = urlparse(page.url)
+                address = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+                return contains(address, signal.get("expected") or "")
+            if signal_type == "text_present":
+                body_text = page.locator("body").inner_text(timeout=self.action_timeout_ms)
+                return contains(" ".join(body_text.split()), signal.get("expected") or "")
             locator = signal.get("locator") or {}
             locator_by = locator.get("by")
             if locator_by == "test_id":

@@ -92,8 +92,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 300
-CELERY_TASK_SOFT_TIME_LIMIT = 270
+# Live journeys on real sites can need many paced model calls; the target policy
+# caps a run at 15 minutes, so the worker limit sits just above that.
+CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "960"))
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get("CELERY_TASK_SOFT_TIME_LIMIT", "930"))
 
 FIXTURE_ALLOWED_ORIGINS = tuple(
     origin.strip()
@@ -125,3 +127,5 @@ PLANNER_MAX_TRANSIENT_RETRIES = int(
 PLANNER_TRANSIENT_BACKOFF_SECONDS = float(
     os.environ.get("PLANNER_TRANSIENT_BACKOFF_SECONDS", "15")
 )
+# Retries for a one-off bad answer (empty, truncated, or unroutable) before fallback.
+PLANNER_MAX_INVALID_RETRIES = int(os.environ.get("PLANNER_MAX_INVALID_RETRIES", "2"))

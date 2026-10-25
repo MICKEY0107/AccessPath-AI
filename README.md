@@ -36,6 +36,16 @@ Each journey's run form lets you pick Gemini, OpenRouter, Groq, or the determini
 
 A typed key is never saved. The web process encrypts it with a key derived from `DJANGO_SECRET_KEY` and passes only the ciphertext to the worker through the task (it expires after an hour). The worker decrypts it in memory and scrubs it from step evidence, planner metadata, error detail, and any re-raised error. The run page shows only whether your key or the server key was used, plus its last four characters.
 
+## Evaluating a real website
+
+On the runs page, open **Evaluate a real website** and add a journey: a start page, a plain-language goal, at least one success check (the address contains some text, or the page shows some text), and optionally a value the evaluator may type, such as a search term. Then start it with Gemini, OpenRouter, or Groq.
+
+These runs reuse the public pilot's fail-closed policy. Only GET, HEAD, and OPTIONS requests are allowed, so nothing is ever submitted. Navigation stays on the site's own address and any extra addresses you list. Popups and downloads stop the run. Images, fonts, and scripts may load from any public CDN, but private and local hosts are blocked, and the start page must resolve to a public address (set `ALLOW_PRIVATE_NETWORKS=true` only for your own local test sites). Real-site journeys have no scripted replay, so a provider failure ends the run as an agent error with the provider's reason. Remove a journey from the dashboard when you are done; its past runs are kept.
+
+## Why live runs fall back, and what the planner does about it
+
+A one-off bad answer (an empty or truncated completion, an unroutable model, or invalid JSON) is retried up to `PLANNER_MAX_INVALID_RETRIES` times before the run switches to its contingency. Rate limits wait for the provider's `Retry-After` (or its "try again in" hint) and get up to three patient retries. A bad key or unknown model fails at once. The run page shows the provider's own error message. `openrouter/free` picks a random free model for every call and is unreliable for multi-step journeys, so the form warns about it; pin a specific model instead.
+
 ## Gemini preflight and evidence
 
 Keep `GEMINI_API_KEY` in local `.env` only; never commit it or pass it as a command-line argument. Leave `GEMINI_MODEL` blank until discovery succeeds.

@@ -355,3 +355,91 @@ def test_repeated_focus_cycle_stops_before_the_full_action_budget(tmp_path: Path
     finally:
         server.shutdown()
         thread.join(timeout=2)
+
+
+def _semantic_executor(origin: str, tmp_path: Path, signals: list[dict]) -> KeyboardExecutor:
+    run_id = uuid4()
+    return KeyboardExecutor(
+        run_id=run_id,
+        start_url=f"{origin}/wiki/Main_Page",
+        allowed_origins=[origin],
+        completion_policy={"signals": signals},
+        barrier_check=None,
+        max_steps=8,
+        action_timeout_ms=5000,
+        headless=True,
+        browser_executable_path=os.environ.get("EVALUATOR_BROWSER_EXECUTABLE") or None,
+        artifact_store=LocalArtifactStore(tmp_path, run_id),
+        on_step=lambda step, artifacts: None,
+    )
+
+
+def test_real_site_success_checks_match_address_text_and_page_text(tmp_path: Path) -> None:
+    server, thread, origin = _serve_semantic_journey()
+    try:
+        executor = _semantic_executor(
+            origin,
+            tmp_path,
+            [
+                {
+                    "id": "success_address",
+                    "type": "url_contains",
+                    "expected": "SEARCH=web",
+                    "case_sensitive": False,
+                },
+                {
+                    "id": "success_text",
+                    "type": "text_present",
+                    "expected": "article BODY",
+                    "case_sensitive": False,
+                },
+            ],
+        )
+        planner = FixturePlanPlanner(
+            {
+                "kind": "fixture_plan.v1",
+                "actions": [
+                    {"action": "tab"},
+                    {"action": "type", "value": "Web accessibility"},
+                    {"action": "tab"},
+                    {"action": "enter"},
+                ],
+            }
+        )
+
+        result = executor.run_with_planner(planner, goal="Find the Web accessibility article")
+
+        assert result.outcome == "completed"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_planner_stop_without_fallback_ends_as_agent_error_with_reason(tmp_path: Path) -> None:
+    class StoppedPlanner:
+        stop_reason = "GROQ_UNAVAILABLE"
+        stop_detail = "Groq rejected the request (Groq HTTP 503)"
+
+        def propose_next_action(self, observation):
+            return None
+
+        def record_outcome(self, *args) -> None:
+            return None
+
+        def runtime_metadata(self) -> dict[str, object]:
+            return {}
+
+    server, thread, origin = _serve_semantic_journey()
+    try:
+        executor = _semantic_executor(
+            origin, tmp_path, [{"id": "t", "type": "text_present", "expected": "never shown"}]
+        )
+
+        result = executor.run_with_planner(StoppedPlanner(), goal="Find the article")
+
+        assert result.outcome == "agent_error"
+        assert result.terminal_reason == "GROQ_UNAVAILABLE"
+        assert "HTTP 503" in result.detail
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

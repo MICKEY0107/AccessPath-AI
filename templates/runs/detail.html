@@ -17,6 +17,7 @@
           {% if run.planner_metadata.fallback_used %}
             <span class="tag tag-issue">Deterministic contingency used</span>
             <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}{% if run.planner_model %} · tried {{ run.planner_model }}{% endif %}</span>
+            {% if run.planner_metadata.fallback_detail %}<span class="muted">· Why: {{ run.planner_metadata.fallback_detail }}</span>{% endif %}
           {% elif run.planner_provider == "fixture" %}
             <span class="tag">Deterministic fixture planner</span>
           {% else %}
