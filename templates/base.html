@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236534dc'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial' font-size='25' font-weight='700' fill='white'%3EAP%3C/text%3E%3C/svg%3E">
+    <title>{% block title %}AccessPath AI{% endblock %}</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: #172033; background: #f5f7fb; }
+      a { color: #214ea3; }
+      a:focus-visible, button:focus-visible, select:focus-visible { outline: 3px solid #7c3aed; outline-offset: 3px; }
+      .skip-link { position: absolute; z-index: 20; top: .6rem; left: 50%; transform: translate(-50%, -160%); border-radius: .5rem; background: #172033; color: #fff; padding: .6rem .9rem; text-decoration: none; transition: transform .15s ease; }
+      .skip-link:focus { transform: translate(-50%, 0); }
+      .app-header { position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #dde3ef; background: rgba(255,255,255,.96); backdrop-filter: blur(10px); }
+      .app-nav, main, footer { max-width: 74rem; margin: 0 auto; padding-inline: 1.5rem; }
+      .app-nav { min-height: 4.5rem; display: flex; gap: 2rem; align-items: center; justify-content: space-between; }
+      .brand { display: inline-flex; align-items: center; gap: .7rem; color: #172033; font-weight: 750; letter-spacing: -.02em; text-decoration: none; }
+      .brand-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: .55rem; background: linear-gradient(135deg, #6534dc, #8d25db); color: #fff; font-size: .78rem; letter-spacing: .04em; }
+      .nav-list { display: flex; gap: .3rem; align-items: center; list-style: none; margin: 0; padding: 0; }
+      .nav-list a { display: inline-block; border-radius: .45rem; color: #44516a; padding: .5rem .7rem; text-decoration: none; }
+      .nav-list a:hover, .nav-list a[aria-current="page"] { background: #edf0fa; color: #352078; }
+      main { padding-block: 2rem 3rem; }
+      footer { padding-block: 1rem 2rem; }
+      .card { background: #fff; border: 1px solid #dce2ef; border-radius: .85rem; box-shadow: 0 .25rem .9rem rgb(20 35 70 / 4%); padding: clamp(1.1rem, 3vw, 1.65rem); margin-block: 1rem; }
+      .tag { display: inline-block; border-radius: 1rem; padding: .18rem .65rem; background: #ede9fe; color: #5422a3; font-size: .9rem; font-weight: 650; }
+      .tag-success { background: #ddf8e7; color: #15733a; }
+      .tag-issue { background: #fee4e2; color: #b42318; }
+      table { border-collapse: separate; border-spacing: 0; width: 100%; overflow: hidden; border: 1px solid #dce2ef; border-radius: .7rem; background: #fff; }
+      th, td { border-bottom: 1px solid #e6eaf2; padding: .75rem; text-align: left; }
+      tbody tr:last-child td { border-bottom: 0; }
+      th { background: #f7f8fc; color: #53627a; font-size: .84rem; font-weight: 700; }
+      .muted { color: #5b6982; }
+      button { border: 0; border-radius: .5rem; background: linear-gradient(135deg, #5830cf, #8b22d7); color: #fff; cursor: pointer; font: inherit; font-weight: 650; padding: .65rem .95rem; }
+      button:hover { filter: brightness(.94); }
+      .planner-picker { display: grid; gap: .55rem; margin-top: 1rem; max-width: 44rem; }
+      .planner-picker label { color: #263550; font-weight: 700; }
+    .planner-picker select { width: 100%; border: 1px solid #bfcadd; border-radius: .5rem; background: #fff; color: #172033; font: inherit; padding: .65rem .75rem; }
+    .run-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .75rem; align-items: end; margin: 1rem 0; }
+    .run-filters > div { display: grid; gap: .35rem; }
+    .run-filters label { color: #263550; font-weight: 700; }
+    .run-filters select { width: 100%; border: 1px solid #bfcadd; border-radius: .5rem; background: #fff; color: #172033; font: inherit; padding: .65rem .75rem; }
+    .run-filters .filter-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+      .planner-picker p { margin: 0; }
+      .secondary { border: 1px solid #cdd5e5; border-radius: .5rem; background: #fff; color: #263550; font: inherit; font-weight: 650; padding: .65rem .95rem; text-decoration: none; }
+      .journey-list, .steps { margin: 0; padding-left: 1.25rem; }
+      .journey { border-top: 1px solid #d7dfec; padding: 1rem 0; }
+      .journey:first-child { border-top: 0; }
+      .run-summary, .step-details { display: grid; gap: .6rem; }
+      .run-summary div, .step-details div { display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; gap: 1rem; }
+      dt { font-weight: 700; }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .error { border-left: .3rem solid #b42318; padding-left: .8rem; color: #741a12; }
+      .run-brief { margin: 1rem 0 0; max-width: 70ch; color: #45546e; }
+      .evidence-intro { max-width: 72ch; color: #53627a; }
+      .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 1rem; list-style: none; margin: 1rem 0 0; padding: 0; }
+      .evidence-card { border: 1px solid #dce2ef; border-radius: .75rem; background: #fff; overflow: hidden; }
+      .evidence-card.is-issue { border: 2px solid #d92d20; background: #fff7f6; box-shadow: 0 0 0 .2rem rgb(217 45 32 / 10%); }
+      .evidence-open { display: block; width: 100%; border-radius: 0; background: #f0f3f9; color: #263550; padding: 0; text-align: left; }
+      .evidence-open:hover { filter: none; background: #e7ebf4; }
+      .evidence-open img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+      .evidence-meta { display: grid; gap: .35rem; padding: .75rem; font-size: .9rem; }
+      .issue-label { display: inline-flex; width: fit-content; border-radius: 1rem; background: #d92d20; color: #fff; font-size: .76rem; font-weight: 750; padding: .2rem .5rem; }
+      dialog { width: min(92vw, 72rem); max-height: 92vh; border: 0; border-radius: .9rem; box-shadow: 0 1.5rem 4rem rgb(19 30 58 / 40%); padding: 0; }
+      dialog::backdrop { background: rgb(17 24 39 / 72%); }
+      .viewer-shell { display: grid; gap: 1rem; padding: 1rem; }
+      .viewer-header, .viewer-controls { display: flex; gap: .75rem; align-items: center; justify-content: space-between; }
+      .viewer-header h2 { font-size: 1rem; margin: 0; }
+      .viewer-image { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #172033; border-radius: .5rem; }
+      .viewer-controls { justify-content: flex-end; }
+      .viewer-controls button:disabled { cursor: not-allowed; opacity: .45; }
+      kbd { border: 1px solid #cbd3e3; border-bottom-width: 2px; border-radius: .25rem; background: #fff; color: #263550; font-family: ui-monospace, monospace; font-size: .82em; padding: .05rem .3rem; }
+      @media (max-width: 42rem) { .app-nav { gap: .8rem; padding-inline: 1rem; } .brand { font-size: .95rem; } .nav-list a { padding: .45rem; } main { padding: 1.25rem 1rem 2rem; } .run-summary div, .step-details div { grid-template-columns: 1fr; gap: .15rem; } table { display: block; overflow-x: auto; } }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="skip-link" href="#main-content">Skip to main content</a>
+      <nav class="app-nav" aria-label="Primary navigation">
+        <a class="brand" href="{% url 'core:home' %}" aria-label="AccessPath AI home">
+          <span class="brand-mark" aria-hidden="true">AP</span>
+          <span>AccessPath AI</span>
+        </a>
+        <ul class="nav-list">
+          <li><a href="{% url 'core:home' %}" {% if request.resolver_match.namespace == 'core' %}aria-current="page"{% endif %}>Overview</a></li>
+          <li><a href="{% url 'runs:list' %}" {% if request.resolver_match.namespace == 'runs' %}aria-current="page"{% endif %}>Evaluation runs</a></li>
+        </ul>
+      </nav>
+    </header>
+    <main id="main-content">
+      {% if messages %}
+        <section class="messages" aria-label="Application messages">
+          {% for message in messages %}
+            <p class="{{ message.tags|default:'info' }}">{{ message }}</p>
+          {% endfor %}
+        </section>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer><p class="muted">Keyboard-first journey accessibility evaluation. Current profile: motor accessibility through keyboard input.</p></footer>
+  </body>
+</html>

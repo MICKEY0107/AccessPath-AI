@@ -1,0 +1,14 @@
+:root { font-family: system-ui, sans-serif; color: #16233b; background: #f4f7fb; line-height: 1.5; }
+body { max-width: 48rem; padding: 1rem; margin: 0 auto; }
+main { background: #fff; border: 1px solid #cbd5e1; border-radius: .5rem; padding: 1.5rem; }
+a, button, input { font: inherit; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #b45309; outline-offset: 3px; }
+.slots { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); margin: 1rem 0; }
+.slot { border: 2px solid #365f91; background: #fff; padding: .8rem; border-radius: .35rem; text-align: left; }
+.slot[aria-pressed="true"] { background: #dbeafe; border-color: #003c88; }
+.actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+.step { color: #475569; font-weight: 600; }
+.notice { padding: .75rem; background: #ecfdf5; border-left: 4px solid #15803d; }
+.fixture-note { padding: .75rem; border-left: 4px solid; margin: 1rem 0; }
+.fixture-note--accessible { background: #ecfdf5; border-color: #15803d; }
+.fixture-note--blocked { background: #fff7ed; border-color: #c2410c; }

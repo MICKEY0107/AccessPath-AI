@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluation runs — AccessPath AI{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="runs-title" class="card">
+    <h1 id="runs-title">Evaluation runs</h1>
+    <p>An evaluation run checks one approved digital journey from start to its declared completion point using only keyboard actions. It records the focus path, action results, screenshots, and a verified outcome so the result can be reviewed afterward.</p>
+    <h2>Available journeys</h2>
+    {% if journeys %}
+      <ul class="journey-list">
+        {% for journey in journeys %}
+          <li class="journey">
+            <h3>{{ journey.name }}</h3>
+            <p>{{ journey.goal }}</p>
+            <p class="muted">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
+            <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}">
+              {% csrf_token %}
+              <label for="planner-provider-{{ journey.id }}">Planner provider</label>
+              <select id="planner-provider-{{ journey.id }}" name="planner_provider" required>
+                <option value="" selected disabled>Choose a provider</option>
+                {% for option in planner_options %}
+                  <option value="{{ option.value }}" {% if not option.configured %}disabled{% endif %}>
+                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.configured %} (setup required){% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+              <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
+              <button type="submit">Start keyboard evaluation</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No configured journeys are available. Run <code>seed_fixture_journeys</code> and <code>seed_public_journeys</code> after migrations.</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="recent-runs-title" class="card">
+    <h2 id="recent-runs-title">Recent evaluation runs</h2>
+    <p class="muted">Open any run to review its outcome, step-by-step keyboard evidence, and captured screenshots.</p>
+    <form id="run-filters" class="run-filters" method="get" aria-label="Filter recent evaluation runs">
+      <div>
+        <label for="filter-journey">Journey</label>
+        <select id="filter-journey" name="journey">
+          <option value="">All journeys</option>
+          {% for journey in run_filter_journeys %}
+            <option value="{{ journey.id }}"{% if selected_journey_id == journey.id %} selected{% endif %}>{{ journey.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-provider">Planner used</label>
+        <select id="filter-provider" name="provider">
+          <option value="">All planners</option>
+          {% for value, label in provider_filter_options %}
+            <option value="{{ value }}"{% if selected_filters.provider == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-status">Status</label>
+        <select id="filter-status" name="status">
+          <option value="">All statuses</option>
+          {% for value, label in status_filter_options %}
+            <option value="{{ value }}"{% if selected_filters.status == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-outcome">Outcome</label>
+        <select id="filter-outcome" name="outcome">
+          <option value="">All outcomes</option>
+          {% for value, label in outcome_filter_options %}
+            <option value="{{ value }}"{% if selected_filters.outcome == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-actions">
+        {% if filters_active %}<a class="secondary" href="{% url 'runs:list' %}">Clear filters</a>{% endif %}
+      </div>
+    </form>
+    <div id="recent-runs-results" aria-live="polite">
+      {% if runs %}
+        <table>
+        <caption>Most recent evaluation runs</caption>
+        <thead><tr><th scope="col">Journey</th><th scope="col">Planner used</th><th scope="col">Status</th><th scope="col">Outcome</th><th scope="col">Created</th></tr></thead>
+        <tbody>
+          {% for run in runs %}
+            <tr>
+              <td><a href="{% url 'runs:detail' run.id %}">{{ run.journey.name }}</a></td>
+              <td>
+                {% if run.planner_metadata.fallback_used %}
+                  Deterministic contingency
+                  <span class="muted">({{ run.get_planner_provider_display }} fallback)</span>
+                {% elif run.planner_provider == "fixture" %}
+                  Deterministic fixture
+                {% else %}
+                  {{ run.get_planner_provider_display }}
+                  {% if run.planner_model %}<span class="muted">— {{ run.planner_model }}</span>{% endif %}
+                {% endif %}
+              </td>
+              <td>{{ run.get_status_display }}</td>
+              <td>{{ run.get_outcome_display }}</td>
+              <td>{{ run.created_at }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        </table>
+      {% else %}
+        <p>No runs exist yet.</p>
+      {% endif %}
+    </div>
+  </section>
+  <script>
+    document.getElementById("run-filters").addEventListener("change", async (event) => {
+      if (event.target.tagName !== "SELECT") return;
+      const form = event.currentTarget;
+      const results = document.getElementById("recent-runs-results");
+      const url = new URL(window.location.href);
+      new FormData(form).forEach((value, key) => {
+        if (value) url.searchParams.set(key, value);
+        else url.searchParams.delete(key);
+      });
+      results.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+        if (!response.ok) throw new Error("Unable to refresh runs");
+        const html = await response.text();
+        const nextResults = new DOMParser().parseFromString(html, "text/html").getElementById("recent-runs-results");
+        if (!nextResults) throw new Error("Results region missing");
+        results.replaceWith(nextResults);
+        window.history.pushState({}, "", url);
+      } catch (error) {
+        window.location.assign(url);
+      }
+    });
+  </script>
+{% endblock %}

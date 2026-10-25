@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Run {{ run.id }} — AccessPath AI{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="run-title" class="card">
+    <p><a href="{% url 'runs:list' %}">Back to evaluation runs</a></p>
+    <h1 id="run-title">{{ run.journey.name }}</h1>
+    <p class="run-brief">{{ run_brief }}</p>
+    <dl class="run-summary">
+      <div><dt>Run ID</dt><dd><code>{{ run.id }}</code></dd></div>
+      <div><dt>Status</dt><dd><span class="tag {% if run.outcome == 'completed' %}tag-success{% elif run.outcome == 'blocked' or run.status == 'failed' %}tag-issue{% endif %}">{{ run.get_status_display }}</span></dd></div>
+      <div><dt>Outcome</dt><dd>{{ run.get_outcome_display }}</dd></div>
+      <div>
+        <dt>Planner</dt>
+        <dd>
+          {% if run.planner_metadata.fallback_used %}
+            <span class="tag tag-issue">Deterministic contingency used</span>
+            <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}</span>
+          {% elif run.planner_provider == "fixture" %}
+            <span class="tag">Deterministic fixture planner</span>
+          {% else %}
+            <span class="tag tag-success">Live {{ run.planner_metadata.provider_label|default:run.get_planner_provider_display }}</span>
+            <span class="muted">{{ run.planner_metadata.model|default:run.planner_model }} · {{ run.planner_metadata.calls|default:"0" }} calls</span>
+          {% endif %}
+        </dd>
+      </div>
+      <div><dt>Terminal reason</dt><dd>{{ run.terminal_reason|default:"Pending" }}</dd></div>
+      <div><dt>Started</dt><dd>{{ run.started_at|default:"Not started" }}</dd></div>
+      <div><dt>Finished</dt><dd>{{ run.finished_at|default:"Not finished" }}</dd></div>
+    </dl>
+    {% if run.status == "queued" or run.status == "starting" or run.status == "running" %}
+      <p class="muted">This page refreshes while the worker is evaluating the journey.</p>
+      <meta http-equiv="refresh" content="3">
+    {% endif %}
+    {% if run.error_detail %}<p class="error"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
+  </section>
+
+  <section aria-labelledby="steps-title" class="card">
+    <h2 id="steps-title">Keyboard evidence</h2>
+    <p class="evidence-intro">Each entry records the action requested, whether policy allowed it, and the observed focus and page state after the action.</p>
+    {% if run.steps.all %}
+      <ol class="steps">
+        {% for step in run.steps.all %}
+          <li>
+            <h3>Step {{ step.step_number }} — {{ step.evidence.proposed_action.action|upper }}</h3>
+            <p>{{ step.evidence.proposed_action.purpose }}</p>
+            <dl class="step-details">
+              <div><dt>Policy</dt><dd>{{ step.evidence.policy_decision.outcome }} ({{ step.evidence.policy_decision.code }})</dd></div>
+              <div><dt>Result</dt><dd>{{ step.evidence.action_result.status }}</dd></div>
+              <div><dt>Focus before</dt><dd>{{ step.evidence.focus_before.name|default:"Document body" }}</dd></div>
+              <div><dt>Focus after</dt><dd>{{ step.evidence.focus_after.name|default:"Document body" }}</dd></div>
+              <div><dt>URL after</dt><dd><code>{{ step.evidence.url_after }}</code></dd></div>
+              {% if step.evidence.completion_signals %}<div><dt>Completion signals</dt><dd>{{ step.evidence.completion_signals }}</dd></div>{% endif %}
+                {% if step.evidence.policy_events %}<div><dt>Blocked policy events</dt><dd>{{ step.evidence.policy_events|join:"; " }}</dd></div>{% endif %}
+                {% if step.evidence.evidence_events %}<div><dt>Evidence events</dt><dd>{{ step.evidence.evidence_events|join:"; " }}</dd></div>{% endif %}
+            </dl>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p>No step evidence has been recorded yet.</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="artifacts-title" class="card">
+    <h2 id="artifacts-title">Captured screenshots</h2>
+    <p class="evidence-intro">Select any screenshot to review it in place. Use <kbd>←</kbd> and <kbd>→</kbd> to move through the evidence, or <kbd>Escape</kbd> to return to this run.</p>
+    {% if evidence_artifacts %}
+      <ul class="gallery-grid" aria-label="Captured evidence screenshots">
+        {% for artifact in evidence_artifacts %}
+          <li class="evidence-card {% if artifact.is_issue_evidence %}is-issue{% endif %}">
+            <button
+              class="evidence-open"
+              type="button"
+              data-evidence-index="{{ forloop.counter0 }}"
+              data-evidence-url="{{ artifact.url }}"
+              data-evidence-label="{{ artifact.kind|title }} for step {{ artifact.step_number|default:'unassigned' }}"
+              aria-label="Open {{ artifact.kind }} for step {{ artifact.step_number|default:'unassigned' }}"
+            >
+              <img src="{{ artifact.url }}" alt="{{ artifact.kind|title }} screenshot for step {{ artifact.step_number|default:'unassigned' }}" loading="lazy">
+              <span class="evidence-meta">
+                <strong>Step {{ artifact.step_number|default:"—" }} · {{ artifact.kind|title }}</strong>
+                {% if artifact.is_issue_evidence %}<span class="issue-label">{{ artifact.issue_label }}</span>{% endif %}
+                <span class="muted">{{ artifact.sha256|slice:":12" }}…</span>
+              </span>
+            </button>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No screenshots have been captured yet.</p>
+    {% endif %}
+  </section>
+
+  {% if evidence_artifacts %}
+    <dialog id="evidence-viewer" aria-labelledby="evidence-viewer-title">
+      <div class="viewer-shell">
+        <div class="viewer-header">
+          <h2 id="evidence-viewer-title">Screenshot evidence</h2>
+          <button class="secondary" type="button" data-viewer-close>Close</button>
+        </div>
+        <img class="viewer-image" data-viewer-image alt="">
+        <p class="muted" data-viewer-caption></p>
+        <div class="viewer-controls">
+          <a class="secondary" data-viewer-original target="_blank" rel="noopener">Open original</a>
+          <button class="secondary" type="button" data-viewer-previous>Previous</button>
+          <button type="button" data-viewer-next>Next</button>
+        </div>
+      </div>
+    </dialog>
+    <script>
+      (() => {
+        const triggers = Array.from(document.querySelectorAll("[data-evidence-index]"));
+        const dialog = document.querySelector("#evidence-viewer");
+        const image = dialog.querySelector("[data-viewer-image]");
+        const caption = dialog.querySelector("[data-viewer-caption]");
+        const original = dialog.querySelector("[data-viewer-original]");
+        const previous = dialog.querySelector("[data-viewer-previous]");
+        const next = dialog.querySelector("[data-viewer-next]");
+        const close = dialog.querySelector("[data-viewer-close]");
+        let activeIndex = 0;
+
+        const display = (index) => {
+          activeIndex = (index + triggers.length) % triggers.length;
+          const trigger = triggers[activeIndex];
+          const label = trigger.dataset.evidenceLabel;
+          image.src = trigger.dataset.evidenceUrl;
+          image.alt = label;
+          caption.textContent = `${label} — ${activeIndex + 1} of ${triggers.length}`;
+          original.href = trigger.dataset.evidenceUrl;
+          original.textContent = "Open original";
+          previous.disabled = triggers.length < 2;
+          next.disabled = triggers.length < 2;
+        };
+
+        triggers.forEach((trigger, index) => {
+          trigger.addEventListener("click", () => {
+            display(index);
+            dialog.showModal();
+            close.focus();
+          });
+        });
+        previous.addEventListener("click", () => display(activeIndex - 1));
+        next.addEventListener("click", () => display(activeIndex + 1));
+        close.addEventListener("click", () => dialog.close());
+        dialog.addEventListener("keydown", (event) => {
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            display(activeIndex - 1);
+          }
+          if (event.key === "ArrowRight") {
+            event.preventDefault();
+            display(activeIndex + 1);
+          }
+        });
+      })();
+    </script>
+  {% endif %}
+{% endblock %}

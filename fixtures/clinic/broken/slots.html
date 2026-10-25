@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Select time — AccessPath Clinic</title><link rel="stylesheet" href="../styles.css"></head>
+<body><main><p class="step">Step 2 of 4</p><h1>Select an appointment time</h1><p id="slot-instructions">Choose one available time, then continue.</p>
+<p class="fixture-note fixture-note--blocked" data-testid="fixture-behavior"><strong>Expected result:</strong> these visible time buttons are skipped by Tab, so the evaluator must report a keyboard barrier.</p>
+<div class="slots" aria-describedby="slot-instructions">
+  <button class="slot" type="button" data-testid="appointment-slot" data-slot-id="0900" tabindex="-1" aria-pressed="false">09:00 — Dr. Rao</button>
+  <button class="slot" type="button" data-testid="appointment-slot" data-slot-id="1030" tabindex="-1" aria-pressed="false">10:30 — Dr. Rao</button>
+  <button class="slot" type="button" data-testid="appointment-slot" data-slot-id="1400" tabindex="-1" aria-pressed="false">14:00 — Dr. Rao</button>
+</div>
+<p id="selection-status" role="status" aria-live="polite"></p>
+<div class="actions"><a href="service.html">Back</a><button id="continue" type="button" data-testid="continue" disabled>Continue</button></div>
+</main><script src="../slot-selection.js"></script></body></html>

@@ -1,0 +1,133 @@
+{
+  "schema_version": "public-journey-manifest.v1",
+  "manifest_version": "public-pilot-1.0.0",
+  "journeys": [
+    {
+      "key": "wikipedia-web-accessibility-search",
+      "name": "Wikipedia — find the Web accessibility article",
+      "goal": "Starting from the English Wikipedia Main Page, use only keyboard actions to search for and open the Web accessibility article.",
+      "execution_mode": "public_read_only",
+      "start_url": "https://en.wikipedia.org/wiki/Main_Page",
+      "target_policy": {
+        "schema_version": "target_policy.v1",
+        "navigation_origins": ["https://en.wikipedia.org"],
+        "resource_origins": [
+          "https://en.wikipedia.org",
+          "https://upload.wikimedia.org",
+          "https://thumb.wikimedia.org"
+        ],
+        "navigation_path_prefixes": ["/wiki/", "/w/index.php"],
+        "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+        "allow_popups": false,
+        "allow_downloads": false,
+        "block_service_workers": true,
+        "max_pages": 1,
+        "max_actions": 40,
+        "total_timeout_ms": 300000,
+        "no_progress_limit": 4,
+        "user_agent": "AccessPathAI-local-pilot/0.1 keyboard-accessibility-evaluator"
+      },
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "article_url",
+            "type": "url_path_equals",
+            "expected": "/wiki/Web_accessibility"
+          },
+          {
+            "id": "article_heading",
+            "type": "element_present",
+            "locator": {
+              "by": "heading",
+              "value": "Web accessibility",
+              "level": 1
+            }
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "synthetic_values": {
+              "search_query": "Web accessibility"
+            },
+            "actions": [
+              {"action": "tab", "purpose": "move from the document to the first keyboard control"},
+              {"action": "tab", "purpose": "advance toward the site search"},
+              {"action": "tab", "purpose": "advance toward the site search"},
+              {"action": "tab", "purpose": "focus the Wikipedia search field"},
+              {"action": "type", "value": "{search_query}", "target_hint": "Search Wikipedia", "purpose": "enter the approved article title"},
+              {"action": "tab", "purpose": "focus the search submit control"},
+              {"action": "enter", "target_hint": "Search", "purpose": "open the requested article"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "key": "w3c-bad-accessible-keyboard-smoke",
+      "name": "W3C BAD accessible page — keyboard smoke",
+      "goal": "Load the official W3C accessible demonstration page and move keyboard focus to the first available control without leaving the approved page.",
+      "execution_mode": "public_read_only",
+      "start_url": "https://www.w3.org/WAI/demos/bad/after/home.html",
+      "target_policy": {
+        "schema_version": "target_policy.v1",
+        "navigation_origins": ["https://www.w3.org"],
+        "resource_origins": ["https://www.w3.org"],
+        "navigation_path_prefixes": ["/WAI/demos/bad/after/"],
+        "allowed_methods": ["GET", "HEAD", "OPTIONS"],
+        "allow_popups": false,
+        "allow_downloads": false,
+        "block_service_workers": true,
+        "max_pages": 1,
+        "max_actions": 5,
+        "total_timeout_ms": 60000,
+        "no_progress_limit": 3,
+        "user_agent": "AccessPathAI-local-pilot/0.1 keyboard-accessibility-evaluator"
+      },
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "w3c_page_url",
+            "type": "url_path_equals",
+            "expected": "/WAI/demos/bad/after/home.html"
+          },
+          {
+            "id": "w3c_page_heading",
+            "type": "element_present",
+            "locator": {
+              "by": "heading",
+              "value": "Welcome to CityLights",
+              "level": 1
+            }
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {"action": "tab", "purpose": "move focus to the first keyboard control"}
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

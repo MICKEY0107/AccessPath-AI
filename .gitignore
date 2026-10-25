@@ -1,0 +1,40 @@
+# Python and uv
+.venv/
+.uv-cache/
+.python/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Django and local runtime state
+.env
+.env.*
+!.env.example
+.runtime/
+output/
+staticfiles/
+media/
+*.sqlite3
+
+# Playwright and browser artifacts
+.playwright-cli/
+playwright-report/
+test-results/
+blob-report/
+ms-playwright/
+
+# Local tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.idea/
+.vscode/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Local scratch and rendered report previews
+.tmp/
+.artifacts/

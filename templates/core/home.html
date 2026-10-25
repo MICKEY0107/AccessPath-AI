@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}AccessPath AI — Keyboard journey evaluation{% endblock %}
+
+{% block content %}
+  <section aria-labelledby="page-title" class="card">
+    <p class="tag">Current implementation: keyboard-only motor accessibility</p>
+    <h1 id="page-title">Evaluate whether a keyboard user can complete a real journey.</h1>
+    <p>AccessPath AI will use bounded AI planning, deterministic keyboard policy checks, and browser evidence to evaluate a declared task.</p>
+    <p><a href="{% url 'runs:list' %}">View evaluation runs</a></p>
+  </section>
+
+  <section aria-labelledby="how-it-works" class="card">
+    <h2 id="how-it-works">How the evaluation works</h2>
+    <ol>
+      <li>A configured journey defines an approved target, goal, keyboard profile, and completion policy.</li>
+      <li>A separate worker opens a browser and observes the target state.</li>
+      <li>The planner proposes one keyboard action; deterministic policy either rejects or authorizes it.</li>
+      <li>The system records focus, state changes, and evidence before reporting a verified outcome or uncertainty.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="scope" class="card">
+    <h2 id="scope">Current safety boundary</h2>
+    <p>Only approved, non-destructive fixture journeys are enabled during the initial build. The system does not log in, submit public forms, send messages, make payments, or claim complete WCAG conformance.</p>
+  </section>
+{% endblock %}

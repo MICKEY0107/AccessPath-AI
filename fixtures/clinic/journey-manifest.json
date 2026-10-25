@@ -1,0 +1,89 @@
+{
+  "schema_version": "journey-manifest.v1",
+  "fixture_version": "clinic-1.1.0",
+  "journeys": [
+    {
+      "key": "clinic-accessible-booking",
+      "name": "Clinic appointment booking — keyboard-accessible reference",
+      "goal": "Book an appointment by selecting a service, choosing a time slot, entering patient details, reviewing the booking, and reaching a confirmed appointment screen using keyboard actions.",
+      "execution_mode": "fixture",
+      "start_path": "/accessible/index.html",
+      "allowed_origins": ["{fixture_base_url}"],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {"id": "confirmation_url", "type": "url_path_equals", "expected": "/accessible/confirmation.html"},
+          {"id": "confirmation_heading", "type": "element_text_equals", "locator": {"by": "test_id", "value": "booking-status"}, "expected": "Appointment confirmed"},
+          {"id": "confirmation_state", "type": "element_attribute_equals", "locator": {"by": "test_id", "value": "booking-status"}, "attribute": "data-booking-state", "expected": "confirmed"}
+        ],
+        "stability": {"consecutive_observations": 2, "interval_ms": 500}
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "synthetic_values": {"name": "Asha Test", "email": "asha.test@example.invalid"},
+            "actions": [
+            {"action": "tab", "purpose": "focus the declared journey entry link"},
+            {"action": "enter", "purpose": "open service selection"},
+            {"action": "tab", "purpose": "focus the available service"},
+            {"action": "enter", "purpose": "choose the service"},
+            {"action": "tab", "purpose": "focus an appointment time"},
+            {"action": "enter", "purpose": "select the focused appointment time"},
+            {"action": "tab", "purpose": "advance within the time-slot controls"},
+            {"action": "tab", "purpose": "advance within the time-slot controls"},
+            {"action": "tab", "purpose": "move past the back link to the enabled continue control"},
+            {"action": "tab", "purpose": "focus the enabled continue control"},
+            {"action": "enter", "purpose": "open patient details"},
+            {"action": "tab", "purpose": "focus name input"},
+            {"action": "type", "value": "{name}", "purpose": "enter synthetic patient name"},
+            {"action": "tab", "purpose": "focus email input"},
+            {"action": "type", "value": "{email}", "purpose": "enter synthetic patient email"},
+            {"action": "tab", "purpose": "advance to form controls"},
+            {"action": "tab", "purpose": "focus review appointment"},
+            {"action": "enter", "purpose": "review appointment"},
+            {"action": "tab", "purpose": "advance to confirmation control"},
+            {"action": "tab", "purpose": "focus simulated confirmation"},
+            {"action": "enter", "purpose": "confirm synthetic appointment"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "key": "clinic-keyboard-trap-control",
+      "name": "Clinic appointment booking — keyboard barrier control",
+      "goal": "Attempt the same appointment-booking journey and record evidence when the keyboard cannot reach or operate the appointment time-slot control.",
+      "execution_mode": "fixture",
+      "start_path": "/broken/index.html",
+      "allowed_origins": ["{fixture_base_url}"],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [{"id": "unreachable_completion", "type": "url_path_equals", "expected": "/broken/confirmation.html"}],
+        "stability": {"consecutive_observations": 2, "interval_ms": 500}
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {"action": "tab", "purpose": "focus the declared journey entry link"},
+              {"action": "enter", "purpose": "open service selection"},
+              {"action": "tab", "purpose": "focus the available service"},
+              {"action": "enter", "purpose": "choose the service"},
+            {"action": "tab", "target_hint": "appointment-slot", "purpose": "attempt to focus an appointment time; the control is intentionally skipped by keyboard focus"}
+            ]
+          }
+        },
+        "barrier_check": {
+          "required_focus_test_id": "appointment-slot",
+          "max_keyboard_actions": 5
+        }
+      }
+    }
+  ]
+}
