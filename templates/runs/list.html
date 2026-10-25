@@ -14,17 +14,29 @@
             <h3>{{ journey.name }}</h3>
             <p>{{ journey.goal }}</p>
             <p class="muted">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
-            <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}">
+            <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}" autocomplete="off">
               {% csrf_token %}
               <label for="planner-provider-{{ journey.id }}">Planner provider</label>
-              <select id="planner-provider-{{ journey.id }}" name="planner_provider" required>
+              <select id="planner-provider-{{ journey.id }}" name="planner_provider" required data-journey="{{ journey.id }}">
                 <option value="" selected disabled>Choose a provider</option>
                 {% for option in planner_options %}
-                  <option value="{{ option.value }}" {% if not option.configured %}disabled{% endif %}>
-                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.configured %} (setup required){% endif %}
+                  <option value="{{ option.value }}"
+                    data-live="{{ option.live|yesno:'true,false' }}"
+                    data-server-key="{{ option.has_server_key|yesno:'true,false' }}"
+                    data-model="{{ option.model }}"
+                    data-model-example="{{ option.model_example }}">
+                    {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}
                   </option>
                 {% endfor %}
               </select>
+              <div class="live-planner-fields" id="live-fields-{{ journey.id }}" hidden>
+                <label for="planner-model-{{ journey.id }}">Model</label>
+                <input id="planner-model-{{ journey.id }}" name="planner_model" type="text" maxlength="255" spellcheck="false" aria-describedby="planner-model-help-{{ journey.id }}">
+                <p class="muted" id="planner-model-help-{{ journey.id }}">The exact model id for this run. Leave blank to use the server default.</p>
+                <label for="api-key-{{ journey.id }}">API key</label>
+                <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
+                <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
+              </div>
               <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
               <button type="submit">Start keyboard evaluation</button>
             </form>
@@ -112,6 +124,31 @@
       {% endif %}
     </div>
   </section>
+  <script>
+    document.querySelectorAll(".planner-picker select[name=planner_provider]").forEach((select) => {
+      const journey = select.dataset.journey;
+      const fields = document.getElementById(`live-fields-${journey}`);
+      const model = document.getElementById(`planner-model-${journey}`);
+      const keyHelp = document.getElementById(`api-key-help-${journey}`);
+      const modelHelp = document.getElementById(`planner-model-help-${journey}`);
+      const keyNote = keyHelp.textContent;
+      const update = () => {
+        const option = select.selectedOptions[0];
+        const live = option && option.dataset.live === "true";
+        fields.hidden = !live;
+        if (!live) return;
+        model.placeholder = option.dataset.modelExample;
+        modelHelp.textContent = option.dataset.model
+          ? `Leave blank to use the server default, ${option.dataset.model}.`
+          : "No server default is set, so enter the exact model id for this run.";
+        keyHelp.textContent = option.dataset.serverKey === "true"
+          ? `Optional: leave blank to use the server key. ${keyNote}`
+          : `Required: no server key is set for this provider. ${keyNote}`;
+      };
+      select.addEventListener("change", update);
+      update();
+    });
+  </script>
   <script>
     document.getElementById("run-filters").addEventListener("change", async (event) => {
       if (event.target.tagName !== "SELECT") return;

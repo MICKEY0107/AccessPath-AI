@@ -3,9 +3,11 @@ from django.contrib import messages
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.debug import sensitive_post_parameters
 
 from apps.journeys.models import Journey
 
+from .credentials import scrub, seal_api_key, validate_api_key, validate_model
 from .models import JourneyOutcome, PlannerProvider, Run
 from .tasks import execute_run
 
@@ -142,6 +144,7 @@ def run_list(request: HttpRequest) -> HttpResponse:
     )
 
 
+@sensitive_post_parameters("api_key")
 def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
@@ -152,21 +155,43 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
     if selected_option is None:
         messages.error(request, "Select a supported planner provider.")
         return redirect(reverse("runs:list"))
-    if not selected_option["configured"]:
-        messages.error(request, selected_option["setup_message"])
-        return redirect(reverse("runs:list"))
+
+    user_api_key = ""
+    model = ""
+    if selected_option["live"]:
+        user_api_key = request.POST.get("api_key", "").strip()
+        model = request.POST.get("planner_model", "").strip() or selected_option["model"]
+        problem = validate_api_key(user_api_key) if user_api_key else None
+        if problem is None and model:
+            problem = validate_model(model)
+        if problem is None and not (user_api_key or selected_option["has_server_key"]):
+            problem = selected_option["setup_message"]
+        if problem is None and not model:
+            problem = "Enter the model to use for this run."
+        if problem:
+            messages.error(request, problem)
+            return redirect(reverse("runs:list"))
+
     run = Run.objects.create(
         journey=journey,
         planner_provider=selected_provider,
-        planner_model=selected_option["model"],
+        planner_model=model,
+        planner_metadata=(
+            {"credential_source": "user_supplied" if user_api_key else "environment"}
+            if selected_option["live"]
+            else {}
+        ),
     )
     try:
-        task = execute_run.delay(str(run.id))
+        if user_api_key:
+            task = execute_run.delay(str(run.id), credential_token=seal_api_key(user_api_key))
+        else:
+            task = execute_run.delay(str(run.id))
     except Exception as error:
         run.status = "failed"
         run.outcome = "environment_blocked"
         run.terminal_reason = "WORKER_UNAVAILABLE"
-        run.error_detail = f"{type(error).__name__}: {error}"
+        run.error_detail = scrub(f"{type(error).__name__}: {error}", [user_api_key])
         run.save(update_fields=["status", "outcome", "terminal_reason", "error_detail"])
         messages.error(request, "The run could not be queued because the worker is unavailable.")
     else:
@@ -184,51 +209,69 @@ def _default_provider_for(journey: Journey) -> str:
 
 
 def _planner_options() -> list[dict[str, object]]:
-    """Expose explicit provider choices without accepting client-supplied credentials/models."""
-    return [
+    """Describe each provider; a live one runs with a typed key or the server's env key.
+
+    Only whether a server key exists is exposed, never the key itself.
+    """
+    live_providers = [
+        (
+            PlannerProvider.GEMINI,
+            "Live Gemini",
+            "Direct Google Gemini structured-action planning.",
+            settings.GEMINI_API_KEY,
+            settings.GEMINI_MODEL,
+            "gemini-2.5-flash",
+        ),
+        (
+            PlannerProvider.OPENROUTER,
+            "Live OpenRouter",
+            "OpenRouter structured-action planning with an explicitly recorded model.",
+            settings.OPENROUTER_API_KEY,
+            settings.OPENROUTER_MODEL,
+            "openai/gpt-4.1-mini",
+        ),
+        (
+            PlannerProvider.GROQ,
+            "Live Groq",
+            "Groq LPU structured-action planning — fast, generous free-tier rate limits.",
+            settings.GROQ_API_KEY,
+            settings.GROQ_MODEL,
+            "llama-3.3-70b-versatile",
+        ),
+    ]
+    options: list[dict[str, object]] = [
         {
-            "value": PlannerProvider.GEMINI,
-            "label": "Live Gemini",
-            "description": "Direct Google Gemini structured-action planning.",
-            "configured": bool(settings.GEMINI_API_KEY and settings.GEMINI_MODEL),
-            "model": settings.GEMINI_MODEL,
-            "setup_message": "Gemini is not configured. Add a verified local Gemini key and model.",
-        },
-        {
-            "value": PlannerProvider.OPENROUTER,
-            "label": "Live OpenRouter",
-            "description": (
-                "OpenRouter structured-action planning with an explicitly recorded model."
-            ),
-            "configured": bool(settings.OPENROUTER_API_KEY and settings.OPENROUTER_MODEL),
-            "model": settings.OPENROUTER_MODEL,
+            "value": value,
+            "label": label,
+            "description": description,
+            "live": True,
+            "configured": True,
+            "has_server_key": bool(server_key),
+            "model": server_model,
+            "model_example": server_model or example_model,
             "setup_message": (
-                "OpenRouter is not configured. Add a local key and a preflight-verified model."
+                f"{label.removeprefix('Live ')} is not configured. Enter an API key for this "
+                f"run, or set {value.upper()}_API_KEY in the server .env."
             ),
-        },
-        {
-            "value": PlannerProvider.GROQ,
-            "label": "Live Groq",
-            "description": (
-                "Groq LPU structured-action planning — fast, generous free-tier rate limits."
-            ),
-            "configured": bool(settings.GROQ_API_KEY and settings.GROQ_MODEL),
-            "model": settings.GROQ_MODEL,
-            "setup_message": (
-                "Groq is not configured. Add GROQ_API_KEY and GROQ_MODEL to your .env."
-            ),
-        },
+        }
+        for value, label, description, server_key, server_model, example_model in live_providers
+    ]
+    options.append(
         {
             "value": PlannerProvider.FIXTURE,
             "label": "Deterministic fixture contingency",
             "description": (
                 "Repeatable scripted fixture evidence; never counted as live-model evidence."
             ),
+            "live": False,
             "configured": True,
+            "has_server_key": False,
             "model": "",
+            "model_example": "",
             "setup_message": "",
-        },
-    ]
+        }
+    )
+    return options
 
 
 def run_detail(request: HttpRequest, run_id) -> HttpResponse:

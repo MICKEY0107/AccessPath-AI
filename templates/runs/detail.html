@@ -16,12 +16,17 @@
         <dd>
           {% if run.planner_metadata.fallback_used %}
             <span class="tag tag-issue">Deterministic contingency used</span>
-            <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}</span>
+            <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}{% if run.planner_model %} · tried {{ run.planner_model }}{% endif %}</span>
           {% elif run.planner_provider == "fixture" %}
             <span class="tag">Deterministic fixture planner</span>
           {% else %}
             <span class="tag tag-success">Live {{ run.planner_metadata.provider_label|default:run.get_planner_provider_display }}</span>
             <span class="muted">{{ run.planner_metadata.model|default:run.planner_model }} · {{ run.planner_metadata.calls|default:"0" }} calls</span>
+          {% endif %}
+          {% if run.planner_metadata.credential_source == "user_supplied" %}
+            <span class="muted">· Your API key{% if run.planner_metadata.credential_hint %} ({{ run.planner_metadata.credential_hint }}){% endif %}</span>
+          {% elif run.planner_metadata.credential_source == "environment" %}
+            <span class="muted">· Server API key</span>
           {% endif %}
         </dd>
       </div>
