@@ -27,6 +27,15 @@ The reviewed live-site pilot is the read-only Wikipedia journey. It remains opt-
 runs from the local stack; see `docs/RUNBOOK_REAL_SITE_PILOT.md` for the exact safety
 boundary, deterministic five-run proof, and live-provider three-run proof.
 
+## Choosing the provider, model, and API key per run
+
+Each journey's run form lets you pick Gemini, OpenRouter, Groq, or the deterministic fixture. For a live provider you can also type:
+
+- **Model**: the exact model id for this run. Leave it blank to use `GEMINI_MODEL`, `OPENROUTER_MODEL`, or `GROQ_MODEL` from `.env`.
+- **API key**: a key used for this run only. Leave it blank to use the provider key from `.env`.
+
+A typed key is never saved. The web process encrypts it with a key derived from `DJANGO_SECRET_KEY` and passes only the ciphertext to the worker through the task (it expires after an hour). The worker decrypts it in memory and scrubs it from step evidence, planner metadata, error detail, and any re-raised error. The run page shows only whether your key or the server key was used, plus its last four characters.
+
 ## Gemini preflight and evidence
 
 Keep `GEMINI_API_KEY` in local `.env` only; never commit it or pass it as a command-line argument. Leave `GEMINI_MODEL` blank until discovery succeeds.

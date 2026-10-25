@@ -16,11 +16,25 @@ from engine.groq import GroqActionClient
 from engine.openrouter import OpenRouterActionClient
 from engine.planner import planner_from_config
 
+from .credentials import mask_api_key, scrub
 from .models import JourneyOutcome, PlannerProvider, Run, RunArtifact, RunStatus, RunStep
 
 
-def execute_configured_run(run: Run) -> EvaluationResult:
-    """Execute one persisted journey and preserve every browser observation."""
+def _environment_api_key(provider: str) -> str:
+    return {
+        PlannerProvider.GEMINI: settings.GEMINI_API_KEY,
+        PlannerProvider.OPENROUTER: settings.OPENROUTER_API_KEY,
+        PlannerProvider.GROQ: settings.GROQ_API_KEY,
+    }.get(provider, "")
+
+
+def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationResult:
+    """Execute one persisted journey and preserve every browser observation.
+
+    ``user_api_key`` is a key the person typed for this run; when it is empty the
+    provider's environment key is used. Either way the key stays in memory and is
+    scrubbed from evidence, metadata, and error detail before they are saved.
+    """
     if run.status not in {RunStatus.QUEUED, RunStatus.STARTING}:
         raise ValueError("RUN_IS_NOT_READY")
 
@@ -42,7 +56,7 @@ def execute_configured_run(run: Run) -> EvaluationResult:
                 step = RunStep.objects.create(
                     run=run,
                     step_number=evidence.step_number,
-                    evidence=evidence.model_dump(mode="json"),
+                    evidence=scrub(evidence.model_dump(mode="json"), secrets),
                 )
                 RunArtifact.objects.bulk_create(
                     [
@@ -73,24 +87,33 @@ def execute_configured_run(run: Run) -> EvaluationResult:
     elif run.planner_provider != PlannerProvider.GEMINI:
         raise ValueError("UNSUPPORTED_PLANNER_PROVIDER")
 
+    api_key = user_api_key or _environment_api_key(run.planner_provider)
+    secrets = [api_key]
+    credential_metadata: dict[str, str] = {}
+    if run.planner_provider != PlannerProvider.FIXTURE:
+        credential_metadata = {
+            "credential_source": "user_supplied" if user_api_key else "environment",
+            "credential_hint": mask_api_key(api_key) if api_key else "",
+        }
+
     gemini_client = None
-    if run.planner_provider == PlannerProvider.GEMINI and settings.GEMINI_API_KEY:
+    if run.planner_provider == PlannerProvider.GEMINI and api_key:
         gemini_client = GoogleGeminiActionClient.from_api_key(
-            settings.GEMINI_API_KEY,
+            api_key,
             timeout_seconds=settings.PLANNER_CALL_TIMEOUT_SECONDS,
             min_interval_seconds=settings.PLANNER_MIN_CALL_INTERVAL_SECONDS,
         )
     openrouter_client = None
-    if run.planner_provider == PlannerProvider.OPENROUTER and settings.OPENROUTER_API_KEY:
+    if run.planner_provider == PlannerProvider.OPENROUTER and api_key:
         openrouter_client = OpenRouterActionClient(
-            api_key=settings.OPENROUTER_API_KEY,
+            api_key=api_key,
             timeout_seconds=settings.PLANNER_CALL_TIMEOUT_SECONDS,
             min_interval_seconds=settings.PLANNER_MIN_CALL_INTERVAL_SECONDS,
         )
     groq_client = None
-    if run.planner_provider == PlannerProvider.GROQ and settings.GROQ_API_KEY:
+    if run.planner_provider == PlannerProvider.GROQ and api_key:
         groq_client = GroqActionClient(
-            api_key=settings.GROQ_API_KEY,
+            api_key=api_key,
             timeout_seconds=settings.PLANNER_CALL_TIMEOUT_SECONDS,
             min_interval_seconds=settings.PLANNER_MIN_CALL_INTERVAL_SECONDS,
         )
@@ -126,18 +149,22 @@ def execute_configured_run(run: Run) -> EvaluationResult:
         result = executor.run_with_planner(planner, goal=run.journey.goal)
     finally:
         persist_steps()
-        run.planner_metadata = {
-            **planner.runtime_metadata(),
-            "executor": executor.runtime_metadata,
-            "journey_key": run.journey.evaluation_config.get("journey_key", ""),
-            "manifest_version": run.journey.evaluation_config.get("manifest_version", ""),
-        }
+        run.planner_metadata = scrub(
+            {
+                **planner.runtime_metadata(),
+                **credential_metadata,
+                "executor": executor.runtime_metadata,
+                "journey_key": run.journey.evaluation_config.get("journey_key", ""),
+                "manifest_version": run.journey.evaluation_config.get("manifest_version", ""),
+            },
+            secrets,
+        )
         run.save(update_fields=["planner_metadata"])
-    _complete_run(run, result)
+    _complete_run(run, result, secrets=secrets)
     return result
 
 
-def _complete_run(run: Run, result: EvaluationResult) -> None:
+def _complete_run(run: Run, result: EvaluationResult, *, secrets: list[str]) -> None:
     outcome_map = {
         "completed": JourneyOutcome.COMPLETED,
         "blocked": JourneyOutcome.BLOCKED,
@@ -153,18 +180,20 @@ def _complete_run(run: Run, result: EvaluationResult) -> None:
         else RunStatus.FAILED
     )
     run.terminal_reason = result.terminal_reason
-    run.error_detail = result.detail
+    run.error_detail = scrub(result.detail, secrets)
     run.finished_at = datetime.now(UTC)
     run.save(
         update_fields=["outcome", "status", "terminal_reason", "error_detail", "finished_at"]
     )
 
 
-def fail_run(run: Run, *, outcome: str, reason: str, detail: str) -> None:
+def fail_run(
+    run: Run, *, outcome: str, reason: str, detail: str, secrets: list[str] | None = None
+) -> None:
     """Persist an expected environment/engine failure without hiding its cause."""
     run.status = RunStatus.FAILED
     run.outcome = outcome
     run.terminal_reason = reason[:128]
-    run.error_detail = detail
+    run.error_detail = scrub(detail, secrets or [])
     run.finished_at = datetime.now(UTC)
     run.save(update_fields=["status", "outcome", "terminal_reason", "error_detail", "finished_at"])
