@@ -470,7 +470,7 @@ Next action and owner:
 
 | Version | Date | Summary |
 |---|---|---|
-| 1.12 | 25 October 2026 | Per-run provider/model/API-key picker with encrypted key handling; resilient live planning (retries, Retry-After, provider error text, Groq strict outputs); real-website journeys; UI redesign; AI-only Wikipedia and TodoMVC demo journeys passing live on free Groq models; 112 tests pass. See PROJECT_HANDOFF.md |
+| 1.12 | 26 October 2026 (IST) | Per-run provider/model/API-key picker with encrypted key handling; resilient live planning (retries, Retry-After, provider error text, Groq strict outputs); real-website journeys; UI redesign; AI-only Wikipedia and TodoMVC demo journeys passing live on free Groq models; 112 tests pass. See PROJECT_HANDOFF.md |
 | 1.11 | 28 September 2026 | Clarified accessible versus blocked fixture behavior, improved blocked-result wording, added live run filters, and changed filter refresh to preserve page position |
 | 1.10 | 28 September 2026 | Added a required provider dropdown, cross-run process-wide pacing, architecture/run-flow diagrams, presentation outline, live OpenRouter diagnosis, and consolidated teammate handoff; 48 tests pass while the final provider-pure live matrix remains pending |
 | 1.9 | 28 September 2026 | Added explicit Gemini/OpenRouter/deterministic provider selection, persisted provider/model metadata, OpenRouter structured-output preflight and provider-specific matrix support; superseded by version 1.10 live-configuration and pacing update |
