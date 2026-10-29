@@ -457,3 +457,45 @@ def export_report_html(request: HttpRequest, run_id) -> HttpResponse:
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="accesspath-report-{run.id}.html"'
     return response
+
+
+def map_to_code(request: HttpRequest, run_id) -> HttpResponse:
+    """Re-map a run's findings to its journey's repository (rule-based, no AI)."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    from .code_mapping import map_run_findings
+
+    run = _load_run(run_id)
+    mapped = map_run_findings(run, use_ai=False)
+    if mapped:
+        messages.success(request, f"Mapped {mapped} finding(s) to {run.journey.repo_binding.short_name}.")
+    else:
+        messages.error(
+            request, "Link this journey to an analysed repository on the Code page first."
+        )
+    return redirect(f"{reverse('runs:detail', kwargs={'run_id': run.id})}#panel-findings")
+
+
+def verify_fix_view(request: HttpRequest, finding_id: int) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    from engine.fix_verify import can_verify
+
+    from .models import Finding
+    from .tasks import verify_fix
+
+    finding = get_object_or_404(Finding.objects.select_related("run"), pk=finding_id)
+    data = dict(finding.data or {})
+    locations = data.get("locations") or {}
+    if not can_verify(locations.get("fix")):
+        messages.error(request, "Only fixes to the project's fixture pages can be verified here.")
+    else:
+        locations["verification"] = {"status": "running", "detail": "Re-running on a copy…"}
+        data["locations"] = locations
+        finding.data = data
+        finding.save(update_fields=["data"])
+        try:
+            verify_fix.delay(finding.pk)
+        except Exception:
+            messages.error(request, "The worker is not running, so the fix could not be verified.")
+    return redirect(f"{reverse('runs:detail', kwargs={'run_id': finding.run_id})}#panel-fixes")

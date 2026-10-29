@@ -43,6 +43,12 @@ VERDICTS = {
 }
 
 
+LOCATION_COLUMNS = (
+    ("exact", "Exact match", "Rule-based: the element's own attributes in the code."),
+    ("likely", "Likely cause", "Its text or classes, or the AI search's answer."),
+    ("related", "Also affected", "Components that render it, or the same pattern elsewhere."),
+)
+
 METHOD_LABELS = {
     "tab_walk": "Tab walk from the top of the page",
     "activation_probe": "Enter, Space and click comparison",
@@ -65,8 +71,21 @@ def _finding_rows(run: Run) -> list[dict[str, Any]]:
     for finding in run.findings.all():
         data = finding.data or {}
         rule = rules.get(finding.rule_id)
+        locations = data.get("locations") or None
+        columns = [
+            {"label": label, "help": help_text, "items": (locations or {}).get(key) or []}
+            for key, label, help_text in LOCATION_COLUMNS
+        ]
         rows.append(
             {
+                "pk": finding.pk,
+                "locations": locations,
+                "location_columns": columns,
+                "can_verify": bool(
+                    locations
+                    and (locations.get("fix") or {}).get("edits")
+                    and str((locations.get("fix") or {}).get("path", "")).startswith("fixtures/clinic/")
+                ),
                 "id": finding.finding_id,
                 "rule_id": finding.rule_id,
                 "title": finding.title,
@@ -88,7 +107,8 @@ def _finding_rows(run: Run) -> list[dict[str, Any]]:
                 "fix_hints": list(rule.fix_hints) if rule else [],
                 "rule_title": rule.title if rule else finding.title,
                 "method_label": METHOD_LABELS.get(
-                    (data.get("confirmation") or {}).get("method", ""), ""
+                    (data.get("confirmation") or {}).get("method", ""),
+                    (data.get("confirmation") or {}).get("method", "") or "—",
                 ),
             }
         )
@@ -205,6 +225,23 @@ def _ai_reasoning(run: Run) -> list[dict[str, Any]]:
     return steps
 
 
+def _repository(run: Run) -> dict[str, Any] | None:
+    binding = run.journey.repo_binding
+    if binding is None:
+        return None
+    return {
+        "journeys": [
+            {"id": journey.pk, "name": journey.name}
+            for journey in binding.journeys.filter(is_active=True).exclude(pk=run.journey_id)[:10]
+        ],
+        "name": binding.short_name,
+        "branch": binding.branch,
+        "commit": binding.commit_sha,
+        "status": binding.status,
+        "ready": binding.status == "ready",
+    }
+
+
 def build_report(run: Run) -> dict[str, Any]:
     findings = _finding_rows(run)
     rules_meta = (run.planner_metadata or {}).get("rules") or {}
@@ -266,6 +303,7 @@ def build_report(run: Run) -> dict[str, Any]:
             "fail_on": fail_on,
         },
         "axe": (metadata.get("executor") or {}).get("axe") or {},
+        "repository": _repository(run),
         "planner": {
             "provider": run.planner_provider,
             "model": metadata.get("model") or run.planner_model,

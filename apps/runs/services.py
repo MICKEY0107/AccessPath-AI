@@ -208,6 +208,16 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         )
         run.save(update_fields=["planner_metadata"])
     _complete_run(run, result, secrets=secrets)
+    try:
+        from .code_mapping import map_run_findings
+
+        map_run_findings(run, api_key=api_key)
+    except Exception as error:  # Mapping to code is extra; never lose the run's result.
+        run.diagnosis = scrub(
+            f"{run.diagnosis} Mapping findings to code failed ({type(error).__name__}).".strip(),
+            secrets,
+        )
+        run.save(update_fields=["diagnosis"])
     return result
 
 

@@ -166,3 +166,6 @@ REPO_MAX_FILES = int(os.environ.get("REPO_MAX_FILES", "20000"))
 REPO_CLONE_TIMEOUT_SECONDS = int(os.environ.get("REPO_CLONE_TIMEOUT_SECONDS", "120"))
 # Tests clone from local folders; production only clones https URLs from the hosts above.
 REPO_ALLOW_FILE_URLS = False
+# Use the run's AI provider to search the code when nothing exact is found, but only
+# when that provider is allowed to read private code (engine/code_safety.py).
+CODE_LOCATOR_USE_AI = os.environ.get("CODE_LOCATOR_USE_AI", "true").lower() == "true"

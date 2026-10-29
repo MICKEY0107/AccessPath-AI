@@ -21,6 +21,7 @@
         {% if run.planner_provider == "fixture" %}Deterministic fixture planner{% else %}AI: {{ report.planner.model|default:"model not recorded" }} ({{ run.get_planner_provider_display }}){% endif %}
         {% if report.rules.preset %} · Rules: {{ report.rules.preset }} (catalog {{ report.rules.catalog_version }}){% endif %}
         {% if run.started_at %} · {{ run.started_at|date:"j M Y, H:i" }}{% endif %}
+        {% if report.repository %} · Repository: {{ report.repository.name }}{% if report.repository.commit %} @ {{ report.repository.commit|slice:":8" }}{% endif %}{% endif %}
       </p>
       <p class="run-brief">{{ run_brief }}</p>
     </div>
@@ -32,6 +33,11 @@
             <option value="{% url 'runs:detail' item.id %}" {% if item.id == run.id %}selected{% endif %}>{{ item.created_at|date:"j M, H:i" }} · {{ item.get_outcome_display }}</option>
           {% endfor %}
         </select>
+      {% endif %}
+      {% if report.repository.ready and report.findings %}
+        <form method="post" action="{% url 'runs:map_code' run.id %}">{% csrf_token %}<button type="submit" class="secondary">Map to code</button></form>
+      {% elif not report.repository %}
+        <a class="secondary" href="{% url 'codebase:page' %}">Link a repository</a>
       {% endif %}
       <a class="secondary" href="{% url 'runs:report_html' run.id %}">Export HTML</a>
       <a class="secondary" href="{% url 'runs:report_json' run.id %}">Export JSON</a>
@@ -124,16 +130,40 @@
               <button type="submit">Re-run this journey</button>
               {% if run.planner_metadata.credential_source == "user_supplied" %}<span class="muted small">Uses your saved or the server key; to use a typed key again, start it from the workspace.</span>{% endif %}
             </form>
+            {% if report.repository.journeys %}
+              <h3 class="small">Other journeys on {{ report.repository.name }}</h3>
+              <p class="muted small">A fix in this repository can affect these too; re-run them after changing the code.</p>
+              <ul class="row-list">
+                {% for item in report.repository.journeys %}
+                  <li><a class="row-link" href="{% url 'runs:list' %}#journey-{{ item.id }}"><span class="row-title">{{ item.name }}</span><span class="row-sub">Open to re-run</span></a></li>
+                {% endfor %}
+              </ul>
+            {% endif %}
           </div>
           <div>
             <h2>Fixes to apply</h2>
             {% for finding in report.confirmed|add:report.review %}
               <article class="fix-card">
                 <h3>{{ finding.rule_title }} <span class="tag severity-{{ finding.severity }}">{{ finding.severity }}</span></h3>
-                {% if finding.element.css_path %}<p class="small"><code>{{ finding.element.css_path }}</code></p>{% endif %}
-                <ol class="fix-steps">
-                  {% for hint in finding.fix_hints %}<li>{{ hint }}</li>{% empty %}<li>See <a href="{{ finding.help_url }}">the rule's guidance</a>.</li>{% endfor %}
-                </ol>
+                {% if finding.locations.fix %}
+                  <p class="small"><strong>{{ finding.locations.fix.title }}</strong> · <code>{{ finding.locations.fix.path }}:{{ finding.locations.fix.line }}</code></p>
+                  <ol class="fix-steps">{% for step in finding.locations.fix.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+                  {% if finding.locations.fix.patch %}
+                    <div class="patch-head"><span class="small muted">Suggested patch, never applied automatically</span> <button type="button" class="secondary copy-patch" data-copy-target="patch-{{ finding.pk }}">Copy patch</button></div>
+                    <pre class="patch" id="patch-{{ finding.pk }}">{{ finding.locations.fix.patch }}</pre>
+                  {% endif %}
+                  {% if finding.can_verify %}
+                    <form method="post" action="{% url 'runs:verify_fix' finding.pk %}" class="verify-form">{% csrf_token %}<button type="submit" class="secondary">Verify on a temporary copy</button></form>
+                  {% endif %}
+                  {% if finding.locations.verification %}
+                    <p class="verification verification-{{ finding.locations.verification.status }}" role="status"><strong>{% if finding.locations.verification.status == "resolved" %}Fix verified.{% elif finding.locations.verification.status == "still_failing" %}Not fixed yet.{% elif finding.locations.verification.status == "running" %}Verifying…{% else %}Could not verify.{% endif %}</strong> {{ finding.locations.verification.detail }}</p>
+                  {% endif %}
+                {% else %}
+                  {% if finding.element.css_path %}<p class="small"><code>{{ finding.element.css_path }}</code></p>{% endif %}
+                  <ol class="fix-steps">
+                    {% for hint in finding.fix_hints %}<li>{{ hint }}</li>{% empty %}<li>See <a href="{{ finding.help_url }}">the rule's guidance</a>.</li>{% endfor %}
+                  </ol>
+                {% endif %}
                 <p class="muted small">What it fixes: {{ finding.summary }}</p>
               </article>
             {% empty %}
@@ -360,6 +390,13 @@
       });
       const fromHash = tabs.findIndex((tab) => `#${tab.getAttribute("aria-controls")}` === location.hash);
       select(fromHash >= 0 ? fromHash : 0, false);
+      document.querySelectorAll("[data-copy-target]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const text = document.getElementById(button.dataset.copyTarget).textContent;
+          try { await navigator.clipboard.writeText(text); button.textContent = "Copied"; }
+          catch (error) { button.textContent = "Select the patch to copy"; }
+        });
+      });
       document.querySelectorAll("[data-show-evidence]").forEach((link) => {
         link.addEventListener("click", () => select(tabs.length - 1, false));
       });

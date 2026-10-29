@@ -70,3 +70,46 @@ def execute_run(self, run_id: str, credential_token: str = "") -> dict[str, str 
             # Celery logs and stores the raised error; never let it carry the key.
             raise RuntimeError(scrub(f"{type(error).__name__}: {error}", [user_api_key])) from None
         raise
+
+
+@shared_task(name="accesspath.verify_fix")
+def verify_fix(finding_pk: int) -> str:
+    """Apply a suggested fix to a temporary copy of a fixture site and re-run the journey."""
+    from django.conf import settings
+
+    from engine.fix_verify import verify_fixture_fix
+    from engine.rules import resolve_rules
+
+    from .models import Finding
+
+    finding = Finding.objects.select_related("run__journey__repo_binding").get(pk=finding_pk)
+    data = dict(finding.data or {})
+    locations = data.get("locations") or {}
+    journey = finding.run.journey
+    binding = journey.repo_binding
+    plan = (journey.evaluation_config.get("planner") or {}).get("fallback")
+    try:
+        if binding is None or not isinstance(plan, dict):
+            raise ValueError("This journey has no repository or scripted plan to verify with.")
+        outcome = verify_fixture_fix(
+            snapshot_root=binding.source_dir,
+            fix=locations.get("fix") or {},
+            finding=data,
+            start_url=journey.start_url,
+            completion_policy=journey.completion_policy,
+            barrier_check=journey.evaluation_config.get("barrier_check"),
+            plan=plan,
+            rule_set=resolve_rules(journey.rule_config),
+            browser_executable_path=settings.EVALUATOR_BROWSER_EXECUTABLE,
+        )
+        verification = {
+            "status": "resolved" if outcome.resolved else "still_failing",
+            "detail": outcome.detail,
+        }
+    except Exception as error:
+        verification = {"status": "error", "detail": f"{type(error).__name__}: {error}"[:300]}
+    locations["verification"] = verification
+    data["locations"] = locations
+    finding.data = data
+    finding.save(update_fields=["data"])
+    return verification["status"]

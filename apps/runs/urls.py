@@ -6,6 +6,8 @@ from .views import (
     create_real_site_journey,
     export_report_html,
     export_report_json,
+    map_to_code,
+    verify_fix_view,
     remove_real_site_journey,
     run_detail,
     run_list,
@@ -28,4 +30,6 @@ urlpatterns = [
     path("<uuid:run_id>/", run_detail, name="detail"),
     path("<uuid:run_id>/report.json", export_report_json, name="report_json"),
     path("<uuid:run_id>/report.html", export_report_html, name="report_html"),
+    path("<uuid:run_id>/map-code/", map_to_code, name="map_code"),
+    path("findings/<int:finding_id>/verify/", verify_fix_view, name="verify_fix"),
 ]

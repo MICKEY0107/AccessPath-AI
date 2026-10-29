@@ -13,6 +13,7 @@ these probes re-check the suspected control with plain keyboard actions:
 from __future__ import annotations
 
 import re
+from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -69,6 +70,19 @@ _RESTORE_WALK = script(
 
 _FOCUSABLE_COUNT = script(
     "return Array.from(document.querySelectorAll('*')).filter(__isSequentiallyFocusable).length;"
+)
+
+_NEXT_IN_TAB_ORDER = script(
+    """
+    const focusable = Array.from(document.querySelectorAll('*')).filter(__isSequentiallyFocusable);
+    const positive = focusable.filter((element) => element.tabIndex > 0)
+      .sort((a, b) => a.tabIndex - b.tabIndex);
+    const ordered = positive.concat(focusable.filter((element) => element.tabIndex === 0));
+    if (!arg) return ordered.length ? __details(ordered[0]) : null;
+    const at = ordered.findIndex((element) => __cssPath(element) === arg);
+    return at >= 0 && at + 1 < ordered.length ? __details(ordered[at + 1]) : null;
+    """,
+    "arg",
 )
 
 _FIND_CANDIDATES = script(
@@ -200,6 +214,7 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
     page.evaluate(_PREPARE_WALK)
     seen: dict[str, int] = {}
     frame_repeats = 0
+    trigger_known = False
     try:
         for _ in range(max_stops):
             page.keyboard.press("Tab")
@@ -220,6 +235,7 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
             if page.url != before_url:
                 walk.navigated_to = page.url
                 walk.navigation_stop = info
+                trigger_known = True
                 break
             if info is None:
                 walk.completed = True
@@ -247,6 +263,12 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
         if walk.navigated_to:
             page.goto(before_url, wait_until="domcontentloaded")
             walk.restored = "reloaded"
+            # The control that navigated is the one after the last stop we could read.
+            last = walk.stops[-1]["css_path"] if walk.stops else ""
+            with suppress(Exception):
+                if trigger_known:
+                    raise LookupError("already known")
+                walk.navigation_stop = page.evaluate(_NEXT_IN_TAB_ORDER, last) or walk.navigation_stop
         else:
             walk.restored = page.evaluate(_RESTORE_WALK)
     return walk

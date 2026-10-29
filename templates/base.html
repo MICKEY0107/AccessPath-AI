@@ -232,7 +232,7 @@
       .severity-head:first-child { margin-top: 0; }
       .severity-head .count { border-radius: 1rem; background: var(--accent-soft); color: var(--accent-strong); font-size: .72rem; padding: .05rem .5rem; }
       .finding-list { display: grid; gap: .7rem; list-style: none; margin: 0; padding: 0; }
-      .finding-card { border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: .75rem; background: var(--surface); padding: .85rem 1rem; }
+      .finding-card { min-width: 0; border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: .75rem; background: var(--surface); padding: .85rem 1rem; }
       .finding-card h3 { margin: .45rem 0 .25rem; font-size: .95rem; }
       .finding-card p { margin: 0 0 .5rem; font-size: .87rem; }
       .finding-card.is-ignored { opacity: .72; }
@@ -310,6 +310,30 @@
       .safety-ok { background: var(--success-soft); color: #14532d; }
       .safety-no { background: var(--warn-soft); color: var(--warn); }
       @media (max-width: 40rem) { .model-form { grid-template-columns: 1fr; } }
+
+      /* Where to fix */
+      .where-to-fix { margin-top: .8rem; border-top: 1px dashed var(--line-strong); padding-top: .7rem; }
+      .where-title { margin: 0 0 .5rem !important; font-size: .82rem !important; font-weight: 700; color: var(--accent-strong); letter-spacing: .04em; text-transform: uppercase; }
+      .where-title .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+      .location-group { min-width: 0; margin-top: .45rem; }
+      .location-group summary { cursor: pointer; font-size: .82rem; }
+      .location-group[open] summary { margin-bottom: .4rem; }
+      .location-head { font-weight: 700; }
+      .location-group .count { border-radius: 1rem; background: var(--accent-soft); color: var(--accent-strong); font-size: .7rem; padding: 0 .45rem; }
+      .location-card { min-width: 0; margin-top: .35rem; }
+      .location-card { border: 1px solid var(--line); border-left: 3px solid var(--line-strong); border-radius: .55rem; background: var(--surface-soft); padding: .45rem .55rem; }
+      .location-card p { margin: 0 0 .25rem !important; }
+      .location-card.confidence-high { border-left-color: var(--issue); }
+      .location-card.confidence-medium { border-left-color: #c2410c; }
+      pre.code-snippet, pre.patch { max-width: 100%; margin: .2rem 0 0; max-height: 14rem; overflow: auto; border-radius: .45rem; background: var(--navy); color: #e0e7ff; font-family: ui-monospace, Consolas, monospace; font-size: .72rem; line-height: 1.45; padding: .5rem .6rem; white-space: pre; }
+      .patch-head { display: flex; gap: .5rem; align-items: center; justify-content: space-between; margin-top: .5rem; }
+      .copy-patch { font-size: .76rem; padding: .3rem .6rem; }
+      .verify-form { margin: .6rem 0 0; }
+      .verification { margin: .5rem 0 0; border-radius: .45rem; font-size: .82rem; padding: .45rem .6rem; }
+      .verification-resolved { background: var(--success-soft); color: #14532d; }
+      .verification-still_failing, .verification-error { background: var(--issue-soft); color: var(--issue); }
+      .verification-running { background: var(--surface-tint); color: var(--accent-strong); }
+      .report-actions form { margin: 0; }
 
       /* Messages */
       .messages { display: grid; gap: .5rem; margin-bottom: 1rem; }

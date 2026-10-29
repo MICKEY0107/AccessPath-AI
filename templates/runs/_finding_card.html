@@ -14,7 +14,7 @@
     {% if finding.element.html_snippet %}<div><dt>HTML</dt><dd><code class="snippet">{{ finding.element.html_snippet }}</code></dd></div>{% endif %}
     {% if finding.element.source_file %}<div><dt>Source hint</dt><dd><code>{{ finding.element.source_file }}{% if finding.element.source_line %}:{{ finding.element.source_line }}{% endif %}</code> ({{ finding.element.framework }})</dd></div>{% endif %}
     {% if finding.occurrences > 1 %}<div><dt>Elements</dt><dd>{{ finding.occurrences }} on this page</dd></div>{% endif %}
-    <div><dt>Checked by</dt><dd>{{ finding.method_label|default:finding.confirmation.method|default:"—" }}{% if finding.step_number %} · <a href="#step-{{ finding.step_number }}" data-show-evidence>step {{ finding.step_number }}</a>{% endif %}</dd></div>
+    <div><dt>Checked by</dt><dd>{{ finding.method_label }}{% if finding.step_number %} · <a href="#step-{{ finding.step_number }}" data-show-evidence>step {{ finding.step_number }}</a>{% endif %}</dd></div>
   </dl>
   {% if finding.locations %}{% include "runs/_finding_locations.html" %}{% endif %}
 </li>

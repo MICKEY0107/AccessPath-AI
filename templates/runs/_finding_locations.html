@@ -1,1 +1,17 @@
-{% comment %}Code locations for a finding (filled in by the code mapper).{% endcomment %}
+<div class="where-to-fix" aria-label="Where to fix">
+  <p class="where-title">Where to fix <span class="muted small">in {{ finding.locations.repo }}{% if finding.locations.commit %} @ {{ finding.locations.commit|slice:":8" }}{% endif %}</span>{% if finding.locations.ai_used %} <span class="chip-small">AI-assisted</span>{% endif %}</p>
+  {% for column in finding.location_columns %}
+    <details class="location-group" {% if not forloop.last %}open{% endif %}>
+      <summary><span class="location-head">{{ column.label }}</span> <span class="count">{{ column.items|length }}</span> <span class="muted small">{{ column.help }}</span></summary>
+      {% for item in column.items %}
+        <div class="location-card confidence-{{ item.confidence }}">
+          <p class="small"><code>{{ item.path }}:{{ item.line }}</code> <span class="tag {% if item.confidence == 'high' %}tag-issue{% elif item.confidence == 'low' %}tag-neutral{% endif %}">{{ item.confidence }}</span>{% if item.source == "ai" %} <span class="chip-small">AI</span>{% endif %} <span class="small">{{ item.reason }}</span></p>
+          {% if item.snippet %}<pre class="code-snippet">{{ item.snippet }}</pre>{% endif %}
+        </div>
+      {% empty %}
+        <p class="muted small">Nothing here.</p>
+      {% endfor %}
+    </details>
+  {% endfor %}
+  {% for note in finding.locations.notes %}<p class="muted small">{{ note }}</p>{% endfor %}
+</div>
