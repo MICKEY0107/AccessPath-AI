@@ -7,6 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# git clones the active codebase (read-only, shallow; never run).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir "uv==0.8.22"
 
 COPY pyproject.toml README.md ./
@@ -15,7 +20,7 @@ RUN uv sync --no-dev --no-install-project
 COPY . .
 RUN uv sync --no-dev --no-install-project \
     && .venv/bin/python -m playwright install --with-deps chromium \
-    && mkdir -p /app/output/runs \
+    && mkdir -p /app/output/runs /app/.runtime/repos \
     && groupadd --system app \
     && useradd --system --gid app --create-home app \
     && chown -R app:app /app /ms-playwright

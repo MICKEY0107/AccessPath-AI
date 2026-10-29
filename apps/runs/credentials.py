@@ -83,3 +83,22 @@ def scrub(value: object, secrets: list[str]) -> object:
     if isinstance(value, list | tuple):
         return [scrub(item, secrets) for item in value]
     return value
+
+
+def _saved_fernet() -> Fernet:
+    # A different context from run credentials, so one can never be used as the other.
+    digest = hashlib.sha256(f"accesspath.saved-credential.v1:{settings.SECRET_KEY}".encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def encrypt_saved_key(api_key: str) -> str:
+    """Encrypt a key a person chose to remember; useless without the server's SECRET_KEY."""
+    return _saved_fernet().encrypt(api_key.encode()).decode()
+
+
+def decrypt_saved_key(token: str) -> str:
+    try:
+        return _saved_fernet().decrypt(token.encode()).decode()
+    except InvalidToken as error:
+        # Happens if DJANGO_SECRET_KEY changed; the person must save the key again.
+        raise CredentialError("SAVED_CREDENTIAL_UNREADABLE") from error

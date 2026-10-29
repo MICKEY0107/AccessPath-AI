@@ -31,6 +31,14 @@ class Journey(models.Model):
     # Rule settings chosen on the Rules page (engine.rules.RuleConfigV1). Kept apart
     # from evaluation_config so re-seeding a manifest never wipes a person's choices.
     rule_config = models.JSONField(default=dict, blank=True)
+    # The repository behind this journey's site, used to map findings to code.
+    repo_binding = models.ForeignKey(
+        "codebase.RepoBinding",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="journeys",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

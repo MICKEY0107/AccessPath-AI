@@ -46,6 +46,7 @@ services:
       - .:/app
       - /app/.venv
       - run_output:/app/output
+      - repo_storage:/app/.runtime/repos
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +63,7 @@ services:
       - .:/app
       - /app/.venv
       - run_output:/app/output
+      - repo_storage:/app/.runtime/repos
     depends_on:
       db:
         condition: service_healthy
@@ -71,3 +73,4 @@ services:
 volumes:
   postgres_data_v18:
   run_output:
+  repo_storage:

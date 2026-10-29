@@ -191,6 +191,7 @@
       .rules-table .row-sub { white-space: normal; }
       .rules-table tr.not-in-preset td { opacity: .62; }
       .check-row { display: inline-flex; gap: .4rem; align-items: center; font-size: .84rem; }
+      .check-row input { width: auto; flex: none; margin: 0; }
       .disable-reason { margin-top: .4rem; }
       .disable-reason[hidden] { display: none; }
       .rules-table select { min-width: 7.5rem; }
@@ -266,6 +267,49 @@
       .gallery-title { margin-top: 1.6rem; }
       @media (max-width: 60rem) { .fix-columns { grid-template-columns: 1fr; } }
       @media (max-width: 40rem) { .stat-grid.four { grid-template-columns: 1fr 1fr; } .finding-facts div { grid-template-columns: 1fr; gap: .05rem; } }
+
+      /* Sign-in */
+      .login-shell { display: grid; place-items: center; padding: 2rem 0; }
+      .login-panel { width: min(100%, 26rem); }
+      .login-form { display: grid; gap: .8rem; margin-top: 1rem; }
+      .signout-form { display: inline-flex; gap: .4rem; align-items: center; margin: 0; }
+      .signout-form .secondary { font-size: .8rem; padding: .35rem .65rem; }
+
+      /* Active codebase */
+      .codebase-card { display: grid; gap: 1rem; }
+      .active-repo { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+      .repo-path { margin: 0 0 .35rem; border-radius: .6rem; background: var(--navy); color: #fff; font-family: ui-monospace, Consolas, monospace; font-size: .92rem; padding: .7rem .9rem; overflow-wrap: anywhere; }
+      .repo-path span { color: #facc15; }
+      .repo-badge { margin: 0; border-radius: 1rem; background: var(--success-soft); color: var(--success); font-size: .8rem; font-weight: 600; padding: .3rem .75rem; }
+      .repo-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1rem; border-top: 1px solid var(--line); padding-top: 1rem; align-items: start; }
+      .repo-form .repo-url, .repo-form .journey-links, .repo-form > p { grid-column: 1 / -1; }
+      .repo-form > p { margin: 0; }
+      .repo-submit { display: flex; align-items: end; }
+      .primary-wide { width: 100%; }
+      .journey-links { display: grid; gap: .45rem; border: 0; margin: 0; padding: 0; }
+      .journey-links legend { font-size: .82rem; font-weight: 600; margin-bottom: .3rem; }
+      .repo-chips { display: flex; gap: .5rem; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+      .repo-chips li { display: inline-flex; align-items: center; gap: .25rem; border: 1px solid var(--line-strong); border-radius: 1rem; background: var(--surface-soft); padding: .2rem .25rem .2rem .7rem; font-size: .8rem; }
+      .repo-chips a { color: var(--ink); text-decoration: none; }
+      .repo-chips a[aria-current="true"] { color: var(--accent-strong); font-weight: 600; }
+      .repo-chips form { margin: 0; }
+      .chip-remove { border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; padding: .15rem .45rem; }
+      .chip-remove:hover { background: var(--issue-soft); color: var(--issue); }
+      @media (max-width: 40rem) { .repo-form { grid-template-columns: 1fr; } }
+
+      /* Model settings */
+      .model-card { display: grid; gap: .9rem; }
+      .provider-switch { display: grid; gap: .3rem; max-width: 22rem; }
+      .model-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem 1rem; }
+      .model-form .form-field:last-of-type, .model-actions { grid-column: 1 / -1; }
+      .model-row { display: flex; gap: .5rem; }
+      .model-row input { flex: 1; }
+      .model-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+      .forget-form { margin: 0; }
+      .safety { margin: 0; border-radius: .55rem; font-size: .84rem; padding: .6rem .8rem; }
+      .safety-ok { background: var(--success-soft); color: #14532d; }
+      .safety-no { background: var(--warn-soft); color: var(--warn); }
+      @media (max-width: 40rem) { .model-form { grid-template-columns: 1fr; } }
 
       /* Messages */
       .messages { display: grid; gap: .5rem; margin-bottom: 1rem; }
@@ -358,6 +402,13 @@
           <a class="brand" href="{% url 'core:home' %}" aria-label="AccessPath AI home">accesspath <small>AI</small></a>
           <div class="top-actions">
             <span class="chip"><span class="dot" aria-hidden="true"></span>Keyboard-only profile</span>
+            {% if user.is_authenticated %}
+              <form method="post" action="{% url 'logout' %}" class="signout-form">
+                {% csrf_token %}
+                <span class="chip">{{ user.get_username }}</span>
+                <button class="secondary" type="submit">Sign out</button>
+              </form>
+            {% endif %}
             <a class="chip" href="{% url 'admin:index' %}">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Admin
             </a>
@@ -384,6 +435,18 @@
               <a class="tab" href="{% url 'runs:rules' %}" {% if request.resolver_match.url_name == 'rules' %}aria-current="page"{% endif %}>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg>
                 <span class="tab-text"><small>Settings</small><span>Rules</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="tab" href="{% url 'codebase:page' %}" {% if request.resolver_match.namespace == 'codebase' %}aria-current="page"{% endif %}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/></svg>
+                <span class="tab-text"><small>Code</small><span>Active codebase</span></span>
+              </a>
+            </li>
+            <li>
+              <a class="tab" href="{% url 'runs:model_settings' %}" {% if request.resolver_match.url_name == 'model_settings' %}aria-current="page"{% endif %}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9z"/></svg>
+                <span class="tab-text"><small>Settings</small><span>Models</span></span>
               </a>
             </li>
             {% block extra_tabs %}{% endblock %}

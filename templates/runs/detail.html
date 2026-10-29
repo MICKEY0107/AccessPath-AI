@@ -122,7 +122,7 @@
               <input type="hidden" name="planner_provider" value="{{ run.planner_provider }}">
               {% if run.planner_model %}<input type="hidden" name="planner_model" value="{{ run.planner_model }}">{% endif %}
               <button type="submit">Re-run this journey</button>
-              {% if run.planner_metadata.credential_source == "user_supplied" %}<span class="muted small">Uses the server key; to use your own key again, start it from the workspace.</span>{% endif %}
+              {% if run.planner_metadata.credential_source == "user_supplied" %}<span class="muted small">Uses your saved or the server key; to use a typed key again, start it from the workspace.</span>{% endif %}
             </form>
           </div>
           <div>
@@ -243,6 +243,10 @@
               {% endif %}
               {% if run.planner_metadata.credential_source == "user_supplied" %}
                 <span class="muted">· Your API key{% if run.planner_metadata.credential_hint %} ({{ run.planner_metadata.credential_hint }}){% endif %}</span>
+              {% elif run.planner_metadata.credential_source == "saved" %}
+                <span class="muted">· Your saved key{% if run.planner_metadata.credential_hint %} ({{ run.planner_metadata.credential_hint }}){% endif %}</span>
+              {% elif run.planner_metadata.credential_source == "none" %}
+                <span class="muted">· No API key (local model)</span>
               {% elif run.planner_metadata.credential_source == "environment" %}
                 <span class="muted">· Server API key</span>
               {% endif %}

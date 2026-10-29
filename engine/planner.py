@@ -80,6 +80,22 @@ class GroqTransientError(GeminiTransientError):
     code = "GROQ_TRANSIENT_FAILURE"
 
 
+class OllamaTimeoutError(GeminiTimeoutError):
+    code = "OLLAMA_TIMEOUT"
+
+
+class OllamaQuotaError(GeminiQuotaError):
+    code = "OLLAMA_QUOTA_FAILURE"
+
+
+class OllamaUnavailableError(GeminiUnavailableError):
+    code = "OLLAMA_UNAVAILABLE"
+
+
+class OllamaTransientError(GeminiTransientError):
+    code = "OLLAMA_TRANSIENT_FAILURE"
+
+
 class MalformedModelOutputError(PlannerError):
     code = "MALFORMED_MODEL_OUTPUT"
     retryable = True
@@ -525,6 +541,33 @@ class UnavailableGroqPlanner(UnavailableGeminiPlanner):
         return metadata
 
 
+class OllamaPlanner(OpenRouterPlanner):
+    """A local Ollama model; the same bounded structured-action loop as the others."""
+
+    provider_label = "Ollama"
+    unavailable_error = OllamaUnavailableError
+    timeout_error = OllamaTimeoutError
+    quota_error = OllamaQuotaError
+
+    def runtime_metadata(self) -> dict[str, object]:
+        metadata = super().runtime_metadata()
+        metadata.update({"kind": "ollama.v1", "provider": "ollama", "provider_label": "Ollama"})
+        return metadata
+
+
+class UnavailableOllamaPlanner(UnavailableGeminiPlanner):
+    def propose_next_action(self, observation: PlannerObservationV1) -> ProposedActionV1:
+        del observation
+        error = OllamaUnavailableError("Ollama is not configured")
+        error.code = self.reason
+        raise error
+
+    def runtime_metadata(self) -> dict[str, object]:
+        metadata = super().runtime_metadata()
+        metadata.update({"kind": "ollama.v1", "provider": "ollama", "provider_label": "Ollama"})
+        return metadata
+
+
 def planner_from_config(
     config: dict[str, Any],
     *,
@@ -534,6 +577,8 @@ def planner_from_config(
     openrouter_model: str = "",
     groq_client: GeminiActionClient | None = None,
     groq_model: str = "",
+    ollama_client: GeminiActionClient | None = None,
+    ollama_model: str = "",
     max_calls: int = 30,
     max_quota_retries: int = 1,
     quota_backoff_seconds: float = 30,
@@ -545,7 +590,7 @@ def planner_from_config(
     kind = planner.get("kind")
     if kind == "fixture_plan.v1":
         return FixturePlanPlanner(planner)
-    if kind in {"gemini.v1", "openrouter.v1", "groq.v1"}:
+    if kind in {"gemini.v1", "openrouter.v1", "groq.v1", "ollama.v1"}:
         fallback_config = planner.get("fallback")
         fallback: Planner | None = None
         if fallback_config is None and planner.get("allow_no_fallback"):
@@ -568,6 +613,23 @@ def planner_from_config(
                 primary = OpenRouterPlanner(
                     client=openrouter_client,
                     model=openrouter_model,
+                    max_calls=max_calls,
+                    max_quota_retries=max_quota_retries,
+                    quota_backoff_seconds=quota_backoff_seconds,
+                    max_transient_retries=max_transient_retries,
+                    transient_backoff_seconds=transient_backoff_seconds,
+                    max_invalid_retries=max_invalid_retries,
+                    synthetic_values=fallback_config.get("synthetic_values", {}),
+                )
+        elif kind == "ollama.v1":
+            if ollama_client is None or not ollama_model:
+                primary = UnavailableOllamaPlanner(
+                    model=ollama_model, reason="OLLAMA_NOT_CONFIGURED"
+                )
+            else:
+                primary = OllamaPlanner(
+                    client=ollama_client,
+                    model=ollama_model,
                     max_calls=max_calls,
                     max_quota_retries=max_quota_retries,
                     quota_backoff_seconds=quota_backoff_seconds,

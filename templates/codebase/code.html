@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Active codebase — AccessPath AI{% endblock %}
+
+{% block content %}
+  {% if refresh %}<meta http-equiv="refresh" content="4">{% endif %}
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">Active codebase</p>
+      <h1>Repository under analysis</h1>
+      <p class="muted">Bind the repository behind a live site. AccessPath clones it read-only, indexes its front-end code, and uses it to show where each finding should be fixed.</p>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div>
+      <section class="panel codebase-card" aria-labelledby="active-title">
+        <div class="active-repo">
+          <div>
+            <h2 id="active-title" class="visually-hidden">Active repository</h2>
+            <p class="repo-path"><span aria-hidden="true">›</span> {% if active %}{{ active.short_name }}{% if active.branch %} · {{ active.branch }}{% endif %}{% else %}No repository yet{% endif %}</p>
+            {% if active %}
+              <p class="muted small">
+                <span class="tag {% if active.status == 'ready' %}tag-success{% elif active.status == 'failed' %}tag-issue{% else %}tag-neutral{% endif %}">{{ active.get_status_display }}</span>
+                {% if active.commit_sha %} Commit <code>{{ active.commit_sha|slice:":10" }}</code>{% endif %}
+                {% if active.analysed_at %} · analysed {{ active.analysed_at|date:"j M, H:i" }}{% endif %}
+                {% if active.live_site_url %} · site <code>{{ active.live_site_url }}</code>{% endif %}
+              </p>
+              {% if active.error %}<p class="error">{{ active.error }}</p>{% endif %}
+            {% endif %}
+          </div>
+          {% if active and active.status == "ready" %}
+            <p class="repo-badge">{{ active.summary.components|default:0 }} components · {{ active.summary.controls|default:0 }} controls · {{ active.summary.test_ids|default:0 }} test IDs</p>
+          {% endif %}
+        </div>
+
+        <form method="post" action="{% url 'codebase:add' %}" class="repo-form" autocomplete="off">
+          {% csrf_token %}
+          <div class="form-field repo-url">
+            <label for="repo_url">Live repository URL</label>
+            <input id="repo_url" name="repo_url" type="url" required placeholder="https://github.com/owner/repo" spellcheck="false">
+          </div>
+          <div class="form-field">
+            <label for="branch">Branch</label>
+            <input id="branch" name="branch" placeholder="Default branch" spellcheck="false" maxlength="100">
+          </div>
+          <div class="form-field">
+            <label for="token">Access token (private repos only)</label>
+            <input id="token" name="token" type="password" placeholder="Not stored" spellcheck="false" maxlength="512" aria-describedby="token-help">
+            <p id="token-help" class="muted small">Use a fine-grained, read-only token for this one repository. It is encrypted on its way to the worker, used once to clone, and never saved.</p>
+          </div>
+          <div class="form-field">
+            <label for="live_site_url">Live site URL</label>
+            <input id="live_site_url" name="live_site_url" type="url" placeholder="https://staging.example.com" spellcheck="false" aria-describedby="site-help">
+            <p id="site-help" class="muted small">Journeys on this site use this repository. Leave the journey list empty to link them automatically.</p>
+          </div>
+          {% if journeys %}
+            <fieldset class="journey-links">
+              <legend>Link journeys (optional)</legend>
+              {% for journey in journeys %}
+                <label class="check-row"><input type="checkbox" name="journeys" value="{{ journey.id }}"> {{ journey.name }}</label>
+              {% endfor %}
+            </fieldset>
+          {% endif %}
+          <div class="repo-submit"><button type="submit" class="primary-wide">Clone &amp; analyse</button></div>
+          <p class="muted small">Paste a {{ allowed_hosts|join:", " }} address to pull the latest commit and make it the active repository. The copy is never run, and secrets and build folders are skipped.</p>
+        </form>
+
+        {% if bindings %}
+          <ul class="repo-chips" aria-label="Your repositories">
+            {% for item in bindings %}
+              <li>
+                <a href="?binding={{ item.pk }}" {% if active and item.pk == active.pk %}aria-current="true"{% endif %}>{{ item.short_name }} · {{ item.branch|default:"default" }}</a>
+                <form method="post" action="{% url 'codebase:remove' item.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="chip-remove" aria-label="Remove {{ item.short_name }} and delete its copy">×</button>
+                </form>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+
+      {% if active and active.status == "ready" %}
+        <section class="panel" aria-labelledby="patterns-title">
+          <h2 id="patterns-title">Code patterns that often break keyboard access</h2>
+          <p class="muted small">Found by reading the code, before any run. A run confirms which of them actually block a task.</p>
+          {% if patterns %}
+            <ul class="finding-list">
+              {% for item in patterns %}
+                <li class="finding-card">
+                  <div class="finding-head">{% if item.rule %}<span class="tag tag-neutral">WCAG {{ item.rule.wcag.criterion }}</span>{% endif %}<span class="tag">{{ item.label }}</span></div>
+                  <p class="small"><code>{{ item.path }}:{{ item.line }}</code>{% if item.rule %} — {{ item.rule.title }}{% endif %}</p>
+                  <code class="snippet">{{ item.snippet }}</code>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="muted">None found.</p>
+          {% endif %}
+        </section>
+      {% endif %}
+    </div>
+
+    <aside>
+      {% if active %}
+        <section class="panel" aria-labelledby="linked-title">
+          <h2 id="linked-title">Journeys using this repository</h2>
+          <form method="post" action="{% url 'codebase:journeys' active.pk %}" class="journey-links">
+            {% csrf_token %}
+            {% for journey in journeys %}
+              <label class="check-row"><input type="checkbox" name="journeys" value="{{ journey.id }}" {% if journey.repo_binding_id == active.pk %}checked{% endif %}> {{ journey.name }}</label>
+            {% empty %}
+              <p class="muted small">No journeys yet.</p>
+            {% endfor %}
+            <button type="submit" class="secondary">Save links</button>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="refresh-title">
+          <h2 id="refresh-title">Pull the latest commit</h2>
+          <form method="post" action="{% url 'codebase:analyze' active.pk %}" class="journey-links" autocomplete="off">
+            {% csrf_token %}
+            <label for="refresh-token">Access token (private repos only)</label>
+            <input id="refresh-token" name="token" type="password" placeholder="Not stored" maxlength="512">
+            <button type="submit" class="secondary">Re-analyse</button>
+          </form>
+        </section>
+      {% endif %}
+      <section class="panel" aria-labelledby="safety-title">
+        <h2 id="safety-title">How the copy is kept safe</h2>
+        <ul class="small source-list">
+          <li>Shallow, read-only clone of one branch; the history is deleted afterwards.</li>
+          <li>Nothing in the repository is ever run: no installs, no scripts, no hooks.</li>
+          <li>Symlinks are not followed; <code>.env</code>, keys and build folders are never read.</li>
+          <li>Secrets are removed before code is shown or sent to an AI, and only providers marked “OK for private code” may read it.</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

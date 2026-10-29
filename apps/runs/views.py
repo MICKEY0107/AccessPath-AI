@@ -13,6 +13,7 @@ from apps.journeys.models import Journey
 from apps.journeys.real_sites import RealSiteJourneyForm
 
 from .credentials import scrub, seal_api_key, validate_api_key, validate_model
+from .model_settings import saved_for, saved_key
 from .models import JourneyOutcome, PlannerProvider, Run
 from .report import build_report, report_json
 from .tasks import execute_run
@@ -133,7 +134,7 @@ def run_list(
     else:
         selected_filters["outcome"] = ""
 
-    planner_options = _planner_options()
+    planner_options = _planner_options(request.user)
     return render(
         request,
         "runs/list.html",
@@ -200,7 +201,7 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     journey = get_object_or_404(Journey, pk=journey_id, is_active=True)
     selected_provider = request.POST.get("planner_provider") or _default_provider_for(journey)
-    options = {option["value"]: option for option in _planner_options()}
+    options = {option["value"]: option for option in _planner_options(request.user)}
     selected_option = options.get(selected_provider)
     if selected_option is None:
         messages.error(request, "Select a supported planner provider.")
@@ -214,13 +215,29 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
 
     user_api_key = ""
     model = ""
+    credential_source = "environment"
     if selected_option["live"]:
         user_api_key = request.POST.get("api_key", "").strip()
-        model = request.POST.get("planner_model", "").strip() or selected_option["model"]
+        if user_api_key:
+            credential_source = "user_supplied"
+        elif selected_option["needs_key"]:
+            user_api_key = saved_key(request.user, selected_provider)
+            credential_source = "saved" if user_api_key else "environment"
+        else:
+            credential_source = "none"
+        model = (
+            request.POST.get("planner_model", "").strip()
+            or selected_option["saved_model"]
+            or selected_option["model"]
+        )
         problem = validate_api_key(user_api_key) if user_api_key else None
         if problem is None and model:
             problem = validate_model(model)
-        if problem is None and not (user_api_key or selected_option["has_server_key"]):
+        if problem is None and not selected_option["configured"]:
+            problem = selected_option["setup_message"]
+        if problem is None and selected_option["needs_key"] and not (
+            user_api_key or selected_option["has_server_key"]
+        ):
             problem = selected_option["setup_message"]
         if problem is None and not model:
             problem = "Enter the model to use for this run."
@@ -233,9 +250,7 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
         planner_provider=selected_provider,
         planner_model=model,
         planner_metadata=(
-            {"credential_source": "user_supplied" if user_api_key else "environment"}
-            if selected_option["live"]
-            else {}
+            {"credential_source": credential_source} if selected_option["live"] else {}
         ),
     )
     try:
@@ -264,10 +279,11 @@ def _default_provider_for(journey: Journey) -> str:
     return PlannerProvider.GEMINI
 
 
-def _planner_options() -> list[dict[str, object]]:
-    """Describe each provider; a live one runs with a typed key or the server's env key.
+def _planner_options(user=None) -> list[dict[str, object]]:
+    """Describe each provider; a live one runs with a typed, saved, or server key.
 
-    Only whether a server key exists is exposed, never the key itself.
+    Only whether a server or saved key exists is exposed (with its masked hint),
+    never the key itself.
     """
     live_providers = [
         (
@@ -294,24 +310,44 @@ def _planner_options() -> list[dict[str, object]]:
             settings.GROQ_MODEL,
             "llama-3.3-70b-versatile",
         ),
+        (
+            PlannerProvider.OLLAMA,
+            "Local Ollama",
+            "A model on your own machine: no API key, and nothing leaves the computer.",
+            "",
+            settings.OLLAMA_MODEL,
+            "llama3.1:8b",
+        ),
     ]
-    options: list[dict[str, object]] = [
-        {
-            "value": value,
-            "label": label,
-            "description": description,
-            "live": True,
-            "configured": True,
-            "has_server_key": bool(server_key),
-            "model": server_model,
-            "model_example": server_model or example_model,
-            "setup_message": (
-                f"{label.removeprefix('Live ')} is not configured. Enter an API key for this "
-                f"run, or set {value.upper()}_API_KEY in the server .env."
-            ),
-        }
-        for value, label, description, server_key, server_model, example_model in live_providers
-    ]
+    saved = saved_for(user)
+    options: list[dict[str, object]] = []
+    for value, label, description, server_key, server_model, example_model in live_providers:
+        item = saved.get(value)
+        is_ollama = value == PlannerProvider.OLLAMA
+        options.append(
+            {
+                "value": value,
+                "label": label,
+                "description": description,
+                "live": True,
+                "configured": bool(settings.OLLAMA_BASE_URL) if is_ollama else True,
+                "needs_key": not is_ollama,
+                "has_server_key": bool(server_key),
+                "saved_hint": item.key_hint if item and item.encrypted_key else "",
+                "saved_model": item.default_model if item else "",
+                "preferred": bool(item and item.is_preferred),
+                "model": server_model,
+                "model_example": (item.default_model if item else "") or server_model or example_model,
+                "setup_message": (
+                    "Ollama is not configured on this server. Set OLLAMA_BASE_URL and run "
+                    "`ollama serve`."
+                    if is_ollama
+                    else f"{label.removeprefix('Live ')} is not configured. Enter an API key for "
+                    f"this run, save one under Models, or set {value.upper()}_API_KEY in the "
+                    "server .env."
+                ),
+            }
+        )
     options.append(
         {
             "value": PlannerProvider.FIXTURE,
@@ -321,7 +357,11 @@ def _planner_options() -> list[dict[str, object]]:
             ),
             "live": False,
             "configured": True,
+            "needs_key": False,
             "has_server_key": False,
+            "saved_hint": "",
+            "saved_model": "",
+            "preferred": False,
             "model": "",
             "model_example": "",
             "setup_message": "",

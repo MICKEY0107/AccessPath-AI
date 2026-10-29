@@ -15,6 +15,7 @@ from engine.contracts import StepEvidenceV1
 from engine.executor import EvaluationResult, KeyboardExecutor
 from engine.gemini import GoogleGeminiActionClient
 from engine.groq import GroqActionClient
+from engine.ollama import OllamaActionClient
 from engine.openrouter import OpenRouterActionClient
 from engine.planner import planner_from_config
 from engine.rules import resolve_rules
@@ -101,15 +102,24 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         configured_planner["kind"] = "openrouter.v1"
     elif run.planner_provider == PlannerProvider.GROQ:
         configured_planner["kind"] = "groq.v1"
+    elif run.planner_provider == PlannerProvider.OLLAMA:
+        configured_planner["kind"] = "ollama.v1"
     elif run.planner_provider != PlannerProvider.GEMINI:
         raise ValueError("UNSUPPORTED_PLANNER_PROVIDER")
 
     api_key = user_api_key or _environment_api_key(run.planner_provider)
     secrets = [api_key]
     credential_metadata: dict[str, str] = {}
-    if run.planner_provider != PlannerProvider.FIXTURE:
+    if run.planner_provider == PlannerProvider.OLLAMA:
+        credential_metadata = {"credential_source": "none", "credential_hint": ""}
+    elif run.planner_provider != PlannerProvider.FIXTURE:
+        requested = (run.planner_metadata or {}).get("credential_source")
         credential_metadata = {
-            "credential_source": "user_supplied" if user_api_key else "environment",
+            "credential_source": (
+                ("saved" if requested == "saved" else "user_supplied")
+                if user_api_key
+                else "environment"
+            ),
             "credential_hint": mask_api_key(api_key) if api_key else "",
         }
 
@@ -134,6 +144,12 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
             timeout_seconds=settings.PLANNER_CALL_TIMEOUT_SECONDS,
             min_interval_seconds=settings.PLANNER_MIN_CALL_INTERVAL_SECONDS,
         )
+    ollama_client = None
+    if run.planner_provider == PlannerProvider.OLLAMA and settings.OLLAMA_BASE_URL:
+        ollama_client = OllamaActionClient(
+            base_url=settings.OLLAMA_BASE_URL,
+            timeout_seconds=max(settings.PLANNER_CALL_TIMEOUT_SECONDS, 120),
+        )
     planner = planner_from_config(
         planner_config,
         gemini_client=gemini_client,
@@ -142,6 +158,8 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         openrouter_model=run.planner_model,
         groq_client=groq_client,
         groq_model=run.planner_model,
+        ollama_client=ollama_client,
+        ollama_model=run.planner_model,
         max_calls=settings.PLANNER_MAX_CALLS_PER_RUN,
         max_quota_retries=settings.PLANNER_MAX_429_RETRIES,
         quota_backoff_seconds=settings.PLANNER_429_BACKOFF_SECONDS,

@@ -79,11 +79,14 @@
                         {% csrf_token %}
                         <label for="planner-provider-{{ journey.id }}">Planner provider</label>
                         <select id="planner-provider-{{ journey.id }}" name="planner_provider" required data-journey="{{ journey.id }}">
-                          <option value="" selected disabled>Choose a provider</option>
+                          <option value="" disabled>Choose a provider</option>
                           {% for option in planner_options %}
-                            <option value="{{ option.value }}"{% if not option.live and not journey.has_fixture_plan %} disabled{% endif %}
+                            <option value="{{ option.value }}"{% if not option.live and not journey.has_fixture_plan %} disabled{% endif %}{% if option.preferred %} selected{% endif %}
                               data-live="{{ option.live|yesno:'true,false' }}"
                               data-server-key="{{ option.has_server_key|yesno:'true,false' }}"
+                              data-needs-key="{{ option.needs_key|yesno:'true,false' }}"
+                              data-saved-key="{{ option.saved_hint }}"
+                              data-saved-model="{{ option.saved_model }}"
                               data-model="{{ option.model }}"
                               data-model-example="{{ option.model_example }}">
                               {{ option.label }}{% if option.model %} — {{ option.model }}{% endif %}{% if not option.live and not journey.has_fixture_plan %} (no scripted plan for this site){% endif %}
@@ -99,7 +102,7 @@
                           <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
                           <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
                         </div>
-                        <p class="muted">Choose Gemini, OpenRouter, or Groq for live planning. The deterministic fixture is clearly labelled contingency evidence.</p>
+                        <p class="muted">Choose Gemini, OpenRouter, Groq or local Ollama for live planning (set defaults under <a href="{% url 'runs:model_settings' %}">Models</a>). The deterministic fixture is clearly labelled contingency evidence.</p>
                         <div><button type="submit">Start keyboard evaluation</button></div>
                       </form>
                       {% if journey.is_real_site %}
@@ -301,12 +304,21 @@
         if (!live) return;
         warnForRouter();
         model.placeholder = option.dataset.modelExample;
-        modelHelp.textContent = option.dataset.model
-          ? `Leave blank to use the server default, ${option.dataset.model}.`
-          : "No server default is set, so enter the exact model id for this run.";
-        keyHelp.textContent = option.dataset.serverKey === "true"
+        const defaultModel = option.dataset.savedModel || option.dataset.model;
+        modelHelp.textContent = defaultModel
+          ? `Leave blank to use ${option.dataset.savedModel ? "your default" : "the server default"}, ${defaultModel}.`
+          : "No default is set, so enter the exact model id for this run.";
+        const keyField = document.getElementById(`api-key-${journey}`);
+        const needsKey = option.dataset.needsKey !== "false";
+        keyField.hidden = !needsKey;
+        keyField.previousElementSibling.hidden = !needsKey;
+        keyHelp.textContent = !needsKey
+          ? "No API key needed: the model runs on your own machine."
+          : option.dataset.savedKey
+          ? `Optional: leave blank to use your saved key (${option.dataset.savedKey}). ${keyNote}`
+          : option.dataset.serverKey === "true"
           ? `Optional: leave blank to use the server key. ${keyNote}`
-          : `Required: no server key is set for this provider. ${keyNote}`;
+          : `Required: no saved or server key for this provider. ${keyNote}`;
       };
       select.addEventListener("change", update);
       update();

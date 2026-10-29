@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 
@@ -32,6 +33,7 @@ class PlannerProvider(models.TextChoices):
     GEMINI = "gemini", "Gemini"
     OPENROUTER = "openrouter", "OpenRouter"
     GROQ = "groq", "Groq"
+    OLLAMA = "ollama", "Ollama (local)"
     FIXTURE = "fixture", "Deterministic fixture"
 
 
@@ -141,3 +143,29 @@ class Finding(models.Model):
 
     def __str__(self) -> str:
         return f"{self.rule_id} — {self.title}"
+
+
+class SavedCredential(models.Model):
+    """A person's model settings for one provider; the key is stored only if they ask.
+
+    ``encrypted_key`` is Fernet ciphertext keyed from SECRET_KEY with its own context,
+    so it is useless without the server's secret and is never shown again.
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_credentials"
+    )
+    provider = models.CharField(max_length=16, choices=PlannerProvider.choices)
+    encrypted_key = models.TextField(blank=True)
+    key_hint = models.CharField(max_length=16, blank=True)
+    default_model = models.CharField(max_length=255, blank=True)
+    is_preferred = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "provider"], name="unique_owner_provider"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.owner} — {self.provider}"

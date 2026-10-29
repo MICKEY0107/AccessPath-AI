@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Model settings — AccessPath AI{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">Model settings</p>
+      <h1>Choose your model and API key</h1>
+      <p class="muted">Use local Ollama or any provider you have a key for. A key you choose to remember is encrypted on this server, never shown again, never written to reports, and only sent to the provider you choose.</p>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div>
+      {% for card in cards %}{% if card.value == selected %}
+        <section class="panel model-card" aria-labelledby="model-title">
+          <form method="get" class="provider-switch">
+            <label for="provider-switch">Provider</label>
+            <select id="provider-switch" name="provider" data-autosubmit>
+              {% for option in cards %}<option value="{{ option.value }}" {% if option.value == selected %}selected{% endif %}>{{ option.label }}</option>{% endfor %}
+            </select>
+            <noscript><button type="submit" class="secondary">Show</button></noscript>
+          </form>
+          <h2 id="model-title" class="visually-hidden">{{ card.label }} settings</h2>
+          <p class="safety {% if card.safety.safe %}safety-ok{% else %}safety-no{% endif %}"><strong>{{ card.safety.label }}.</strong> {{ card.safety.reason }}</p>
+          {% if not card.configured %}<p class="error">Ollama is not configured on this server. Set <code>OLLAMA_BASE_URL</code> (from Docker: <code>http://host.docker.internal:11434</code>) and run <code>ollama serve</code>.</p>{% endif %}
+
+          <form method="post" action="{% url 'runs:save_model_settings' %}" class="model-form" autocomplete="off" data-model-form>
+            {% csrf_token %}
+            <input type="hidden" name="provider" value="{{ card.value }}">
+            {% if card.needs_key %}
+              <div class="form-field">
+                <label for="api_key">API key</label>
+                <input id="api_key" name="api_key" type="password" maxlength="512" spellcheck="false"
+                  placeholder="{% if card.saved.key_hint %}Saved key {{ card.saved.key_hint }} (leave blank to keep){% elif card.has_server_key %}Server key in use (leave blank){% else %}Paste your key{% endif %}">
+              </div>
+            {% else %}
+              <p class="muted small">No API key needed: the model runs on your own machine.</p>
+            {% endif %}
+            <div class="form-field">
+              <label for="recommended">Recommended models</label>
+              <select id="recommended" data-recommended>
+                <option value="">Choose a starting point…</option>
+                {% for model, note in card.recommended %}<option value="{{ model }}">{{ model }} · {{ note }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="model">Model</label>
+              <div class="model-row">
+                <input id="model" name="model" list="model-list" maxlength="255" spellcheck="false" value="{{ card.saved.default_model }}" placeholder="exact model id">
+                <datalist id="model-list"></datalist>
+                <button type="button" class="secondary" data-list-models data-url="{% url 'runs:list_models' %}">List</button>
+              </div>
+              <p class="muted small" role="status" data-list-status></p>
+            </div>
+            <div class="model-actions">
+              <button type="submit">Save &amp; use</button>
+              {% if card.needs_key %}<label class="check-row"><input type="checkbox" name="remember" {% if card.saved.key_hint %}checked{% endif %}> Remember on this computer (encrypted)</label>{% endif %}
+            </div>
+          </form>
+          {% if card.saved.key_hint %}
+            <form method="post" action="{% url 'runs:forget_key' %}" class="forget-form">
+              {% csrf_token %}
+              <input type="hidden" name="provider" value="{{ card.value }}">
+              <button type="submit" class="secondary">Forget key</button>
+            </form>
+          {% endif %}
+        </section>
+      {% endif %}{% endfor %}
+    </div>
+    <aside>
+      <section class="panel" aria-labelledby="providers-title">
+        <h2 id="providers-title">Your providers</h2>
+        <ul class="row-list">
+          {% for card in cards %}
+            <li><a class="row-link" href="?provider={{ card.value }}" {% if card.value == selected %}aria-current="true"{% endif %}>
+              <span class="row-title">{{ card.label }}{% if preferred and preferred.provider == card.value %} · in use{% endif %}</span>
+              <span class="row-sub">{% if card.saved.key_hint %}Saved key {{ card.saved.key_hint }}{% elif card.has_server_key %}Server key{% elif not card.needs_key %}No key needed{% else %}No key{% endif %}{% if card.saved.default_model %} · {{ card.saved.default_model }}{% endif %} · {{ card.safety.label }}</span>
+            </a></li>
+          {% endfor %}
+        </ul>
+      </section>
+    </aside>
+  </div>
+  <script>
+    (() => {
+      document.querySelector("[data-autosubmit]")?.addEventListener("change", (event) => event.target.form.submit());
+      const form = document.querySelector("[data-model-form]");
+      if (!form) return;
+      const model = form.querySelector("#model");
+      form.querySelector("[data-recommended]").addEventListener("change", (event) => {
+        if (event.target.value) model.value = event.target.value;
+      });
+      const button = form.querySelector("[data-list-models]");
+      const status = form.querySelector("[data-list-status]");
+      const list = form.querySelector("#model-list");
+      button.addEventListener("click", async () => {
+        status.textContent = "Fetching models…";
+        const body = new FormData();
+        body.append("provider", form.elements.provider.value);
+        if (form.elements.api_key) body.append("api_key", form.elements.api_key.value);
+        body.append("csrfmiddlewaretoken", form.elements.csrfmiddlewaretoken.value);
+        try {
+          const response = await fetch(button.dataset.url, {method: "POST", body, credentials: "same-origin"});
+          const data = await response.json();
+          if (!response.ok) { status.textContent = data.error || "Could not list models."; return; }
+          list.replaceChildren(...data.models.map((name) => Object.assign(document.createElement("option"), {value: name})));
+          status.textContent = `${data.models.length} models available. Start typing in the Model field to pick one.`;
+        } catch (error) {
+          status.textContent = "Could not reach the server.";
+        }
+      });
+    })();
+  </script>
+{% endblock %}

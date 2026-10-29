@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.journeys",
     "apps.runs",
+    "apps.codebase",
 ]
 
 MIDDLEWARE = [
@@ -36,11 +37,18 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Every page needs a signed-in user: the app stores repositories and saved API keys.
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "runs:list"
+LOGOUT_REDIRECT_URL = "login"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -139,3 +147,22 @@ AXE_CORE_PATH = Path(
 # Keyboard checks (focus visible, focus obscured, names, skip links, focus order) run
 # during every evaluation unless turned off here.
 EVALUATOR_RUN_CHECKS = os.environ.get("EVALUATOR_RUN_CHECKS", "true").lower() == "true"
+
+# Local Ollama (no API key; code never leaves the machine). Set only from the server
+# environment, never from a web form. From Docker, the host is host.docker.internal.
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "")
+# Providers allowed to read private repository code in addition to the built-in rules
+# (engine/code_safety.py), e.g. "openrouter" for a paid tier with a data agreement.
+CODE_SAFE_PROVIDERS = tuple(
+    item.strip() for item in os.environ.get("CODE_SAFE_PROVIDERS", "").split(",") if item.strip()
+)
+
+# Active codebase: read-only clones live outside the media folder so they are never served.
+REPO_STORAGE_ROOT = Path(os.environ.get("REPO_STORAGE_ROOT", str(BASE_DIR / ".runtime" / "repos")))
+REPO_ALLOWED_HOSTS = ("github.com", "gitlab.com", "bitbucket.org")
+REPO_MAX_BYTES = int(os.environ.get("REPO_MAX_BYTES", str(200 * 1024 * 1024)))
+REPO_MAX_FILES = int(os.environ.get("REPO_MAX_FILES", "20000"))
+REPO_CLONE_TIMEOUT_SECONDS = int(os.environ.get("REPO_CLONE_TIMEOUT_SECONDS", "120"))
+# Tests clone from local folders; production only clones https URLs from the hosts above.
+REPO_ALLOW_FILE_URLS = False

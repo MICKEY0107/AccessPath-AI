@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .model_settings import forget_key, list_provider_models, model_settings, save_model_settings
 from .rule_views import rules_page, save_journey_rules
 from .views import (
     create_real_site_journey,
@@ -19,6 +20,10 @@ urlpatterns = [
     path("journeys/new/", create_real_site_journey, name="create_journey"),
     path("journeys/<int:journey_id>/remove/", remove_real_site_journey, name="remove_journey"),
     path("rules/", rules_page, name="rules"),
+    path("models/", model_settings, name="model_settings"),
+    path("models/save/", save_model_settings, name="save_model_settings"),
+    path("models/forget/", forget_key, name="forget_key"),
+    path("models/list/", list_provider_models, name="list_models"),
     path("journeys/<int:journey_id>/rules/", save_journey_rules, name="save_rules"),
     path("<uuid:run_id>/", run_detail, name="detail"),
     path("<uuid:run_id>/report.json", export_report_json, name="report_json"),
