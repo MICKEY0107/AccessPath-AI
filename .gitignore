@@ -38,3 +38,6 @@ Thumbs.db
 # Local scratch and rendered report previews
 .tmp/
 .artifacts/
+
+# Third-party scripts downloaded by manage.py commands
+vendor/

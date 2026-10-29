@@ -130,7 +130,8 @@ def test_provider_failure_says_nothing_about_the_site(tmp_path: Path) -> None:
         result = executor_for(origin, tmp_path).run_with_planner(StoppingPlanner(), goal="Pay")
     assert result.outcome == "agent_error"
     assert result.failure_kind == "provider_failure"
-    assert result.findings == []
+    # Page checks still flag the click-only div for a human, but nothing is confirmed.
+    assert all(finding.status == "needs_review" for finding in result.findings)
     assert "says nothing about the website" in result.diagnosis
 
 
@@ -144,8 +145,8 @@ def test_collector_merges_repeats_and_applies_ignores() -> None:
         }
     )
     collector = FindingCollector(rule_set)
-    element = {"tag": "input", "css_path": "ul > li > input.toggle", "name": ""}
-    for _ in range(3):
+    for index in range(3):
+        element = {"tag": "input", "css_path": f"ul > li:nth-of-type({index + 1}) > input.toggle"}
         collector.add(
             "name-role-value",
             summary="Checkbox has no name",
@@ -154,6 +155,15 @@ def test_collector_merges_repeats_and_applies_ignores() -> None:
             element=element,
             merge_key="input.toggle",
         )
+    # The same element again is not counted twice.
+    collector.add(
+        "name-role-value",
+        summary="Checkbox has no name",
+        url="https://todo.example/",
+        method="dom_scan",
+        element={"tag": "input", "css_path": "ul > li:nth-of-type(1) > input.toggle"},
+        merge_key="input.toggle",
+    )
     collector.add("focus-appearance", summary="x", url="https://todo.example/", method="focus_diff")
     [finding] = collector.findings
     assert finding.occurrences == 3

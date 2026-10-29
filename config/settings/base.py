@@ -129,3 +129,13 @@ PLANNER_TRANSIENT_BACKOFF_SECONDS = float(
 )
 # Retries for a one-off bad answer (empty, truncated, or unroutable) before fallback.
 PLANNER_MAX_INVALID_RETRIES = int(os.environ.get("PLANNER_MAX_INVALID_RETRIES", "3"))
+
+# axe-core runs on each page a journey visits when this file exists. Install it with
+# `python manage.py install_axe_core`; without it the report marks axe rules "not checked".
+AXE_CORE_VERSION = os.environ.get("AXE_CORE_VERSION", "4.10.3")
+AXE_CORE_PATH = Path(
+    os.environ.get("AXE_CORE_PATH", str(BASE_DIR / "vendor" / "axe-core" / "axe.min.js"))
+)
+# Keyboard checks (focus visible, focus obscured, names, skip links, focus order) run
+# during every evaluation unless turned off here.
+EVALUATOR_RUN_CHECKS = os.environ.get("EVALUATOR_RUN_CHECKS", "true").lower() == "true"

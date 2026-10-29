@@ -28,7 +28,8 @@ from .contracts import (
     StepEvidenceV1,
     TargetPolicyV1,
 )
-from .findings import FindingCollector
+from .checks import CheckRunner, page_key
+from .findings import FindingCollector, element_signature
 from .planner import Planner
 from .policy import KeyboardActionPolicy
 from .probes import probe_target, probe_trap, tab_walk
@@ -91,6 +92,8 @@ class KeyboardExecutor:
         artifact_store: LocalArtifactStore,
         on_step: StepCallback,
         rule_set: ActiveRuleSet | None = None,
+        axe_source: str | None = None,
+        run_checks: bool = True,
     ) -> None:
         self.run_id = run_id
         self.start_url = start_url
@@ -119,6 +122,9 @@ class KeyboardExecutor:
         self._started_monotonic = 0.0
         self.rule_set = rule_set or resolve_rules({})
         self.findings = FindingCollector(self.rule_set)
+        self.axe_source = axe_source
+        self.run_checks = run_checks
+        self.checks = CheckRunner(self.findings, axe_source, self.rule_set.axe_tags)
         self._history: list[PlannerHistoryEntryV1] = []
         # While a probe re-checks a suspected barrier, blocked requests are counted as
         # evidence that a key did something instead of being recorded as violations.
@@ -185,6 +191,7 @@ class KeyboardExecutor:
         self._pending_policy_events = []
         self._pending_evidence_events = []
         self.findings = FindingCollector(self.rule_set)
+        self.checks = CheckRunner(self.findings, self.axe_source, self.rule_set.axe_tags)
         self._history = []
         self._probing = False
         self._probe_requests = 0
@@ -330,11 +337,25 @@ class KeyboardExecutor:
                     failure_kind=result.failure_kind or _default_failure_kind(result),
                     diagnosis=f"{result.diagnosis} {note}".strip(),
                 )
+        self.runtime_metadata["axe"] = self.checks.axe_status
         return replace(
             result,
             findings=self.findings.sorted_findings(),
             rule_results=self.findings.results(),
         )
+
+    def _safe_check(self, name: str, check: Callable[[], object]) -> None:
+        """Run one accessibility check; a check failure becomes evidence, never a crash."""
+        if not self.run_checks:
+            return
+        try:
+            with self._probe():
+                check()
+        except Exception as error:
+            if len(self._pending_evidence_events) < 20:
+                self._pending_evidence_events.append(
+                    f"CHECK_FAILED {name} {type(error).__name__.upper()}"[:512]
+                )
 
     @contextmanager
     def _probe(self) -> Iterator[None]:
@@ -376,7 +397,7 @@ class KeyboardExecutor:
             return replace(result, failure_kind=_default_failure_kind(result))
         with self._probe():
             walk = tab_walk(page)
-            self._record_walk_results(walk, page.url)
+            self.checks.record_walk(walk, page.url, result.steps_completed or None)
             if result.terminal_reason == "REPEATED_FOCUS_CYCLE":
                 trap = probe_trap(page, walk)
                 if trap.confirmed_trap:
@@ -428,6 +449,11 @@ class KeyboardExecutor:
                 detail=probe.detail,
                 element=probe.element,
                 step_number=result.steps_completed or None,
+                merge_key=(
+                    element_signature("unreachable", probe.element)
+                    if probe.method == "tab_walk"
+                    else None
+                ),
             )
             return replace(
                 result,
@@ -452,29 +478,19 @@ class KeyboardExecutor:
             result, failure_kind=_default_failure_kind(result), diagnosis=probe.diagnosis
         )
 
-    def _record_walk_results(self, walk, current_url: str) -> None:
-        """A Tab walk also tests the trap and on-focus rules for the page it walked."""
-        if walk.navigated_to:
-            self._record_on_focus_navigation(walk, current_url)
-        elif walk.stops:
-            self.findings.checked("on-focus", applicable=True)
-        if walk.completed and not walk.cycle_paths:
-            self.findings.checked("no-keyboard-trap", applicable=bool(walk.stops))
-
-    def _record_on_focus_navigation(self, walk, current_url: str) -> None:
-        stop = walk.navigation_stop
-        name = (stop or {}).get("name") or "a control"
+    def _record_tab_navigation(self, focus, before_url: str, after_url: str, step: int) -> None:
+        name = (focus.name if focus else "") or "a control"
         summary = (
-            f"Moving focus onto “{name}” with Tab opened another page "
-            f"({walk.navigated_to}). Focus alone must not change the page."
+            f"Pressing Tab on “{name}” opened another page ({after_url}). "
+            "Moving focus alone must not change the page."
         )
         self.findings.add(
             "on-focus",
             summary=summary,
-            url=current_url,
-            method="tab_walk",
+            url=before_url,
+            method="observation",
             detail=summary,
-            element=stop,
+            step_number=step,
         )
 
     def _run_loop(
@@ -488,6 +504,7 @@ class KeyboardExecutor:
         rejection_counts: dict[str, int] = {}
         steps_run = 0
         history: list[PlannerHistoryEntryV1] = self._history
+        self._safe_check("page", lambda: self.checks.check_page(page, None))
         state_visit_counts: dict[str, int] = {}
         action_iterator = iter(actions) if actions is not None else None
         while True:
@@ -635,6 +652,16 @@ class KeyboardExecutor:
                 completion_signals=self._completion_evaluations(page),
             )
             self.on_step(evidence, artifacts)
+            if (
+                executed_action is not None
+                and action.action in {ActionKind.TAB, ActionKind.SHIFT_TAB}
+                and page_key(after_url) != page_key(before_url)
+            ):
+                self._record_tab_navigation(before_focus, before_url, after_url, step_number)
+            if executed_action is not None and after_focus is not None:
+                self._safe_check("focus", lambda: self.checks.check_focus(page, step_number))
+            if page_key(page.url) != page_key(before_url) and self._origin_is_allowed(page.url):
+                self._safe_check("page", lambda: self.checks.check_page(page, step_number))
             if planner is not None and observation is not None:
                 planner.record_outcome(observation, action, decision, action_result)
             history.append(

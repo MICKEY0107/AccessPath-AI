@@ -209,7 +209,18 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
                 walk.navigated_to = page.url
                 walk.navigation_stop = walk.stops[-1] if walk.stops else None
                 break
-            info = page.evaluate(ACTIVE_DETAILS)
+            try:
+                info = page.evaluate(ACTIVE_DETAILS)
+            except Exception:
+                # The page navigated away while we were reading focus.
+                page.wait_for_load_state("domcontentloaded")
+                walk.navigated_to = page.url if page.url != before_url else before_url
+                walk.navigation_stop = walk.stops[-1] if walk.stops else None
+                break
+            if page.url != before_url:
+                walk.navigated_to = page.url
+                walk.navigation_stop = info
+                break
             if info is None:
                 walk.completed = True
                 break

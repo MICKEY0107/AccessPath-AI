@@ -154,6 +154,7 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
     except (ValueError, KeyError):
         # Settings saved against an older catalog fall back to the default preset.
         rule_set = resolve_rules({})
+    axe_source = _axe_source()
     executor = KeyboardExecutor(
         run_id=run.id,
         start_url=run.journey.start_url,
@@ -168,6 +169,8 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         artifact_store=artifact_store,
         on_step=capture_step,
         rule_set=rule_set,
+        axe_source=axe_source,
+        run_checks=settings.EVALUATOR_RUN_CHECKS,
     )
     try:
         result = executor.run_with_planner(planner, goal=run.journey.goal)
@@ -188,6 +191,14 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         run.save(update_fields=["planner_metadata"])
     _complete_run(run, result, secrets=secrets)
     return result
+
+
+def _axe_source() -> str | None:
+    path = settings.AXE_CORE_PATH
+    try:
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+    except OSError:
+        return None
 
 
 def _save_findings(run: Run, result: EvaluationResult, *, secrets: list[str]) -> None:

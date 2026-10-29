@@ -71,13 +71,22 @@ class FindingCollector:
         finding_id = hashlib.sha256(f"{rule_id}|{_page(url)}|{key}".encode()).hexdigest()[:16]
         existing = next((item for item in self.findings if item.id == finding_id), None)
         if existing is not None:
-            existing.occurrences += 1
-            if details and len(existing.examples) < 5:
-                existing.examples.append(details)
+            path = details.css_path if details else ""
+            seen = bool(path) and any(example.css_path == path for example in existing.examples)
+            if not seen:
+                existing.occurrences += 1
+                if details and len(existing.examples) < 5:
+                    existing.examples.append(details)
             if confirmed and existing.status != "confirmed":
+                # A probe confirmed what a scan only suspected: its wording replaces the scan's.
                 existing.status = "confirmed"
+                existing.summary = summary[:800]
+                existing.step_number = step_number or existing.step_number
+                existing.element = details or existing.element
                 existing.confirmation = FindingConfirmationV1(
-                    method=method, confirmed=True, detail=detail[:600]
+                    method=method,  # type: ignore[arg-type]
+                    confirmed=True,
+                    detail=detail[:600],
                 )
             return existing
         ignore = self.rule_set.ignore_for(
@@ -162,6 +171,15 @@ class FindingCollector:
                 item.step_number or 0,
             ),
         )
+
+
+def element_signature(kind: str, element: ElementDetailsV1 | dict | None) -> str:
+    """Group copies of the same control (for example three identical slot buttons)."""
+    if element is None:
+        return kind
+    data = element.model_dump() if isinstance(element, ElementDetailsV1) else element
+    classes = ".".join(sorted(data.get("classes") or []))
+    return f"{kind}|{data.get('tag')}|{data.get('role')}|{classes}|{data.get('tabindex')}"
 
 
 def _page(url: str) -> str:
