@@ -28,6 +28,9 @@ class Journey(models.Model):
     allowed_origins = models.JSONField(default=list)
     completion_policy = models.JSONField(default=dict)
     evaluation_config = models.JSONField(default=dict)
+    # Rule settings chosen on the Rules page (engine.rules.RuleConfigV1). Kept apart
+    # from evaluation_config so re-seeding a manifest never wipes a person's choices.
+    rule_config = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

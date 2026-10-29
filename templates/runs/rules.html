@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Rules — AccessPath AI{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>Rules</h1>
+      <p class="muted">Choose which keyboard accessibility rules each journey checks. Rules come from WCAG 2.2 and the W3C ACT rules; catalog {{ catalog.catalog_version }}, reviewed {{ catalog.reviewed|date:"j F Y" }}.</p>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div>
+      {% if journey %}
+        <form class="panel rules-form" method="post" action="{% url 'runs:save_rules' journey.id %}" aria-labelledby="rules-journey-title">
+          {% csrf_token %}
+          <div class="section-head">
+            <h2 id="rules-journey-title">Settings for {{ journey.name }}</h2>
+            <button type="submit">Save rules</button>
+          </div>
+
+          <div class="rules-top">
+            <div class="form-field">
+              <label for="preset">Preset</label>
+              <select id="preset" name="preset" aria-describedby="preset-help">
+                {% for preset in catalog.presets %}
+                  <option value="{{ preset.id }}" {% if preset.id == config.preset %}selected{% endif %}>{{ preset.label }}</option>
+                {% endfor %}
+              </select>
+              <p id="preset-help" class="muted small">
+                {% for preset in catalog.presets %}<span data-preset-help="{{ preset.id }}" {% if preset.id != config.preset %}hidden{% endif %}>{{ preset.description }}</span>{% endfor %}
+              </p>
+            </div>
+            <div class="form-field">
+              <label for="fail_on">Fail the run from</label>
+              <select id="fail_on" name="fail_on" aria-describedby="fail-help">
+                {% for level in severity_choices %}
+                  <option value="{{ level }}" {% if level == config.fail_on %}selected{% endif %}>{{ level|capfirst }}</option>
+                {% endfor %}
+              </select>
+              <p id="fail-help" class="muted small">Findings at this severity or higher mark the report as failing.</p>
+            </div>
+          </div>
+
+          <table class="rules-table">
+            <caption class="visually-hidden">Rules in the catalog and whether this journey checks them</caption>
+            <thead><tr><th scope="col">Rule</th><th scope="col">WCAG</th><th scope="col">Check</th><th scope="col">Severity</th></tr></thead>
+            <tbody>
+              {% for row in rows %}
+                <tr class="{% if not row.in_preset %}not-in-preset{% endif %}">
+                  <td>
+                    <strong>{{ row.rule.title }}</strong>
+                    <span class="row-sub">{{ row.rule.summary }}</span>
+                    {% if row.rule.act_rules %}
+                      <span class="row-sub">ACT: {% for act in row.rule.act_rules %}<a href="{{ act.url }}">{{ act.id }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                    {% endif %}
+                  </td>
+                  <td><a href="{{ row.rule.wcag.url }}">{{ row.rule.wcag.criterion }} {{ row.rule.wcag.name }}</a> <span class="tag tag-neutral">{{ row.rule.wcag.level }}</span>{% if row.rule.advisory %} <span class="tag">Advisory</span>{% endif %}</td>
+                  <td>
+                    {% if row.in_preset %}
+                      <label class="check-row"><input type="checkbox" name="enabled-{{ row.rule.id }}" {% if row.enabled %}checked{% endif %} data-rule-toggle="{{ row.rule.id }}"> Check this rule</label>
+                      <div class="form-field disable-reason" data-reason-for="{{ row.rule.id }}" {% if row.enabled %}hidden{% endif %}>
+                        <label for="reason-{{ row.rule.id }}">Why is it off?</label>
+                        <input id="reason-{{ row.rule.id }}" name="reason-{{ row.rule.id }}" value="{{ row.disabled_reason }}" maxlength="240">
+                      </div>
+                    {% else %}
+                      <span class="muted small">Not in this preset</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <label class="visually-hidden" for="severity-{{ row.rule.id }}">Severity for {{ row.rule.title }}</label>
+                    <select id="severity-{{ row.rule.id }}" name="severity-{{ row.rule.id }}">
+                      {% for level in severity_choices %}
+                        <option value="{{ level }}" {% if level == row.severity %}selected{% endif %}>{{ level|capfirst }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+          <div class="panel-section">
+            <h2>Known issues (ignores)</h2>
+            <p class="muted small">An ignore keeps a finding visible but stops it failing the run. It needs a reason and an expiry date, so known issues cannot be hidden forever.</p>
+            {% if ignores %}
+              <ul class="row-list">
+                {% for index, item in ignores %}
+                  <li class="ignore-row">
+                    <input type="hidden" name="ignore-{{ index }}-id" value="{{ item.id }}">
+                    <input type="hidden" name="ignore-{{ index }}-match" value="{{ item.match }}">
+                    <input type="hidden" name="ignore-{{ index }}-reason" value="{{ item.reason }}">
+                    <input type="hidden" name="ignore-{{ index }}-until" value="{{ item.until|date:'Y-m-d' }}">
+                    <label class="check-row"><input type="checkbox" name="keep-ignore" value="{{ index }}" checked> Keep</label>
+                    <span><strong>{{ item.id }}</strong> where the element contains “{{ item.match }}”</span>
+                    <span class="row-sub">{{ item.reason }} · until {{ item.until|date:"j M Y" }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            <fieldset class="ignore-add">
+              <legend>Add an ignore</legend>
+              <div class="form-field"><label for="new-ignore-id">Rule</label>
+                <select id="new-ignore-id" name="new-ignore-id">{% for row in rows %}<option value="{{ row.rule.id }}">{{ row.rule.title }}</option>{% endfor %}</select></div>
+              <div class="form-field"><label for="new-ignore-match">Element contains</label>
+                <input id="new-ignore-match" name="new-ignore-match" maxlength="200" placeholder="e.g. .todo-list .toggle"></div>
+              <div class="form-field"><label for="new-ignore-reason">Reason</label>
+                <input id="new-ignore-reason" name="new-ignore-reason" maxlength="240" placeholder="e.g. Ticket A11Y-12"></div>
+              <div class="form-field"><label for="new-ignore-until">Until</label>
+                <input id="new-ignore-until" name="new-ignore-until" type="date"></div>
+            </fieldset>
+          </div>
+        </form>
+      {% else %}
+        <section class="panel"><p class="muted">No journeys yet. Seed the demo journeys or add a website first.</p></section>
+      {% endif %}
+    </div>
+
+    <aside>
+      <section class="panel" aria-labelledby="rules-journeys-title">
+        <h2 id="rules-journeys-title">Journeys</h2>
+        <ul class="row-list">
+          {% for item in journeys %}
+            <li><a class="row-link" href="?journey={{ item.id }}" {% if journey and item.id == journey.id %}aria-current="true"{% endif %}><span class="row-title">{{ item.name }}</span><span class="row-sub">{{ item.rule_config.preset|default:catalog.default_preset }}</span></a></li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section class="panel" aria-labelledby="rules-sources-title">
+        <h2 id="rules-sources-title">Where the rules come from</h2>
+        <ul class="small source-list">
+          <li><a href="{{ catalog.sources.wcag }}">WCAG 2.2</a> — the success criteria each finding names.</li>
+          <li><a href="{{ catalog.sources.act }}">W3C ACT rules</a> — testable rules with pass and fail examples.</li>
+          <li><a href="{{ catalog.sources.apg }}">ARIA Authoring Practices</a> — the keys each widget should support.</li>
+        </ul>
+        <p class="muted small">The catalog ships with AccessPath and is never fetched while a run is going, so a web page cannot change your results.</p>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    (() => {
+      const preset = document.getElementById("preset");
+      preset?.addEventListener("change", () => {
+        for (const help of document.querySelectorAll("[data-preset-help]")) {
+          help.hidden = help.dataset.presetHelp !== preset.value;
+        }
+      });
+      for (const toggle of document.querySelectorAll("[data-rule-toggle]")) {
+        toggle.addEventListener("change", () => {
+          const reason = document.querySelector(`[data-reason-for="${toggle.dataset.ruleToggle}"]`);
+          if (reason) reason.hidden = toggle.checked;
+        });
+      }
+    })();
+  </script>
+{% endblock %}

@@ -1,0 +1,187 @@
+{
+  "schema_version": "rule_catalog.v1",
+  "catalog_version": "2026.10.29",
+  "reviewed": "2026-10-29",
+  "sources": {
+    "wcag": "https://www.w3.org/TR/WCAG22/",
+    "act": "https://www.w3.org/WAI/standards-guidelines/act/rules/",
+    "apg": "https://www.w3.org/WAI/ARIA/apg/"
+  },
+  "rules": [
+    {
+      "id": "keyboard-operable",
+      "title": "Every control works with the keyboard",
+      "wcag": {"criterion": "2.1.1", "name": "Keyboard", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html"},
+      "act_rules": [
+        {"id": "0ssw9k", "name": "Scrollable content can be reached with sequential focus navigation", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/0ssw9k/proposed/"},
+        {"id": "akn7bn", "name": "Iframe with interactive elements is not excluded from tab-order", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/akn7bn/proposed/"}
+      ],
+      "checks": ["barrier_probe", "interactive_not_focusable"],
+      "default_severity": "critical",
+      "summary": "A keyboard user must be able to reach every control the task needs with Tab and operate it with Enter, Space or the arrow keys.",
+      "fix_hints": [
+        "Use a native element (button, a href, input) instead of a div or span with a click handler.",
+        "Remove tabindex=\"-1\" from controls people need to reach.",
+        "If a custom widget must be used, give it tabindex=\"0\", a role, and key handlers for Enter and Space."
+      ],
+      "code_patterns": ["tabindex_negative_on_control", "click_handler_on_non_control"],
+      "advisory": false
+    },
+    {
+      "id": "no-keyboard-trap",
+      "title": "Focus can always leave a component",
+      "wcag": {"criterion": "2.1.2", "name": "No Keyboard Trap", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html"},
+      "act_rules": [
+        {"id": "80af7b", "name": "Focusable element has no keyboard trap", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/80af7b/proposed/"},
+        {"id": "a1b64e", "name": "Focusable element has no keyboard trap via standard navigation", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/a1b64e/proposed/"}
+      ],
+      "checks": ["trap_probe"],
+      "default_severity": "critical",
+      "summary": "Tab and Shift+Tab must always be able to move focus out of a component, such as a widget or embedded player.",
+      "fix_hints": [
+        "Do not cancel Tab key events or force focus back into a component.",
+        "A modal dialog may keep focus inside while open, but Escape or a close button must release it."
+      ],
+      "code_patterns": ["tab_keydown_prevent_default"],
+      "advisory": false
+    },
+    {
+      "id": "bypass-blocks",
+      "title": "Repeated content can be skipped",
+      "wcag": {"criterion": "2.4.1", "name": "Bypass Blocks", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html"},
+      "act_rules": [
+        {"id": "cf77f2", "name": "Bypass Blocks of Repeated Content", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/cf77f2/proposed/"},
+        {"id": "ye5d6e", "name": "Document has an instrument to move focus to non-repeated content", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/ye5d6e/proposed/"},
+        {"id": "b40fd1", "name": "Document has a landmark with non-repeated content", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/b40fd1/proposed/"},
+        {"id": "047fe0", "name": "Document has heading for non-repeated content", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/047fe0/proposed/"}
+      ],
+      "checks": ["bypass_mechanism"],
+      "default_severity": "moderate",
+      "summary": "When a page repeats navigation before its main content, there must be a skip link, a main landmark or headings so keyboard users do not Tab through it every time.",
+      "fix_hints": [
+        "Add a \"Skip to main content\" link as the first focusable element, pointing at the main element's id.",
+        "Wrap the main content in a main element."
+      ],
+      "code_patterns": [],
+      "advisory": false
+    },
+    {
+      "id": "focus-order",
+      "title": "Focus moves in a meaningful order",
+      "wcag": {"criterion": "2.4.3", "name": "Focus Order", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html"},
+      "act_rules": [],
+      "checks": ["focus_order_walk"],
+      "default_severity": "moderate",
+      "summary": "The Tab order should follow the visual reading order, so focus does not jump around the page unexpectedly.",
+      "fix_hints": [
+        "Remove positive tabindex values (tabindex=\"1\" and higher); order the DOM the way the page reads.",
+        "Avoid CSS that visually reorders controls (order, flex-direction: row-reverse, absolute positioning) away from DOM order."
+      ],
+      "code_patterns": ["tabindex_positive"],
+      "advisory": false
+    },
+    {
+      "id": "focus-visible",
+      "title": "The focused control is visibly marked",
+      "wcag": {"criterion": "2.4.7", "name": "Focus Visible", "level": "AA", "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html"},
+      "act_rules": [
+        {"id": "oj04fd", "name": "Element in sequential focus order has visible focus", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/oj04fd/proposed/"}
+      ],
+      "checks": ["focus_indicator_diff"],
+      "default_severity": "serious",
+      "summary": "When a control has keyboard focus, something on screen must change so the person can see where they are.",
+      "fix_hints": [
+        "Do not remove the outline on :focus without a replacement.",
+        "Add a :focus-visible style, for example outline: 3px solid currentColor; outline-offset: 2px."
+      ],
+      "code_patterns": ["outline_removed_on_focus"],
+      "advisory": false
+    },
+    {
+      "id": "focus-not-obscured",
+      "title": "The focused control is not hidden",
+      "wcag": {"criterion": "2.4.11", "name": "Focus Not Obscured (Minimum)", "level": "AA", "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html"},
+      "act_rules": [],
+      "checks": ["focus_obscured_points"],
+      "default_severity": "serious",
+      "summary": "A focused control must not be completely covered by sticky headers, cookie banners or other content the author added.",
+      "fix_hints": [
+        "Add scroll-padding-top (equal to the sticky header height) on the html element.",
+        "Let banners be dismissed, or place them so they do not cover the page content."
+      ],
+      "code_patterns": [],
+      "advisory": false
+    },
+    {
+      "id": "on-focus",
+      "title": "Moving focus does not change the page",
+      "wcag": {"criterion": "3.2.1", "name": "On Focus", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/on-focus.html"},
+      "act_rules": [],
+      "checks": ["tab_causes_navigation"],
+      "default_severity": "critical",
+      "summary": "Tabbing onto a control must not by itself open a new page, submit a form or move focus somewhere else.",
+      "fix_hints": [
+        "Start navigation or submission from an explicit action such as Enter or a button press, not from a focus event."
+      ],
+      "code_patterns": ["navigation_on_focus"],
+      "advisory": false
+    },
+    {
+      "id": "name-role-value",
+      "title": "Controls have an accessible name",
+      "wcag": {"criterion": "4.1.2", "name": "Name, Role, Value", "level": "A", "url": "https://www.w3.org/WAI/WCAG22/Understanding/name-role-value.html"},
+      "act_rules": [
+        {"id": "97a4e1", "name": "Button has non-empty accessible name", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/97a4e1/proposed/"},
+        {"id": "c487ae", "name": "Link has non-empty accessible name", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/c487ae/proposed/"},
+        {"id": "e086e5", "name": "Form field has non-empty accessible name", "url": "https://www.w3.org/WAI/standards-guidelines/act/rules/e086e5/proposed/"}
+      ],
+      "checks": ["unnamed_focusable_scan"],
+      "default_severity": "serious",
+      "summary": "Every focusable control needs a name that assistive technology can announce, such as \"Mark Buy milk as complete\".",
+      "fix_hints": [
+        "Give inputs a label element or aria-label.",
+        "Give icon-only buttons and links an aria-label or visually hidden text."
+      ],
+      "code_patterns": ["unlabelled_input", "icon_only_control"],
+      "advisory": false
+    },
+    {
+      "id": "focus-appearance",
+      "title": "The focus indicator is large and clear",
+      "wcag": {"criterion": "2.4.13", "name": "Focus Appearance", "level": "AAA", "url": "https://www.w3.org/WAI/WCAG22/Understanding/focus-appearance.html"},
+      "act_rules": [],
+      "checks": ["focus_indicator_area"],
+      "default_severity": "minor",
+      "summary": "The focus indicator should be at least as large as a 2 pixel outline around the control and contrast with its surroundings. Reported as advice only.",
+      "fix_hints": [
+        "Use an outline of at least 2px with strong contrast against both the control and the page background."
+      ],
+      "code_patterns": [],
+      "advisory": true
+    }
+  ],
+  "presets": [
+    {
+      "id": "essential",
+      "label": "Essential",
+      "description": "Level A keyboard blockers only. Start here when adopting AccessPath.",
+      "rules": ["keyboard-operable", "no-keyboard-trap", "focus-order", "name-role-value"],
+      "axe_tags": []
+    },
+    {
+      "id": "wcag22-aa",
+      "label": "WCAG 2.2 AA",
+      "description": "The keyboard rules for WCAG 2.2 level AA, plus axe-core's A and AA page rules. The legal target most teams have.",
+      "rules": ["keyboard-operable", "no-keyboard-trap", "bypass-blocks", "focus-order", "focus-visible", "focus-not-obscured", "on-focus", "name-role-value"],
+      "axe_tags": ["wcag2a", "wcag21a", "wcag2aa", "wcag21aa", "wcag22aa"]
+    },
+    {
+      "id": "strict",
+      "label": "Strict",
+      "description": "WCAG 2.2 AA plus focus appearance (advisory) and axe-core best practices.",
+      "rules": ["keyboard-operable", "no-keyboard-trap", "bypass-blocks", "focus-order", "focus-visible", "focus-not-obscured", "on-focus", "name-role-value", "focus-appearance"],
+      "axe_tags": ["wcag2a", "wcag21a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"]
+    }
+  ],
+  "default_preset": "wcag22-aa"
+}
