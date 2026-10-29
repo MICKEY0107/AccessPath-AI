@@ -238,3 +238,33 @@ def test_run_benchmark_command_runs_a_journey_and_saves_the_summary(tmp_path, se
     assert summary["metrics"]["runs"] == 1
     assert summary["results"][0]["outcome"] == "blocked"
     assert summary["results"][0]["matches"] is True
+
+
+@pytest.mark.django_db
+def test_benchmark_ignores_team_rules() -> None:
+    from apps.runs.benchmark import result_for
+
+    journey = Journey.objects.create(
+        name="Library",
+        goal="Apply for a card by keyboard.",
+        start_url="http://127.0.0.1:8001/x",
+        allowed_origins=["http://127.0.0.1:8001"],
+        completion_policy={},
+        evaluation_config={
+            "benchmark": {"outcome": "completed", "confirmed_rules": ["bypass-blocks"]}
+        },
+    )
+    run = Run.objects.create(journey=journey, planner_provider="fixture", outcome="completed")
+    for rule_id in ("bypass-blocks", "custom-apply-button-reached-quickly"):
+        Finding.objects.create(
+            run=run,
+            finding_id=rule_id[:16].ljust(16, "x"),
+            rule_id=rule_id,
+            severity="serious",
+            status="confirmed",
+            title="t",
+            summary="s",
+            url="http://127.0.0.1:8001/x",
+        )
+    result = result_for(run)
+    assert result.matches and result.extra_rules == []

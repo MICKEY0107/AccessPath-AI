@@ -191,7 +191,7 @@ docker compose exec web python manage.py install_axe_core       # optional
   `services: { web: { ports: !override ["127.0.0.1:8010:8000"] } }`, then open http://127.0.0.1:8010/runs/.
 - Restart the worker after engine changes: `docker compose restart worker`.
 - `.env` holds `GEMINI_*`, `OPENROUTER_*`, `GROQ_*` keys and models (currently `models/gemini-3.5-flash-lite`, `openrouter/free`, `openai/gpt-oss-20b`). Never print or commit it.
-- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **235 passed, 9 skipped** in the build workspace (`./scripts/dev.ps1 test`) (live-site tests are opt-in).
+- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **236 passed, 9 skipped** in the build workspace (`./scripts/dev.ps1 test`) (live-site tests are opt-in).
 - Host lint: `UV_CACHE_DIR=.uv-cache uv run ruff check .`
 
 ## 10. Where the code is

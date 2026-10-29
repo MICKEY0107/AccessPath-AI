@@ -107,9 +107,16 @@ def verify_fixture_fix(
         return Verification(
             False, result.outcome, f"The re-run still confirms this barrier: {still[0].summary}"
         )
+    if result.outcome == "completed":
+        ending = " and the journey now completes."
+    else:
+        ending = (
+            f". The replayed plan was written for the unfixed page, so the run itself ended "
+            f"as “{result.outcome}”; a live AI run would follow the fixed page."
+        )
     return Verification(
         True,
         result.outcome,
-        f"With the patch applied to a temporary copy, the re-run no longer confirms this "
-        f"barrier (run outcome: {result.outcome}).",
+        "With the patch applied to a temporary copy, the re-run no longer confirms this "
+        f"barrier{ending}",
     )

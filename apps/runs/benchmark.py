@@ -51,6 +51,8 @@ def result_for(run: Run) -> BenchmarkResult:
             if finding.status == "confirmed"
             and not finding.ignored
             and finding.source == "accesspath"
+            # Team rules are each team's own policy, not part of the benchmark's ground truth.
+            and not finding.rule_id.startswith("custom-")
         }
     )
     expected_rules = sorted(expected.get("confirmed_rules", []))
