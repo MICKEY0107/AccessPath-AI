@@ -31,7 +31,9 @@ def code_safety(provider: str, model: str = "", allowed: tuple[str, ...] = ()) -
     if provider in allowed:
         return CodeSafety(True, "Allowed by server setting", "Marked safe in CODE_SAFE_PROVIDERS.")
     if provider == "ollama":
-        return CodeSafety(True, "OK for private code", "Runs on your machine; code never leaves it.")
+        return CodeSafety(
+            True, "OK for private code", "Runs on your machine; code never leaves it."
+        )
     if provider == "groq":
         return CodeSafety(
             True,

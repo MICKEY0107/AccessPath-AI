@@ -81,6 +81,46 @@
             </tbody>
           </table>
 
+          <div class="panel-section" id="custom-rules">
+            <h2>Your team's rules</h2>
+            <p class="muted small">Add rules for your own product, built from fixed checks: you choose the check and a CSS selector, never code. They run on every page of this journey and appear in the report next to the WCAG rules.</p>
+            {% if custom_rows %}
+              <ul class="row-list">
+                {% for row in custom_rows %}
+                  <li class="ignore-row">
+                    <input type="hidden" name="custom-{{ row.index }}" value="{{ row.json }}">
+                    <label class="check-row"><input type="checkbox" name="keep-custom" value="{{ row.index }}" checked> Keep</label>
+                    <span><strong>{{ row.rule.title }}</strong> <span class="tag severity-{{ row.rule.severity }}">{{ row.rule.severity }}</span> <span class="tag tag-neutral">WCAG {{ row.rule.criterion }}</span></span>
+                    <span class="row-sub">{{ row.check_label }}: {{ row.describe }}{% if row.rule.fix_hint %} · Fix: {{ row.rule.fix_hint }}{% endif %}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            <fieldset class="ignore-add custom-add">
+              <legend>Add a rule</legend>
+              <div class="form-field"><label for="new-custom-title">Name</label>
+                <input id="new-custom-title" name="new-custom-title" maxlength="120" placeholder="e.g. Checkout button reachable quickly"></div>
+              <div class="form-field"><label for="new-custom-check">Check</label>
+                <select id="new-custom-check" name="new-custom-check" aria-describedby="custom-check-help">
+                  {% for key, check in custom_checks.items %}<option value="{{ key }}" data-criterion="{{ check.criterion }}">{{ check.label }}</option>{% endfor %}
+                </select>
+                <p id="custom-check-help" class="muted small">{% for key, check in custom_checks.items %}<span data-check-help="{{ key }}" {% if not forloop.first %}hidden{% endif %}>{{ check.help }}</span>{% endfor %}</p></div>
+              <div class="form-field"><label for="new-custom-selector">CSS selector</label>
+                <input id="new-custom-selector" name="new-custom-selector" maxlength="200" placeholder="e.g. [data-testid=checkout], .icon-button" spellcheck="false" autocapitalize="off"></div>
+              <div class="form-field" data-max-tabs hidden><label for="new-custom-max">Within how many Tab presses</label>
+                <input id="new-custom-max" name="new-custom-max" type="number" min="1" max="60" inputmode="numeric"></div>
+              <div class="form-field"><label for="new-custom-criterion">WCAG criterion</label>
+                <select id="new-custom-criterion" name="new-custom-criterion">
+                  <option value="">Suggested for the check</option>
+                  {% for value, label in wcag_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                </select></div>
+              <div class="form-field"><label for="new-custom-severity">Severity</label>
+                <select id="new-custom-severity" name="new-custom-severity">{% for level in severity_choices %}<option value="{{ level }}" {% if level == "serious" %}selected{% endif %}>{{ level|capfirst }}</option>{% endfor %}</select></div>
+              <div class="form-field"><label for="new-custom-fix">How to fix (optional)</label>
+                <input id="new-custom-fix" name="new-custom-fix" maxlength="240" placeholder="e.g. Use the Button component from our design system"></div>
+            </fieldset>
+          </div>
+
           <div class="panel-section">
             <h2>Known issues (ignores)</h2>
             <p class="muted small">An ignore keeps a finding visible but stops it failing the run. It needs a reason and an expiry date, so known issues cannot be hidden forever.</p>
@@ -102,7 +142,7 @@
             <fieldset class="ignore-add">
               <legend>Add an ignore</legend>
               <div class="form-field"><label for="new-ignore-id">Rule</label>
-                <select id="new-ignore-id" name="new-ignore-id">{% for row in rows %}<option value="{{ row.rule.id }}">{{ row.rule.title }}</option>{% endfor %}</select></div>
+                <select id="new-ignore-id" name="new-ignore-id">{% for row in rows %}<option value="{{ row.rule.id }}">{{ row.rule.title }}</option>{% endfor %}{% for row in custom_rows %}<option value="{{ row.rule.id }}">{{ row.rule.title }} (your rule)</option>{% endfor %}</select></div>
               <div class="form-field"><label for="new-ignore-match">Element contains</label>
                 <input id="new-ignore-match" name="new-ignore-match" maxlength="200" placeholder="e.g. .todo-list .toggle"></div>
               <div class="form-field"><label for="new-ignore-reason">Reason</label>
@@ -146,6 +186,17 @@
           help.hidden = help.dataset.presetHelp !== preset.value;
         }
       });
+      const check = document.getElementById("new-custom-check");
+      const showCheck = () => {
+        if (!check) return;
+        for (const help of document.querySelectorAll("[data-check-help]")) {
+          help.hidden = help.dataset.checkHelp !== check.value;
+        }
+        const max = document.querySelector("[data-max-tabs]");
+        if (max) max.hidden = check.value !== "selector_reachable_within";
+      };
+      check?.addEventListener("change", showCheck);
+      showCheck();
       for (const toggle of document.querySelectorAll("[data-rule-toggle]")) {
         toggle.addEventListener("change", () => {
           const reason = document.querySelector(`[data-reason-for="${toggle.dataset.ruleToggle}"]`);

@@ -43,10 +43,12 @@ const __accName = (element) => {
   if (aria) return aria;
   const tag = element.tagName.toLowerCase();
   const type = (element.getAttribute('type') || '').toLowerCase();
-  const labels = __norm(Array.from(element.labels || []).map((label) => label.textContent).join(' '));
+  const labelText = Array.from(element.labels || []).map((label) => label.textContent);
+  const labels = __norm(labelText.join(' '));
   if (labels) return labels;
   if (tag === 'input' && ['button', 'submit', 'reset'].includes(type)) {
-    return __norm(element.value) || (type === 'submit' ? 'Submit' : type === 'reset' ? 'Reset' : '');
+    const fallback = type === 'submit' ? 'Submit' : type === 'reset' ? 'Reset' : '';
+    return __norm(element.value) || fallback;
   }
   if (tag === 'input' && type === 'image') return __norm(element.getAttribute('alt'));
   if (tag === 'img') return __norm(element.getAttribute('alt'));
@@ -141,7 +143,8 @@ const __details = (element) => {
     classes: Array.from(element.classList).slice(0, 12),
     css_path: __cssPath(element),
     html_snippet: __snippet(element),
-    tabindex: element.hasAttribute('tabindex') ? element.getAttribute('tabindex').slice(0, 8) : null,
+    tabindex: element.hasAttribute('tabindex')
+      ? element.getAttribute('tabindex').slice(0, 8) : null,
     rect: {x: Math.round(rect.x), y: Math.round(rect.y + window.scrollY),
       width: Math.round(rect.width), height: Math.round(rect.height)},
     source_file: hint.file,

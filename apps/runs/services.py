@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -191,7 +193,8 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         run_checks=settings.EVALUATOR_RUN_CHECKS,
     )
     try:
-        result = executor.run_with_planner(planner, goal=run.journey.goal)
+        with _fixture_site(run.journey):
+            result = executor.run_with_planner(planner, goal=run.journey.goal)
     finally:
         persist_steps()
         started_by = (run.planner_metadata or {}).get("started_by")
@@ -223,6 +226,19 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         )
         run.save(update_fields=["diagnosis"])
     return result
+
+
+def _fixture_site(journey):
+    """Serve the bundled fixture site for a fixture journey if nothing else does."""
+    from engine.fixture_site import serve_if_missing
+
+    if journey.execution_mode != "fixture":
+        return nullcontext(False)
+    parsed = urlparse(journey.start_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if origin not in {item.rstrip("/") for item in settings.FIXTURE_ALLOWED_ORIGINS}:
+        return nullcontext(False)
+    return serve_if_missing(origin, Path(settings.BASE_DIR) / "fixtures" / "clinic")
 
 
 def started_by_repo_owner(run: Run) -> bool:

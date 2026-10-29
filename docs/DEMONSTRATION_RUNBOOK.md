@@ -1,26 +1,30 @@
 # AccessPath AI demonstration runbook
 
 **Rehearsal target:** 10 minutes
-**Updated:** 29 October 2026, for the web product (rules, confirmed findings, report, where to fix). The September runbook is in git history.
+**Updated:** 29 October 2026, for the web product (rules, team rules, confirmed findings, report, where to fix, one-command demo). The September runbook is in git history.
 
 ## Before the room
 
-1. `docker compose up -d --build`, then `docker compose ps` shows all services healthy.
-2. `docker compose exec web python manage.py migrate` and `seed_fixture_journeys`; sign in with your account.
-3. On **Code**, bind `https://github.com/MICKEY0107/AccessPath-AI` with live site `http://127.0.0.1:8001` and wait for **Ready**. Use a branch that contains `fixtures/clinic/benchmark/` (push it first) if you will show benchmark pages; the clinic pages are on every branch.
-4. Run these once with the deterministic planner and keep the report tabs open:
-   - Clinic appointment booking — keyboard-accessible reference (expect **Passed**)
-   - Clinic appointment booking — keyboard barrier control (expect **Blocked**)
-   - Benchmark — order confirmation without a focus outline (expect **Issues found**)
-5. Run `docker compose exec worker python manage.py run_benchmark --provider fixture --repeat 1` and keep the output in a terminal.
-6. Optional live run: only with at least ten minutes of buffer (Groq `openai/gpt-oss-120b` or local Ollama).
+1. Run `./scripts/dev.ps1 setup` (first time) or `./scripts/dev.ps1 demo` (later). That command:
+   - starts everything and applies the schema
+   - creates the **demo** account and links the bundled demo repository (nothing is pushed or cloned)
+   - adds the team rule "Apply button reached quickly"
+   - finishes six reports and prints their links
+
+   Keep these three reports open in tabs:
+   - Clinic appointment booking — keyboard-accessible reference (**Passed**)
+   - Clinic appointment booking — keyboard barrier control (**Blocked**)
+   - Benchmark — library page without a skip link (**Issues found**, including the team rule)
+2. Open **Status** and check that everything is **Ready** apart from optional items.
+3. Run `./scripts/dev.ps1 benchmark` and keep the output in a terminal.
+4. Optional live run, only with at least ten minutes of buffer: Groq `openai/gpt-oss-120b` or local Ollama.
 
 ## Ten-minute flow
 
 | Time | Screen | What to say | Proof point |
 |---|---|---|---|
 | 0:00–0:45 | Evaluation runs | "AccessPath answers one question: can a keyboard user finish this task on this site, and if not, where and why?" | Scope: motor accessibility, keyboard only |
-| 0:45–1:45 | Rules | "Rules come from WCAG 2.2 and the W3C ACT rules, shipped as a reviewed catalog. Teams pick a preset, and a rule can only be turned off with a reason; ignores expire." | Catalog version, ACT IDs, presets |
+| 0:45–1:45 | Rules | "Rules come from WCAG 2.2 and the W3C ACT rules, shipped as a reviewed catalog. Teams pick a preset, and a rule can only be turned off with a reason; ignores expire. Teams add their own rules from fixed checks — no code." Show the library report's team rule. | Catalog version, ACT IDs, presets, team rule |
 | 1:45–3:00 | Accessible clinic report | Read the verdict **Passed**, the plain-words panel, and Fixes & re-checks: every rule passed or not applicable, none silently skipped. | No false positives on the reference journey |
 | 3:00–5:00 | Broken clinic report | Verdict **Blocked**. "Before blaming the site, AccessPath re-checked: a Tab walk from the top skipped the time buttons because of tabindex=-1." Open Findings map → Where to fix: `fixtures/clinic/broken/slots.html` lines 6–8. | Confirmed barrier, exact code lines |
 | 5:00–6:15 | Fixes & re-checks | Show the patch, press **Copy patch**, then **Verify on a temporary copy**: "the re-run no longer confirms this barrier". "Nothing was applied to the repository." | Find → prove → locate → fix → verify |

@@ -1,6 +1,23 @@
 # AccessPath AI
 
-AccessPath AI evaluates whether a declared digital journey can be completed using a keyboard-only accessibility profile. The current implementation targets motor accessibility and begins with a controlled appointment-booking fixture.
+AccessPath AI evaluates whether a declared digital journey can be completed using a keyboard-only accessibility profile. The current implementation targets motor accessibility.
+
+## Quick start
+
+You need Docker Desktop. No AI key and no GitHub account are needed to try it.
+
+```powershell
+./scripts/dev.ps1 setup        # Windows   (macOS/Linux: ./scripts/dev.sh setup)
+```
+
+Then open <http://127.0.0.1:8000/> and sign in as **demo** with the password the setup printed. The demo has twelve journeys, a linked demo repository, a team rule and six finished reports. Start with the **Blocked** report: it names the file and line to fix and can verify the patch.
+
+| Guide | For |
+|---|---|
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Setup, a five-minute tour, everyday commands, fixing common problems |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Reading a report (product managers) and setting up journeys, rules, code and models (developers) |
+| [docs/ADAPTING.md](docs/ADAPTING.md) | Settings, extension points (rules, checks, providers, code patterns, hosts), testing |
+| [docs/DEMONSTRATION_RUNBOOK.md](docs/DEMONSTRATION_RUNBOOK.md) | The 10-minute presentation demo |
 
 ## What it does
 
@@ -16,13 +33,17 @@ AccessPath runs a declared task on a website using only the keyboard and returns
 
 | Tab | What it is for |
 |---|---|
+| Overview | What AccessPath does and a getting-started checklist (with a **Load the demo** button) |
 | Evaluation runs | Start journeys, add a real website, see recent runs |
-| Rules | Pick a preset (Essential, WCAG 2.2 AA, Strict) per journey, turn rules off with a reason, change severities, add ignores that expire |
-| Active codebase | Bind a GitHub, GitLab or Bitbucket repository and branch to a live site; see code patterns that often break keyboard access |
+| Rules | Pick a preset (Essential, WCAG 2.2 AA, Strict) per journey, turn rules off with a reason, change severities, add ignores that expire, add your team's own rules (four fixed checks plus a CSS selector) |
+| Active codebase | Bind a GitHub, GitLab or Bitbucket repository and branch to a live site, or use the bundled demo repository; see code patterns that often break keyboard access |
 | Models | Choose provider and model, list the provider's models, optionally remember an encrypted key; see which providers may read private code |
 | Report (per run) | Findings map with where-to-fix, fixes and re-checks, AI reasoning, evidence, exports |
+| Status | What is set up (database, worker, browser, demo site, axe-core, git, AI providers) and the exact fix for anything that is not; `python manage.py check_setup` in a terminal |
 
-## Local setup
+## Local setup (step by step)
+
+`./scripts/dev.ps1 setup` does all of this; these are the individual steps.
 
 1. Install Docker Desktop with WSL2/Linux containers.
 2. Copy `.env.example` to `.env` and replace local-only placeholder values.
@@ -35,6 +56,7 @@ AccessPath runs a declared task on a website using only the keyboard and returns
    docker compose exec web python manage.py seed_fixture_journeys
    docker compose exec web python manage.py seed_public_journeys
    docker compose exec web python manage.py install_axe_core   # optional, adds axe-core page rules
+   docker compose exec web python manage.py demo_setup         # optional: demo account, repository, reports
    ```
 
 5. Open `http://127.0.0.1:8000/runs/` and sign in. Start the accessible clinic journey, then the keyboard-barrier control.

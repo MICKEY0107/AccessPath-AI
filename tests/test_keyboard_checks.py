@@ -14,7 +14,9 @@ from engine.executor import KeyboardExecutor
 from engine.planner import FixturePlanPlanner
 from engine.rules import resolve_rules
 
-PAGE = "<!doctype html><html lang='en'><head><title>t</title>{head}</head><body>{body}</body></html>"
+PAGE = (
+    "<!doctype html><html lang='en'><head><title>t</title>{head}</head><body>{body}</body></html>"
+)
 
 
 def page(body: str, head: str = "") -> str:
@@ -199,7 +201,9 @@ def _kwargs(origin: str, tmp_path: Path) -> dict:
         "run_id": run_id,
         "start_url": f"{origin}/",
         "allowed_origins": [origin],
-        "completion_policy": {"signals": [{"id": "n", "type": "url_path_equals", "expected": "/n"}]},
+        "completion_policy": {
+            "signals": [{"id": "n", "type": "url_path_equals", "expected": "/n"}]
+        },
         "barrier_check": None,
         "max_steps": 4,
         "action_timeout_ms": 5000,

@@ -15,6 +15,11 @@ class RepoStatus(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
+class RepoSource(models.TextChoices):
+    GIT = "git", "Git repository"
+    BUNDLED = "bundled", "Bundled demo copy"
+
+
 class RepoBinding(models.Model):
     """This repository + branch is the code behind this live site."""
 
@@ -22,6 +27,8 @@ class RepoBinding(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="repo_bindings"
     )
     repo_url = models.URLField(max_length=300)
+    # "bundled" is the demo: a copy of AccessPath's own fixture site, never cloned.
+    source = models.CharField(max_length=16, choices=RepoSource.choices, default=RepoSource.GIT)
     branch = models.CharField(max_length=100, blank=True)
     live_site_url = models.URLField(max_length=500, blank=True)
     status = models.CharField(max_length=16, choices=RepoStatus.choices, default=RepoStatus.PENDING)
@@ -35,6 +42,13 @@ class RepoBinding(models.Model):
 
     class Meta:
         ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner"],
+                condition=models.Q(source="bundled"),
+                name="one_demo_repository_per_owner",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.short_name} · {self.branch or 'default branch'}"
@@ -43,6 +57,10 @@ class RepoBinding(models.Model):
     def short_name(self) -> str:
         parsed = urlparse(self.repo_url)
         return f"{parsed.hostname or ''}{parsed.path.removesuffix('.git')}".lstrip("/")
+
+    @property
+    def is_bundled(self) -> bool:
+        return self.source == RepoSource.BUNDLED
 
     @property
     def storage_dir(self):

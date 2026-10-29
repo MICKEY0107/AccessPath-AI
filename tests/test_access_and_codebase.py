@@ -37,7 +37,9 @@ ALLOWED = ("github.com", "gitlab.com", "bitbucket.org")
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("name", ["runs:list", "runs:rules", "runs:model_settings", "codebase:page"])
+@pytest.mark.parametrize(
+    "name", ["runs:list", "runs:rules", "runs:model_settings", "codebase:page"]
+)
 def test_every_page_requires_sign_in(anonymous_client, name) -> None:
     response = anonymous_client.get(reverse(name))
     assert response.status_code == 302
@@ -81,7 +83,9 @@ def test_key_is_not_stored_unless_remember_is_ticked(client, user) -> None:
 
 @pytest.mark.django_db
 def test_forget_key_deletes_it(client, user) -> None:
-    client.post(reverse("runs:save_model_settings"), {"provider": "groq", "api_key": KEY, "remember": "on"})
+    client.post(
+        reverse("runs:save_model_settings"), {"provider": "groq", "api_key": KEY, "remember": "on"}
+    )
     client.post(reverse("runs:forget_key"), {"provider": "groq"})
     saved = SavedCredential.objects.get(owner=user, provider="groq")
     assert saved.encrypted_key == "" and saved.key_hint == ""
@@ -94,7 +98,9 @@ def _journey() -> Journey:
         start_url="http://127.0.0.1:8001/accessible/index.html",
         allowed_origins=["http://127.0.0.1:8001"],
         completion_policy={},
-        evaluation_config={"planner": {"kind": "gemini.v1", "fallback": {"kind": "fixture_plan.v1"}}},
+        evaluation_config={
+            "planner": {"kind": "gemini.v1", "fallback": {"kind": "fixture_plan.v1"}}
+        },
     )
 
 
@@ -121,10 +127,14 @@ def test_another_persons_saved_key_is_never_used(client, user) -> None:
     other = get_user_model().objects.create_user("other", password="x")
     other_client = Client()
     other_client.force_login(other)
-    other_client.post(reverse("runs:save_model_settings"), {"provider": "groq", "api_key": KEY, "remember": "on"})
+    other_client.post(
+        reverse("runs:save_model_settings"), {"provider": "groq", "api_key": KEY, "remember": "on"}
+    )
     journey = _journey()
     with patch("apps.runs.views.execute_run.delay") as delay:
-        client.post(reverse("runs:start", args=[journey.id]), {"planner_provider": "groq"}, follow=True)
+        client.post(
+            reverse("runs:start", args=[journey.id]), {"planner_provider": "groq"}, follow=True
+        )
     delay.assert_not_called()
     assert Run.objects.count() == 0
 
@@ -132,11 +142,18 @@ def test_another_persons_saved_key_is_never_used(client, user) -> None:
 @pytest.mark.django_db
 def test_list_models_endpoint_prefers_the_typed_key_and_hides_it_in_errors(client) -> None:
     with patch("apps.runs.model_settings.list_models", return_value=["a", "b"]) as listing:
-        response = client.post(reverse("runs:list_models"), {"provider": "groq", "api_key": "typed-key-9876"})
+        response = client.post(
+            reverse("runs:list_models"), {"provider": "groq", "api_key": "typed-key-9876"}
+        )
     assert json.loads(response.content) == {"models": ["a", "b"]}
     assert listing.call_args.kwargs["api_key"] == "typed-key-9876"
-    with patch("apps.runs.model_settings.list_models", side_effect=ModelListError("The provider rejected the API key.")):
-        response = client.post(reverse("runs:list_models"), {"provider": "groq", "api_key": "typed-key-9876"})
+    with patch(
+        "apps.runs.model_settings.list_models",
+        side_effect=ModelListError("The provider rejected the API key."),
+    ):
+        response = client.post(
+            reverse("runs:list_models"), {"provider": "groq", "api_key": "typed-key-9876"}
+        )
     assert response.status_code == 502
     assert "typed-key-9876" not in response.content.decode()
 
@@ -157,15 +174,29 @@ def test_model_lists_send_keys_only_in_headers() -> None:
         if "groq" in request.full_url:
             return _Response(json.dumps({"data": [{"id": "openai/gpt-oss-120b"}]}).encode())
         if "googleapis" in request.full_url:
-            return _Response(json.dumps({"models": [
-                {"name": "models/gemini-2.5-flash", "supportedGenerationMethods": ["generateContent"]},
-                {"name": "models/embedding", "supportedGenerationMethods": ["embedContent"]},
-            ]}).encode())
+            return _Response(
+                json.dumps(
+                    {
+                        "models": [
+                            {
+                                "name": "models/gemini-2.5-flash",
+                                "supportedGenerationMethods": ["generateContent"],
+                            },
+                            {
+                                "name": "models/embedding",
+                                "supportedGenerationMethods": ["embedContent"],
+                            },
+                        ]
+                    }
+                ).encode()
+            )
         return _Response(json.dumps({"models": [{"name": "llama3.1:8b"}]}).encode())
 
     assert list_models("groq", api_key="k1", opener=opener) == ["openai/gpt-oss-120b"]
     assert list_models("gemini", api_key="k2", opener=opener) == ["models/gemini-2.5-flash"]
-    assert list_models("ollama", ollama_base_url="http://localhost:11434", opener=opener) == ["llama3.1:8b"]
+    assert list_models("ollama", ollama_base_url="http://localhost:11434", opener=opener) == [
+        "llama3.1:8b"
+    ]
     assert all("k1" not in request.full_url and "k2" not in request.full_url for request in seen)
     assert seen[1].get_header("X-goog-api-key") == "k2"
 
@@ -196,10 +227,16 @@ def test_ollama_client_returns_a_structured_action() -> None:
         body = json.loads(request.data)
         assert body["format"]["properties"]["action"]["enum"]
         assert request.full_url == "http://localhost:11434/api/chat"
-        content = json.dumps({"action": "tab", "value": None, "target_hint": "Search", "purpose": "p"})
-        return _Response(json.dumps({"model": "llama3.1:8b", "message": {"content": content}}).encode())
+        content = json.dumps(
+            {"action": "tab", "value": None, "target_hint": "Search", "purpose": "p"}
+        )
+        return _Response(
+            json.dumps({"model": "llama3.1:8b", "message": {"content": content}}).encode()
+        )
 
-    client = OllamaActionClient(base_url="http://localhost:11434/", timeout_seconds=5, opener=opener)
+    client = OllamaActionClient(
+        base_url="http://localhost:11434/", timeout_seconds=5, opener=opener
+    )
     planner = planner_from_config(
         {"planner": {"kind": "ollama.v1", "allow_no_fallback": True}},
         ollama_client=client,
@@ -213,13 +250,20 @@ def test_ollama_client_returns_a_structured_action() -> None:
 
 def test_ollama_errors_are_labelled_as_ollama() -> None:
     def missing_model(request, timeout):
-        raise HTTPError(request.full_url, 404, "missing", {}, io.BytesIO(b'{"error":"model not found"}'))
+        raise HTTPError(
+            request.full_url, 404, "missing", {}, io.BytesIO(b'{"error":"model not found"}')
+        )
 
     def offline(request, timeout):
         raise URLError(ConnectionRefusedError())
 
-    for opener, code in ((missing_model, "OLLAMA_MODEL_NOT_FOUND"), (offline, "OLLAMA_NOT_REACHABLE")):
-        client = OllamaActionClient(base_url="http://localhost:11434", timeout_seconds=5, opener=opener)
+    for opener, code in (
+        (missing_model, "OLLAMA_MODEL_NOT_FOUND"),
+        (offline, "OLLAMA_NOT_REACHABLE"),
+    ):
+        client = OllamaActionClient(
+            base_url="http://localhost:11434", timeout_seconds=5, opener=opener
+        )
         with pytest.raises(OllamaUnavailableError) as raised:
             client.generate_action(model="m", observation=_observation())
         assert raised.value.code == code
@@ -286,13 +330,15 @@ def sample_repo(tmp_path: Path) -> Path:
     (repo / "src").mkdir(parents=True)
     (repo / "src" / "App.jsx").write_text(
         "export default function App() {\n"
-        "  return <div className=\"pay\" onClick={pay}>Pay now</div>;\n"
+        '  return <div className="pay" onClick={pay}>Pay now</div>;\n'
         "}\n"
         "export function Toolbar() { return <App />; }\n",
         encoding="utf-8",
     )
     (repo / "src" / "styles.css").write_text(".btn:focus { outline: none; }\n", encoding="utf-8")
-    (repo / "src" / "config.js").write_text('const api_key = "sk-live-abcdefghijklmnopqrstuv";\n', encoding="utf-8")
+    (repo / "src" / "config.js").write_text(
+        'const api_key = "sk-live-abcdefghijklmnopqrstuv";\n', encoding="utf-8"
+    )
     (repo / ".env").write_text("SECRET=hunter2\n", encoding="utf-8")
     (repo / "leak").symlink_to("/etc/passwd")
     _git("init", "-q", "-b", "main", cwd=repo)
@@ -339,7 +385,9 @@ def test_index_skips_secrets_and_finds_patterns_and_components(sample_repo) -> N
 
 
 def test_secret_scan_redacts_keys_and_blocks_key_files() -> None:
-    text, count = redact('const api_key = "sk-live-abcdefghijklmnopqrstuv"; ghp_ABCDEFGHIJKLMNOPQRSTUV123')
+    text, count = redact(
+        'const api_key = "sk-live-abcdefghijklmnopqrstuv"; ghp_ABCDEFGHIJKLMNOPQRSTUV123'
+    )
     assert count >= 2 and "sk-live" not in text and "ghp_" not in text
     assert is_blocked_path(".env.production")
     assert is_blocked_path("certs/server.key")
@@ -366,15 +414,22 @@ def test_analyze_binding_end_to_end(sample_repo, tmp_path, user, settings) -> No
 @pytest.mark.django_db
 def test_adding_a_repository_queues_a_sealed_token_and_links_journeys(client, user) -> None:
     journey = Journey.objects.create(
-        name="Staging journey", goal="Do the thing on staging.", start_url="https://staging.example.com/a",
-        allowed_origins=["https://staging.example.com"], completion_policy={}, evaluation_config={},
+        name="Staging journey",
+        goal="Do the thing on staging.",
+        start_url="https://staging.example.com/a",
+        allowed_origins=["https://staging.example.com"],
+        completion_policy={},
+        evaluation_config={},
     )
     token = "github_pat_ABCDEFGHIJKLMNOPQRSTUV"
     with patch("apps.codebase.views.analyze_repository.delay") as delay:
         client.post(
             reverse("codebase:add"),
-            {"repo_url": "https://github.com/owner/repo", "token": token,
-             "live_site_url": "https://staging.example.com"},
+            {
+                "repo_url": "https://github.com/owner/repo",
+                "token": token,
+                "live_site_url": "https://staging.example.com",
+            },
         )
     binding = RepoBinding.objects.get()
     assert binding.owner == user
@@ -387,7 +442,9 @@ def test_adding_a_repository_queues_a_sealed_token_and_links_journeys(client, us
 
 @pytest.mark.django_db
 def test_bad_repository_address_is_explained(client) -> None:
-    response = client.post(reverse("codebase:add"), {"repo_url": "https://evil.example/a/b"}, follow=True)
+    response = client.post(
+        reverse("codebase:add"), {"repo_url": "https://evil.example/a/b"}, follow=True
+    )
     assert "Only github.com" in response.content.decode()
     assert RepoBinding.objects.count() == 0
 

@@ -35,6 +35,13 @@ class Command(BaseCommand):
         "versioned manifests. Benchmark journeys carry their expected results."
     )
 
+    def add_arguments(self, parser) -> None:
+        parser.add_argument(
+            "--only-missing",
+            action="store_true",
+            help="Add journeys that do not exist yet; never change existing ones.",
+        )
+
     def handle(self, *args: object, **options: object) -> None:
         fixture_base_url = settings.FIXTURE_ALLOWED_ORIGINS[0].rstrip("/")
         manifests = [_load(Path(settings.BASE_DIR) / path) for path in MANIFESTS]
@@ -56,6 +63,9 @@ class Command(BaseCommand):
                 evaluation_config = {**item["evaluation_config"], "journey_key": key}
                 if key in expected_by_key:
                     evaluation_config["benchmark"] = expected_by_key[key]
+                exists = Journey.objects.filter(name=item["name"]).exists()
+                if options.get("only_missing") and exists:
+                    continue
                 journey, created = Journey.objects.update_or_create(
                     name=item["name"],
                     defaults={

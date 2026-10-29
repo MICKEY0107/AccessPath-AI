@@ -20,9 +20,32 @@ from .secret_scan import is_blocked_path, redact
 
 INDEX_VERSION = "code_index.v1"
 SOURCE_EXTENSIONS = {
-    ".html", ".htm", ".jsx", ".tsx", ".js", ".mjs", ".ts", ".vue", ".svelte", ".astro",
-    ".erb", ".php", ".twig", ".hbs", ".handlebars", ".ejs", ".jinja", ".j2", ".njk",
-    ".liquid", ".cshtml", ".razor", ".css", ".scss", ".sass", ".less",
+    ".html",
+    ".htm",
+    ".jsx",
+    ".tsx",
+    ".js",
+    ".mjs",
+    ".ts",
+    ".vue",
+    ".svelte",
+    ".astro",
+    ".erb",
+    ".php",
+    ".twig",
+    ".hbs",
+    ".handlebars",
+    ".ejs",
+    ".jinja",
+    ".j2",
+    ".njk",
+    ".liquid",
+    ".cshtml",
+    ".razor",
+    ".css",
+    ".scss",
+    ".sass",
+    ".less",
 }
 STYLE_EXTENSIONS = {".css", ".scss", ".sass", ".less"}
 MAX_FILE_BYTES = 512 * 1024
@@ -37,17 +60,22 @@ ATTRIBUTE_PATTERNS = {
 CONTROL_TAG = re.compile(r"<(button|a\s|input|select|textarea|summary)\b", re.IGNORECASE)
 ROLE_CONTROL = re.compile(r"""\brole\s*=\s*["'](button|link|checkbox|switch|tab|menuitem)["']""")
 # Composite widgets (tabs, menus, listboxes) correctly use tabindex="-1" on all but one item.
-ROVING_ROLE = re.compile(r"""\brole\s*=\s*["'](tab|option|menuitem\w*|treeitem|radio|gridcell)["']""")
+ROVING_ROLE = re.compile(
+    r"""\brole\s*=\s*["'](tab|option|menuitem\w*|treeitem|radio|gridcell)["']"""
+)
 TABINDEX = re.compile(r"""\btab[iI]ndex\s*=\s*\{?\s*["']?\s*(-?\d+)""")
 CLICK_ON_NON_CONTROL = re.compile(
     r"""<(div|span|li|td|tr|img|p|section|article)\b[^>]*?\s"""
     r"""(onclick|onClick|@click|v-on:click|\(click\)|on:click)\s*=""",
     re.IGNORECASE,
 )
-FOCUS_NAVIGATION = re.compile(r"""\bon[Ff]ocus\s*=\s*[^>]*(location|navigate|router\.push|submit)""")
+FOCUS_NAVIGATION = re.compile(
+    r"""\bon[Ff]ocus\s*=\s*[^>]*(location|navigate|router\.push|submit)"""
+)
 TAB_PREVENT = re.compile(r"""key\s*===?\s*["']Tab["'][^\n]{0,120}preventDefault""")
-INPUT_TAG = re.compile(r"""<input\b(?![^>]*type\s*=\s*["']?(hidden|submit|button|reset|image))[^>]*>""",
-                       re.IGNORECASE)
+INPUT_TAG = re.compile(
+    r"""<input\b(?![^>]*type\s*=\s*["']?(hidden|submit|button|reset|image))[^>]*>""", re.IGNORECASE
+)
 COMPONENT_DEFINITION = re.compile(
     r"""(?:export\s+(?:default\s+)?)?(?:function|const|class)\s+([A-Z][A-Za-z0-9]{1,60})\b"""
 )
@@ -131,7 +159,8 @@ def _index_markup(index: CodeIndex, path: str, lines: list[str]) -> None:
             tag = match.group(0)
             wrapped = "<label" in line[: match.start()]
             if not wrapped and not any(
-                attribute in tag for attribute in ("aria-label", "aria-labelledby", " id=", "title=")
+                attribute in tag
+                for attribute in ("aria-label", "aria-labelledby", " id=", "title=")
             ):
                 _pattern(index, "unlabelled_input", path, number, line)
         for match in COMPONENT_DEFINITION.finditer(line):
@@ -149,7 +178,9 @@ def _index_styles(index: CodeIndex, path: str, text: str) -> None:
         selector, body = match.group(1), match.group(2)
         if ":focus" in selector and OUTLINE_REMOVED.search(body) and "box-shadow" not in body:
             line = text.count("\n", 0, match.start(2)) + 1
-            snippet = selector.strip()[-80:].split(">")[-1].strip() + " { " + body.strip()[:120] + " }"
+            snippet = (
+                selector.strip()[-80:].split(">")[-1].strip() + " { " + body.strip()[:120] + " }"
+            )
             _pattern(index, "outline_removed_on_focus", path, line, snippet)
 
 

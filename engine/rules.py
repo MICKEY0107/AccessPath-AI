@@ -132,6 +132,120 @@ class RuleIgnoreV1(BaseModel):
     until: date
 
 
+CustomCheck = Literal[
+    "selector_focusable", "selector_named", "selector_reachable_within", "selector_absent"
+]
+CUSTOM_RULE_ID_PATTERN = r"^custom-[a-z0-9-]{1,56}$"
+
+# The only checks a custom rule can use. Each takes a CSS selector (and the reachable
+# check a number), so a rule can be tightened for one product without running code.
+CUSTOM_CHECKS: dict[str, dict[str, str]] = {
+    "selector_focusable": {
+        "label": "Must be reachable with Tab",
+        "help": "Every visible element matching the selector must be a stop in the Tab order.",
+        "criterion": "2.1.1",
+        "fix": 'Use a native control, or remove tabindex="-1" from the matching elements.',
+    },
+    "selector_named": {
+        "label": "Must have an accessible name",
+        "help": "Every visible element matching the selector must have a name a screen "
+        "reader announces.",
+        "criterion": "4.1.2",
+        "fix": "Give the matching elements visible text, aria-label or aria-labelledby.",
+    },
+    "selector_reachable_within": {
+        "label": "Must be reached within N Tab presses",
+        "help": "The first visible element matching the selector must be reached from the top "
+        "of the page within the given number of Tab presses.",
+        "criterion": "2.4.1",
+        "fix": "Add a skip link to it, or move it earlier in the page source.",
+    },
+    "selector_absent": {
+        "label": "Must not appear",
+        "help": "No visible element may match the selector (for example a banned pattern).",
+        "criterion": "4.1.2",
+        "fix": "Replace the matching pattern with the accessible one your team agreed.",
+    },
+}
+
+
+class CustomRuleV1(BaseModel):
+    """A team's own rule, built from one of the fixed checks above; never runs code."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=CUSTOM_RULE_ID_PATTERN)
+    title: str = Field(min_length=3, max_length=120)
+    check: CustomCheck
+    selector: str = Field(min_length=1, max_length=200)
+    max_tabs: int | None = Field(default=None, ge=1, le=60)
+    criterion: str = Field(pattern=r"^\d\.\d\.\d{1,2}$")
+    severity: Severity = "serious"
+    fix_hint: str = Field(default="", max_length=240)
+
+    @field_validator("selector")
+    @classmethod
+    def selector_is_one_line(cls, value: str) -> str:
+        value = value.strip()
+        if not value or any(char in value for char in "\n\r{};"):
+            raise ValueError("a selector is one line without braces or semicolons")
+        return value
+
+    @model_validator(mode="after")
+    def reachable_needs_a_number(self) -> CustomRuleV1:
+        if self.check == "selector_reachable_within" and self.max_tabs is None:
+            raise ValueError("say within how many Tab presses")
+        if self.check != "selector_reachable_within":
+            self.max_tabs = None
+        return self
+
+    def describe(self) -> str:
+        if self.check == "selector_focusable":
+            return f"Every visible “{self.selector}” must be reachable with Tab."
+        if self.check == "selector_named":
+            return f"Every visible “{self.selector}” must have an accessible name."
+        if self.check == "selector_reachable_within":
+            return (
+                f"The first “{self.selector}” must be reached within {self.max_tabs} Tab presses."
+            )
+        return f"No visible element may match “{self.selector}”."
+
+    def as_rule(self, catalog: RuleCatalogV1) -> RuleV1:
+        """The custom rule in catalog shape, borrowing the WCAG reference it names."""
+        wcag = next(
+            (rule.wcag for rule in catalog.rules if rule.wcag.criterion == self.criterion), None
+        )
+        if wcag is None:
+            raise ValueError(f"no catalog rule covers WCAG {self.criterion}")
+        return RuleV1(
+            id=self.id,
+            title=self.title,
+            wcag=wcag,
+            checks=[self.check],
+            default_severity=self.severity,
+            summary=self.describe(),
+            fix_hints=[self.fix_hint or CUSTOM_CHECKS[self.check]["fix"]],
+        )
+
+
+def custom_rule_id(title: str, taken: set[str]) -> str:
+    import re
+
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40] or "rule"
+    candidate, number = f"custom-{slug}", 2
+    while candidate in taken:
+        candidate, number = f"custom-{slug}-{number}", number + 1
+    return candidate
+
+
+def wcag_choices(catalog: RuleCatalogV1) -> list[tuple[str, str]]:
+    """The WCAG criteria a custom rule may name: those the catalog covers."""
+    seen: dict[str, str] = {}
+    for rule in catalog.rules:
+        seen.setdefault(rule.wcag.criterion, f"{rule.wcag.criterion} {rule.wcag.name}")
+    return sorted(seen.items(), key=lambda item: [int(part) for part in item[0].split(".")])
+
+
 class RuleConfigV1(BaseModel):
     """Per-journey rule settings chosen on the Rules page."""
 
@@ -143,6 +257,7 @@ class RuleConfigV1(BaseModel):
     disabled: list[DisabledRuleV1] = Field(default_factory=list, max_length=20)
     severity: dict[str, Severity] = Field(default_factory=dict, max_length=20)
     ignores: list[RuleIgnoreV1] = Field(default_factory=list, max_length=50)
+    custom: list[CustomRuleV1] = Field(default_factory=list, max_length=20)
 
     @field_validator("severity")
     @classmethod
@@ -162,7 +277,12 @@ class RuleConfigV1(BaseModel):
             | set(self.severity)
             | {item.id for item in self.ignores}
         )
-        unknown = named - known
+        custom_ids = [item.id for item in self.custom]
+        if len(custom_ids) != len(set(custom_ids)):
+            raise ValueError("custom rule ids must be unique")
+        for item in self.custom:
+            item.as_rule(catalog)
+        unknown = named - known - set(custom_ids)
         if unknown:
             raise ValueError(f"unknown rule ids: {sorted(unknown)}")
         return self
@@ -190,6 +310,7 @@ class ActiveRuleSet:
     axe_tags: list[str]
     ignores: list[RuleIgnoreV1] = field(default_factory=list)
     expired_ignores: list[RuleIgnoreV1] = field(default_factory=list)
+    custom: list[CustomRuleV1] = field(default_factory=list)
 
     def get(self, rule_id: str) -> ActiveRule | None:
         return next((item for item in self.rules if item.id == rule_id), None)
@@ -217,6 +338,7 @@ class ActiveRuleSet:
             "axe_tags": self.axe_tags,
             "ignores": [item.model_dump(mode="json") for item in self.ignores],
             "expired_ignores": [item.model_dump(mode="json") for item in self.expired_ignores],
+            "custom": [item.model_dump(mode="json") for item in self.custom],
         }
 
 
@@ -240,6 +362,13 @@ def resolve_rules(
         for rule in (catalog.rule(rule_id) for rule_id in preset.rules)
         if rule.id not in disabled
     ]
+    rules += [
+        ActiveRule(
+            rule=item.as_rule(catalog), severity=settings.severity.get(item.id, item.severity)
+        )
+        for item in settings.custom
+        if item.id not in disabled
+    ]
     today = today or date.today()
     current = [item for item in settings.ignores if item.until >= today]
     expired = [item for item in settings.ignores if item.until < today]
@@ -252,4 +381,20 @@ def resolve_rules(
         axe_tags=list(preset.axe_tags),
         ignores=current,
         expired_ignores=expired,
+        custom=list(settings.custom),
     )
+
+
+def rules_for_metadata(
+    metadata: dict | None, catalog: RuleCatalogV1 | None = None
+) -> dict[str, RuleV1]:
+    """Catalog rules plus the custom rules a run recorded, keyed by id (for reports)."""
+    catalog = catalog or load_catalog()
+    rules = {rule.id: rule for rule in catalog.rules}
+    for raw in (metadata or {}).get("custom") or []:
+        try:
+            custom = CustomRuleV1.model_validate(raw)
+            rules[custom.id] = custom.as_rule(catalog)
+        except (ValueError, TypeError):
+            continue
+    return rules

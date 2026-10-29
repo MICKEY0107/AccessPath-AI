@@ -87,7 +87,9 @@ def scrub(value: object, secrets: list[str]) -> object:
 
 def _saved_fernet() -> Fernet:
     # A different context from run credentials, so one can never be used as the other.
-    digest = hashlib.sha256(f"accesspath.saved-credential.v1:{settings.SECRET_KEY}".encode()).digest()
+    digest = hashlib.sha256(
+        f"accesspath.saved-credential.v1:{settings.SECRET_KEY}".encode()
+    ).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
 
 

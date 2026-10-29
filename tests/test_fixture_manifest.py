@@ -30,7 +30,10 @@ def test_seed_fixture_journeys_is_idempotent(db) -> None:
     assert accessible.evaluation_config["planner"]["kind"] == "gemini.v1"
     assert accessible.evaluation_config["planner"]["fallback"]["kind"] == "fixture_plan.v1"
     assert Journey.objects.count() == 12
-    assert accessible.evaluation_config["benchmark"] == {"outcome": "completed", "confirmed_rules": []}
+    assert accessible.evaluation_config["benchmark"] == {
+        "outcome": "completed",
+        "confirmed_rules": [],
+    }
     trap = Journey.objects.get(name="Benchmark — cookie dialog keyboard trap")
     assert trap.evaluation_config["benchmark"]["confirmed_rules"] == ["no-keyboard-trap"]
     assert trap.start_url == f"{fixture_origin}/benchmark/cookie-trap.html"

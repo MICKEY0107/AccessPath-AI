@@ -99,7 +99,9 @@ class SourceReader:
         if not lines:
             return ""
         start, end = max(1, line - context), min(len(lines), line + context)
-        text = "\n".join(f"{number:>4}  {lines[number - 1][:200]}" for number in range(start, end + 1))
+        text = "\n".join(
+            f"{number:>4}  {lines[number - 1][:200]}" for number in range(start, end + 1)
+        )
         return redact(text)[0]
 
     def search(self, needle: str, limit: int = 10) -> list[tuple[str, int, str]]:
@@ -143,7 +145,12 @@ def _match_source_hint(element: dict[str, Any], reader: SourceReader) -> CodeLoc
             except (TypeError, ValueError):
                 line = 1
             line = min(max(line, 1), max(len(reader.lines(path)), 1))
-            return CodeLocation(path, line, "high", f"{element.get('framework', 'Framework')} source hint from the page")
+            return CodeLocation(
+                path,
+                line,
+                "high",
+                f"{element.get('framework', 'Framework')} source hint from the page",
+            )
     return None
 
 
@@ -201,14 +208,27 @@ def locate_rule_based(
         tokens.append(f">{name_text}<")
     for (path, line), kind in pattern_lines.items():
         snippet = next(
-            (item["snippet"] for item in index.get("patterns", [])
-             if item["path"] == path and item["line"] == line), ""
+            (
+                item["snippet"]
+                for item in index.get("patterns", [])
+                if item["path"] == path and item["line"] == line
+            ),
+            "",
         )
         on_line = [token for token in tokens if token in snippet]
         if on_line:
-            candidates.append((score(path, line), CodeLocation(
-                path, line, "high",
-                f"{kind.replace('_', ' ')} on the line that renders {on_line[0]}", source="pattern")))
+            candidates.append(
+                (
+                    score(path, line),
+                    CodeLocation(
+                        path,
+                        line,
+                        "high",
+                        f"{kind.replace('_', ' ')} on the line that renders {on_line[0]}",
+                        source="pattern",
+                    ),
+                )
+            )
 
     ranked = sorted(candidates, key=lambda item: -item[0])
     best = ranked[0][0] if ranked else 0
@@ -230,26 +250,53 @@ def locate_rule_based(
                 tag_content = f">{name}<" in reader.lines(item[0])[item[1] - 1]
                 return score(*item) + (2 if tag_content else 0)
 
-            ranked = sorted(dict.fromkeys((path, line) for path, line, _text in hits), key=lambda item: -text_score(item))
+            ranked = sorted(
+                dict.fromkeys((path, line) for path, line, _text in hits),
+                key=lambda item: -text_score(item),
+            )
             for path, line in ranked[:MAX_PER_COLUMN]:
-                _add(result.likely, CodeLocation(path, line, "medium",
-                                                 f"Contains the control's text “{name[:60]}”",
-                                                 reader.snippet(path, line), "text"))
+                _add(
+                    result.likely,
+                    CodeLocation(
+                        path,
+                        line,
+                        "medium",
+                        f"Contains the control's text “{name[:60]}”",
+                        reader.snippet(path, line),
+                        "text",
+                    ),
+                )
         classes = [name for name in element.get("classes") or [] if len(name) >= 3]
         if classes and len(result.likely) < MAX_PER_COLUMN:
             for path, line, _text in reader.search(classes[0], limit=MAX_PER_COLUMN):
                 text = reader.lines(path)[line - 1]
                 if all(name in text for name in classes):
-                    _add(result.likely, CodeLocation(path, line, "medium",
-                                                     f"Uses the classes {' '.join(classes)}",
-                                                     reader.snippet(path, line), "text"))
+                    _add(
+                        result.likely,
+                        CodeLocation(
+                            path,
+                            line,
+                            "medium",
+                            f"Uses the classes {' '.join(classes)}",
+                            reader.snippet(path, line),
+                            "text",
+                        ),
+                    )
         if not result.likely:
             for item in index.get("patterns", []):
                 if item["kind"] in rule_patterns:
-                    _add(result.likely, CodeLocation(
-                        item["path"], item["line"], "low",
-                        f"A {item['kind'].replace('_', ' ')} pattern this rule often comes from",
-                        reader.snippet(item["path"], item["line"]), "pattern"))
+                    _add(
+                        result.likely,
+                        CodeLocation(
+                            item["path"],
+                            item["line"],
+                            "low",
+                            f"A {item['kind'].replace('_', ' ')} pattern this rule often "
+                            f"comes from",
+                            reader.snippet(item["path"], item["line"]),
+                            "pattern",
+                        ),
+                    )
 
     anchor_paths = [item.path for item in result.exact] or [item.path for item in result.likely[:1]]
     components = index.get("components", {})
@@ -257,14 +304,30 @@ def locate_rule_based(
         if any(defined[0] in anchor_paths for defined in entry.get("defined_in", [])):
             for path, line in entry.get("used_in", [])[:MAX_PER_COLUMN]:
                 if path not in anchor_paths:
-                    _add(result.related, CodeLocation(path, line, "medium",
-                                                      f"Renders the <{name}> component",
-                                                      reader.snippet(path, line, 0), "component"))
+                    _add(
+                        result.related,
+                        CodeLocation(
+                            path,
+                            line,
+                            "medium",
+                            f"Renders the <{name}> component",
+                            reader.snippet(path, line, 0),
+                            "component",
+                        ),
+                    )
     for item in index.get("patterns", []):
         if item["kind"] in rule_patterns and item["path"] not in anchor_paths:
-            _add(result.related, CodeLocation(item["path"], item["line"], "low",
-                                              f"Same {item['kind'].replace('_', ' ')} pattern",
-                                              reader.snippet(item["path"], item["line"], 0), "pattern"))
+            _add(
+                result.related,
+                CodeLocation(
+                    item["path"],
+                    item["line"],
+                    "low",
+                    f"Same {item['kind'].replace('_', ' ')} pattern",
+                    reader.snippet(item["path"], item["line"], 0),
+                    "pattern",
+                ),
+            )
     return result
 
 
@@ -316,62 +379,132 @@ def suggest_fix(
             }
         )
         edits = {item: _TABINDEX_NEGATIVE.sub("", lines[item - 1], count=1) for item in numbers}
-        return FixSuggestion(path, number, "Put the control back in the Tab order", [
-            "Remove tabindex=\"-1\" so Tab reaches the control again.",
-            f"The patch changes {len(edits)} line{'s' if len(edits) != 1 else ''}; check other files in Also affected.",
-        ], _diff(path, lines, edits), edits)
-    if rule_id == "keyboard-operable" and _CLICKABLE_TAG.search(original) and re.search(
-        r"on[Cc]lick|@click|\(click\)", original
+        return FixSuggestion(
+            path,
+            number,
+            "Put the control back in the Tab order",
+            [
+                'Remove tabindex="-1" so Tab reaches the control again.',
+                f"The patch changes {len(edits)} line{'s' if len(edits) != 1 else ''}; check "
+                f"other files in Also affected.",
+            ],
+            _diff(path, lines, edits),
+            edits,
+        )
+    if (
+        rule_id == "keyboard-operable"
+        and _CLICKABLE_TAG.search(original)
+        and re.search(r"on[Cc]lick|@click|\(click\)", original)
     ):
         tag = _CLICKABLE_TAG.search(original).group(1)
         new = _CLICKABLE_TAG.sub('<button type="button"', original, count=1)
         new = re.sub(rf"</{tag}>", "</button>", new, count=1)
         new = re.sub(r"""\s+role\s*=\s*["']button["']""", "", new, count=1)
         new = re.sub(r"""\s+tab[iI]ndex\s*=\s*["']?0["']?""", "", new, count=1)
-        return FixSuggestion(path, number, "Use a real button", [
-            f"Replace the <{tag}> with <button type=\"button\"> so it is focusable and works with Enter and Space.",
-            "Move any visual styling onto the button; browsers give it focus and keyboard support for free.",
-        ], _diff(path, lines, {number: new}), {number: new})
+        return FixSuggestion(
+            path,
+            number,
+            "Use a real button",
+            [
+                f'Replace the <{tag}> with <button type="button"> so it is focusable and '
+                f'works with Enter and Space.',
+                "Move any visual styling onto the button; browsers give it focus and "
+                "keyboard support for free.",
+            ],
+            _diff(path, lines, {number: new}),
+            {number: new},
+        )
     if rule_id == "keyboard-operable":
-        return FixSuggestion(path, number, "Make the control work with Enter and Space", [
-            "Prefer a native <button> or <a href>; they handle Enter and Space automatically.",
-            "If it must stay custom: add tabindex=\"0\", the right role, and a keydown handler for Enter and Space.",
-        ])
+        return FixSuggestion(
+            path,
+            number,
+            "Make the control work with Enter and Space",
+            [
+                "Prefer a native <button> or <a href>; they handle Enter and Space automatically.",
+                'If it must stay custom: add tabindex="0", the right role, and a keydown '
+                'handler for Enter and Space.',
+            ],
+        )
     if rule_id == "focus-visible" and _OUTLINE.search(original):
-        new = _OUTLINE.sub("outline: 3px solid currentColor; outline-offset: 2px;", original, count=1)
-        return FixSuggestion(path, number, "Bring back a visible focus indicator", [
-            "Replace outline: none with a clear outline on :focus-visible.",
-            "Check the colour contrasts with both the control and the page background.",
-        ], _diff(path, lines, {number: new}), {number: new})
+        new = _OUTLINE.sub(
+            "outline: 3px solid currentColor; outline-offset: 2px;", original, count=1
+        )
+        return FixSuggestion(
+            path,
+            number,
+            "Bring back a visible focus indicator",
+            [
+                "Replace outline: none with a clear outline on :focus-visible.",
+                "Check the colour contrasts with both the control and the page background.",
+            ],
+            _diff(path, lines, {number: new}),
+            {number: new},
+        )
     if rule_id == "on-focus" and _ONFOCUS.search(original):
         new = _ONFOCUS.sub("", original, count=1)
-        return FixSuggestion(path, number, "Do not navigate when focus arrives", [
-            "Remove the focus handler that changes the page.",
-            "Navigate from a click or Enter instead (a normal link already does this).",
-        ], _diff(path, lines, {number: new}), {number: new})
+        return FixSuggestion(
+            path,
+            number,
+            "Do not navigate when focus arrives",
+            [
+                "Remove the focus handler that changes the page.",
+                "Navigate from a click or Enter instead (a normal link already does this).",
+            ],
+            _diff(path, lines, {number: new}),
+            {number: new},
+        )
     if rule_id == "name-role-value":
         tag_match = re.search(r"<(input|button|a)\b", original)
         if tag_match and "aria-label" not in original:
-            new = original[: tag_match.end()] + ' aria-label="Describe what this does"' + original[tag_match.end():]
-            return FixSuggestion(path, number, "Give the control an accessible name", [
-                "Add an aria-label (or a <label>) that says what the control does, e.g. “Mark Buy milk as complete”.",
-                "Replace the placeholder text in the patch with a real description.",
-            ], _diff(path, lines, {number: new}), {number: new})
+            new = (
+                original[: tag_match.end()]
+                + ' aria-label="Describe what this does"'
+                + original[tag_match.end() :]
+            )
+            return FixSuggestion(
+                path,
+                number,
+                "Give the control an accessible name",
+                [
+                    "Add an aria-label (or a <label>) that says what the control does, e.g. "
+                    "“Mark Buy milk as complete”.",
+                    "Replace the placeholder text in the patch with a real description.",
+                ],
+                _diff(path, lines, {number: new}),
+                {number: new},
+            )
     if rule_id == "no-keyboard-trap":
-        return FixSuggestion(path, number, "Let Tab leave the component", [
-            "Remove the keydown handler that cancels Tab or moves focus back.",
-            "In a modal dialog, let Escape close it and return focus to the control that opened it.",
-        ])
+        return FixSuggestion(
+            path,
+            number,
+            "Let Tab leave the component",
+            [
+                "Remove the keydown handler that cancels Tab or moves focus back.",
+                "In a modal dialog, let Escape close it and return focus to the control that "
+                "opened it.",
+            ],
+        )
     if rule_id == "focus-not-obscured":
-        return FixSuggestion(path, number, "Stop the fixed header covering focus", [
-            "Add html { scroll-padding-top: <header height>; } so focused controls scroll clear of it.",
-            f"Check “{name}” is fully visible when it has focus.",
-        ])
+        return FixSuggestion(
+            path,
+            number,
+            "Stop the fixed header covering focus",
+            [
+                "Add html { scroll-padding-top: <header height>; } so focused controls "
+                "scroll clear of it.",
+                f"Check “{name}” is fully visible when it has focus.",
+            ],
+        )
     if rule_id == "bypass-blocks":
-        return FixSuggestion(path, number, "Add a way to skip the navigation", [
-            "Add <a href=\"#main\">Skip to main content</a> as the first focusable element.",
-            "Wrap the page content in <main id=\"main\">.",
-        ])
+        return FixSuggestion(
+            path,
+            number,
+            "Add a way to skip the navigation",
+            [
+                'Add <a href="#main">Skip to main content</a> as the first focusable element.',
+                'Wrap the page content in <main id="main">.',
+            ],
+        )
     return None
 
 
@@ -399,8 +532,12 @@ def locate(
             if note:
                 result.notes.append(note)
     if not (result.exact or result.likely):
-        result.notes.append("No matching code was found; the element may come from a library or a CMS.")
-    result.fix = suggest_fix(finding.get("rule_id", ""), finding.get("element") or {}, result, reader)
+        result.notes.append(
+            "No matching code was found; the element may come from a library or a CMS."
+        )
+    result.fix = suggest_fix(
+        finding.get("rule_id", ""), finding.get("element") or {}, result, reader
+    )
     if result.fix is not None:
         result.fix.patch, _found = redact(result.fix.patch)
         clean_edits = {number: redact(text)[0] for number, text in result.fix.edits.items()}

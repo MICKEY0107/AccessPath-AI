@@ -28,7 +28,15 @@ class RunArtifactAdmin(admin.ModelAdmin):
 
 @admin.register(Finding)
 class FindingAdmin(admin.ModelAdmin):
-    list_display = ("rule_id", "wcag_criterion", "severity", "status", "ignored", "run", "created_at")
+    list_display = (
+        "rule_id",
+        "wcag_criterion",
+        "severity",
+        "status",
+        "ignored",
+        "run",
+        "created_at",
+    )
     list_filter = ("severity", "status", "rule_id", "ignored")
     search_fields = ("title", "summary", "url")
     readonly_fields = ("data",)

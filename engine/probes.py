@@ -23,9 +23,35 @@ from .dom import ACTIVE_DETAILS, script
 
 WALK_START_ID = "__accesspath_walk_start"
 STOPWORDS = {
-    "the", "and", "for", "with", "button", "link", "field", "input", "control", "focus",
-    "next", "element", "item", "select", "choose", "open", "press", "click", "tab", "page",
-    "this", "that", "into", "onto", "from", "then", "area", "box", "text",
+    "the",
+    "and",
+    "for",
+    "with",
+    "button",
+    "link",
+    "field",
+    "input",
+    "control",
+    "focus",
+    "next",
+    "element",
+    "item",
+    "select",
+    "choose",
+    "open",
+    "press",
+    "click",
+    "tab",
+    "page",
+    "this",
+    "that",
+    "into",
+    "onto",
+    "from",
+    "then",
+    "area",
+    "box",
+    "text",
 }
 
 _PREPARE_WALK = script(
@@ -43,6 +69,18 @@ _PREPARE_WALK = script(
     return true;
     """
 )
+
+STOP_MARK = "data-accesspath-stop"
+_MARK_ACTIVE = f"""(index) => {{
+    const element = document.activeElement;
+    if (element && element !== document.body) element.setAttribute('{STOP_MARK}', String(index));
+    return true;
+}}"""
+CLEAR_STOP_MARKS = f"""() => {{
+    document.querySelectorAll('[{STOP_MARK}]')
+      .forEach((element) => element.removeAttribute('{STOP_MARK}'));
+    return true;
+}}"""
 
 _RESTORE_WALK = script(
     f"""
@@ -207,10 +245,20 @@ def hint_tokens(hint: str) -> list[str]:
     return [word for word in dict.fromkeys(words) if word not in STOPWORDS][:8]
 
 
-def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk:
-    """Press Tab from the top of the page and record each focus stop, then restore focus."""
+def tab_walk(
+    page: Page, *, max_stops: int = 80, settle_ms: int = 30, mark_stops: bool = False
+) -> TabWalk:
+    """Press Tab from the top of the page and record each focus stop, then restore focus.
+
+    With ``mark_stops`` each element Tab reached keeps a ``data-accesspath-stop``
+    attribute (its position) until ``CLEAR_STOP_MARKS`` runs, so later checks can ask
+    "did Tab reach this element?" by identity rather than by a CSS path that can
+    change with focus styling.
+    """
     walk = TabWalk()
     before_url = page.url
+    if mark_stops:
+        page.evaluate(CLEAR_STOP_MARKS)
     page.evaluate(_PREPARE_WALK)
     seen: dict[str, int] = {}
     frame_repeats = 0
@@ -258,6 +306,8 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
             frame_repeats = 0
             seen[path] = len(walk.stops)
             walk.stops.append(info)
+            if mark_stops:
+                page.evaluate(_MARK_ACTIVE, len(walk.stops) - 1)
         walk.focusable_count = int(page.evaluate(_FOCUSABLE_COUNT))
     finally:
         if walk.navigated_to:
@@ -268,7 +318,9 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
             with suppress(Exception):
                 if trigger_known:
                     raise LookupError("already known")
-                walk.navigation_stop = page.evaluate(_NEXT_IN_TAB_ORDER, last) or walk.navigation_stop
+                walk.navigation_stop = (
+                    page.evaluate(_NEXT_IN_TAB_ORDER, last) or walk.navigation_stop
+                )
         else:
             walk.restored = page.evaluate(_RESTORE_WALK)
     return walk
@@ -359,7 +411,8 @@ def probe_target(
         name = details.get("name") or details.get("tag")
         position = walk.position_of(details.get("css_path", ""))
         where = (
-            f"after {position + 1} Tab press{'' if position == 0 else 'es'} from the top of the page"
+            f"after {position + 1} Tab press{'' if position == 0 else 'es'} from the top of "
+            f"the page"
             if position is not None
             else "with Tab"
         )

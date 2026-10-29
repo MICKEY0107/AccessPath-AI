@@ -37,16 +37,25 @@ def _run(journey: Journey, *, outcome: str, failure_kind: str = "", diagnosis: s
         diagnosis=diagnosis,
         started_at=started,
         finished_at=started + timedelta(seconds=75),
-        planner_metadata={"rules": {"preset": "wcag22-aa", "catalog_version": "2026.10.29", "fail_on": "serious"}},
+        planner_metadata={
+            "rules": {"preset": "wcag22-aa", "catalog_version": "2026.10.29", "fail_on": "serious"}
+        },
         rule_results=[
             {"rule_id": "keyboard-operable", "result": "failed", "detail": "", "finding_count": 1},
             {"rule_id": "focus-visible", "result": "passed", "detail": "", "finding_count": 0},
-            {"rule_id": "bypass-blocks", "result": "not_applicable", "detail": "", "finding_count": 0},
+            {
+                "rule_id": "bypass-blocks",
+                "result": "not_applicable",
+                "detail": "",
+                "finding_count": 0,
+            },
         ],
     )
 
 
-def _finding(run: Run, *, rule_id="keyboard-operable", severity="critical", status="confirmed", ignored=False):
+def _finding(
+    run: Run, *, rule_id="keyboard-operable", severity="critical", status="confirmed", ignored=False
+):
     data = {
         "id": f"{rule_id}-{status}-{ignored}"[:16].ljust(16, "0"),
         "rule_id": rule_id,
@@ -55,7 +64,11 @@ def _finding(run: Run, *, rule_id="keyboard-operable", severity="critical", stat
         "severity": severity,
         "status": status,
         "summary": "“09:00” is skipped by Tab.",
-        "element": {"name": "09:00", "css_path": "main > button.slot", "html_snippet": "<button class=\"slot\" tabindex=\"-1\">"},
+        "element": {
+            "name": "09:00",
+            "css_path": "main > button.slot",
+            "html_snippet": '<button class="slot" tabindex="-1">',
+        },
         "confirmation": {"method": "tab_walk", "confirmed": True, "detail": ""},
         "occurrences": 3,
         "ignored": ignored,
@@ -63,9 +76,18 @@ def _finding(run: Run, *, rule_id="keyboard-operable", severity="critical", stat
         "help_url": "https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html",
     }
     return Finding.objects.create(
-        run=run, finding_id=data["id"], rule_id=rule_id, wcag_criterion="2.1.1", severity=severity,
-        status=status, title="Every control works with the keyboard", summary=data["summary"],
-        step_number=4, url="https://clinic.example/slots", ignored=ignored, data=data,
+        run=run,
+        finding_id=data["id"],
+        rule_id=rule_id,
+        wcag_criterion="2.1.1",
+        severity=severity,
+        status=status,
+        title="Every control works with the keyboard",
+        summary=data["summary"],
+        step_number=4,
+        url="https://clinic.example/slots",
+        ignored=ignored,
+        data=data,
     )
 
 
@@ -96,7 +118,9 @@ def test_completed_run_with_only_review_items_needs_review_and_ignores_do_not_fa
 @pytest.mark.django_db
 def test_agent_failure_is_incomplete_and_does_not_blame_the_site() -> None:
     run = _run(
-        _journey(), outcome="agent_error", failure_kind="agent_failure",
+        _journey(),
+        outcome="agent_error",
+        failure_kind="agent_failure",
         diagnosis="Not a site barrier: “Continue” is reachable after 3 Tab presses.",
     )
     report = build_report(run)
@@ -129,7 +153,9 @@ def test_json_export_is_plain_data(client) -> None:
     assert data["verdict"]["key"] == "blocked"
     assert data["findings"][0]["element"]["css_path"] == "main > button.slot"
     assert {item["rule_id"] for item in data["rule_results"]} == {
-        "keyboard-operable", "focus-visible", "bypass-blocks"
+        "keyboard-operable",
+        "focus-visible",
+        "bypass-blocks",
     }
 
 
@@ -145,10 +171,18 @@ def test_html_export_is_standalone(client) -> None:
     assert "Every control works with the keyboard" in html
 
 
-def _result(key, outcome, rules, expected_outcome="blocked", expected=("keyboard-operable",), reason=""):
+def _result(
+    key, outcome, rules, expected_outcome="blocked", expected=("keyboard-operable",), reason=""
+):
     return BenchmarkResult(
-        journey_key=key, run_id="r", expected_outcome=expected_outcome, expected_rules=list(expected),
-        outcome=outcome, terminal_reason=reason, failure_kind="", confirmed_rules=list(rules),
+        journey_key=key,
+        run_id="r",
+        expected_outcome=expected_outcome,
+        expected_rules=list(expected),
+        outcome=outcome,
+        terminal_reason=reason,
+        failure_kind="",
+        confirmed_rules=list(rules),
         duration_seconds=10.0,
     )
 
@@ -158,7 +192,9 @@ def test_benchmark_summary_computes_the_gate_1_measures() -> None:
         _result("a", "blocked", ["keyboard-operable"]),
         _result("a", "blocked", ["keyboard-operable"]),
         _result("b", "completed", [], "completed", ()),
-        _result("b", "agent_error", ["focus-visible"], "completed", (), reason="GROQ_QUOTA_FAILURE"),
+        _result(
+            "b", "agent_error", ["focus-visible"], "completed", (), reason="GROQ_QUOTA_FAILURE"
+        ),
     ]
     summary = summarize(results)
     metrics = summary["metrics"]
@@ -194,9 +230,7 @@ def test_run_benchmark_command_runs_a_journey_and_saves_the_summary(tmp_path, se
         settings.MEDIA_ROOT = tmp_path
         call_command("seed_fixture_journeys")
         output = tmp_path / "summary.json"
-        call_command(
-            "run_benchmark", "--journeys", "bench-span-button", "--output", str(output)
-        )
+        call_command("run_benchmark", "--journeys", "bench-span-button", "--output", str(output))
     finally:
         server.shutdown()
         thread.join(timeout=2)

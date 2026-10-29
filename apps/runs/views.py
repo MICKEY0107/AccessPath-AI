@@ -1,11 +1,11 @@
+import base64
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-import base64
-
 from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
-from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.debug import sensitive_post_parameters
 
@@ -27,7 +27,8 @@ ISSUE_OUTCOMES = {
 }
 
 TERMINAL_REASON_LABELS = {
-    "KEYBOARD_TARGET_NOT_REACHABLE": "A control the task needs cannot be reached with the keyboard.",
+    "KEYBOARD_TARGET_NOT_REACHABLE": "A control the task needs cannot be reached with the "
+    "keyboard.",
     "KEYBOARD_TARGET_NOT_OPERABLE": "A control the task needs does not respond to Enter or Space.",
     "KEYBOARD_TRAP_CONFIRMED": "Keyboard focus is trapped and cannot leave a component.",
     "BARRIER_NOT_CONFIRMED": "A suspected barrier was re-checked and not confirmed.",
@@ -147,9 +148,7 @@ def run_list(
                 "completed_runs": Run.objects.filter(outcome=JourneyOutcome.COMPLETED).count(),
                 "server_planners": sum(1 for option in planner_options if option["has_server_key"]),
             },
-            "run_filter_journeys": Journey.objects.filter(
-                pk__in=Run.objects.values("journey_id")
-            )
+            "run_filter_journeys": Journey.objects.filter(pk__in=Run.objects.values("journey_id"))
             .order_by("name")
             .distinct(),
             "provider_filter_options": Run._meta.get_field("planner_provider").choices,
@@ -235,8 +234,10 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
             problem = validate_model(model)
         if problem is None and not selected_option["configured"]:
             problem = selected_option["setup_message"]
-        if problem is None and selected_option["needs_key"] and not (
-            user_api_key or selected_option["has_server_key"]
+        if (
+            problem is None
+            and selected_option["needs_key"]
+            and not (user_api_key or selected_option["has_server_key"])
         ):
             problem = selected_option["setup_message"]
         if problem is None and not model:
@@ -338,7 +339,9 @@ def _planner_options(user=None) -> list[dict[str, object]]:
                 "saved_model": item.default_model if item else "",
                 "preferred": bool(item and item.is_preferred),
                 "model": server_model,
-                "model_example": (item.default_model if item else "") or server_model or example_model,
+                "model_example": (item.default_model if item else "")
+                or server_model
+                or example_model,
                 "setup_message": (
                     "Ollama is not configured on this server. Set OLLAMA_BASE_URL and run "
                     "`ollama serve`."
@@ -352,9 +355,10 @@ def _planner_options(user=None) -> list[dict[str, object]]:
     options.append(
         {
             "value": PlannerProvider.FIXTURE,
-            "label": "Deterministic fixture contingency",
+            "label": "Scripted plan (no AI)",
             "description": (
-                "Repeatable scripted fixture evidence; never counted as live-model evidence."
+                "Replays the journey's reviewed plan: repeatable, needs no key, and is never "
+                "counted as AI evidence."
             ),
             "live": False,
             "configured": True,
@@ -471,11 +475,15 @@ def map_to_code(request: HttpRequest, run_id) -> HttpResponse:
     run = _load_run(run_id)
     binding = run.journey.repo_binding
     if binding is not None and binding.owner_id != request.user.pk:
-        messages.error(request, "Only the person who linked this repository can map findings to it.")
+        messages.error(
+            request, "Only the person who linked this repository can map findings to it."
+        )
         return redirect(reverse("runs:detail", kwargs={"run_id": run.id}))
     mapped = map_run_findings(run, use_ai=False)
     if mapped:
-        messages.success(request, f"Mapped {mapped} finding(s) to {run.journey.repo_binding.short_name}.")
+        messages.success(
+            request, f"Mapped {mapped} finding(s) to {run.journey.repo_binding.short_name}."
+        )
     else:
         messages.error(
             request, "Link this journey to an analysed repository on the Code page first."

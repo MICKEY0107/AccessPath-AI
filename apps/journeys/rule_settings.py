@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 
 from django.http import QueryDict
 from pydantic import ValidationError
 
-from engine.rules import RuleCatalogV1, RuleConfigV1, load_catalog
+from engine.rules import (
+    CUSTOM_CHECKS,
+    CustomRuleV1,
+    RuleCatalogV1,
+    RuleConfigV1,
+    custom_rule_id,
+    load_catalog,
+)
 
 SEVERITY_CHOICES = ["critical", "serious", "moderate", "minor"]
 
@@ -99,6 +107,11 @@ def config_from_form(data: QueryDict, catalog: RuleCatalogV1 | None = None) -> R
             }
         )
 
+    custom = _custom_rules_from_form(data, catalog)
+    # Ignores for a team rule that was just removed go with it.
+    known = {rule.id for rule in catalog.rules} | {item["id"] for item in custom}
+    ignores = [item for item in ignores if item.get("id") in known]
+
     try:
         config = RuleConfigV1.model_validate(
             {
@@ -107,6 +120,7 @@ def config_from_form(data: QueryDict, catalog: RuleCatalogV1 | None = None) -> R
                 "disabled": disabled,
                 "severity": severity,
                 "ignores": ignores,
+                "custom": custom,
             }
         )
         return config.validate_against(catalog)
@@ -115,3 +129,67 @@ def config_from_form(data: QueryDict, catalog: RuleCatalogV1 | None = None) -> R
             "Some rule settings were not valid. Check each ignore has a rule, a match text, "
             "a reason of at least 3 characters and an expiry date."
         ) from error
+
+
+def _custom_rules_from_form(data: QueryDict, catalog: RuleCatalogV1) -> list[dict]:
+    """Kept custom rules (posted back as JSON) plus a new one from the add form."""
+    rules: list[dict] = []
+    for index in data.getlist("keep-custom"):
+        try:
+            rules.append(
+                CustomRuleV1.model_validate(
+                    json.loads(data.get(f"custom-{index}", ""))
+                ).model_dump()
+            )
+        except (ValueError, TypeError, ValidationError) as error:
+            raise RuleSettingsError(
+                "A saved custom rule could not be read; add it again."
+            ) from error
+    title = data.get("new-custom-title", "").strip()
+    selector = data.get("new-custom-selector", "").strip()
+    if not title and not selector:
+        return rules
+    if not title or not selector:
+        raise RuleSettingsError("A custom rule needs a name and a CSS selector.")
+    check = data.get("new-custom-check", "")
+    if check not in CUSTOM_CHECKS:
+        raise RuleSettingsError("Choose one of the listed checks for the custom rule.")
+    criterion = data.get("new-custom-criterion", "").strip() or CUSTOM_CHECKS[check]["criterion"]
+    max_tabs = data.get("new-custom-max", "").strip()
+    if check == "selector_reachable_within" and not max_tabs.isdigit():
+        raise RuleSettingsError(
+            "Say within how many Tab presses (1 to 60) the element must be reached."
+        )
+    try:
+        rule = CustomRuleV1(
+            id=custom_rule_id(title, {item["id"] for item in rules}),
+            title=title,
+            check=check,
+            selector=selector,
+            max_tabs=int(max_tabs) if check == "selector_reachable_within" else None,
+            criterion=criterion,
+            severity=data.get("new-custom-severity", "serious"),
+            fix_hint=data.get("new-custom-fix", "").strip(),
+        )
+        rule.as_rule(catalog)
+    except (ValidationError, ValueError) as error:
+        raise RuleSettingsError(
+            "The custom rule is not valid. Use a one-line CSS selector (no braces or semicolons), "
+            "a name of at least 3 characters and, for “within N Tab presses”, a number from "
+            "1 to 60."
+        ) from error
+    rules.append(rule.model_dump())
+    return rules
+
+
+def custom_rows(config: RuleConfigV1) -> list[dict]:
+    return [
+        {
+            "index": index,
+            "rule": item,
+            "json": json.dumps(item.model_dump(mode="json")),
+            "check_label": CUSTOM_CHECKS[item.check]["label"],
+            "describe": item.describe(),
+        }
+        for index, item in enumerate(config.custom)
+    ]

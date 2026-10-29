@@ -110,3 +110,15 @@ flowchart LR
 | `engine/code_locator.py`, `engine/locator_ai.py` | Where to fix, patches, policy-bound AI search |
 | `engine/fix_verify.py` | Re-run a journey against a patched temporary fixture copy |
 | `apps/runs/benchmark.py` | Gate 1 measures over the benchmark journeys |
+
+### Product pass (29 October 2026, stage 8)
+
+| Module | Role |
+|---|---|
+| `engine/rules.py` (`CustomRuleV1`, `CUSTOM_CHECKS`) | Team rules: one of four fixed checks plus a CSS selector, stored in `Journey.rule_config["custom"]`, turned into catalog-shaped rules at run time |
+| `engine/checks.py` (`_run_custom`) | Runs team rules once per page, using the page's Tab walk; an invalid selector is reported as not checked |
+| `engine/fixture_site.py` | Serves the bundled demo site on its loopback address for a fixture run when nothing else answers there; copies it as the demo repository |
+| `apps/codebase/demo.py`, `RepoBinding.source` | The bundled demo repository: analysed in-process, linked to the demo journeys, never cloned |
+| `apps/runs/management/commands/demo_setup.py` | One command: demo account, journeys, demo repository, a team rule, scripted runs |
+| `apps/core/setup_checks.py` | Shared by the Status page and `check_setup`: database, worker, browser, demo site, axe-core, git, storage, providers, secret key |
+| `engine/executor.py` (`_route_web_socket`) | WebSockets follow the same origin policy as requests; a blocked socket is never connected |

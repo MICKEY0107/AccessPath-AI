@@ -17,15 +17,12 @@ from engine.code_index import load_index
 from engine.repo_clone import RepoCloneError, validate_branch, validate_repo_url
 from engine.rules import load_catalog
 
+from .demo import ensure_demo_binding
 from .models import RepoBinding, RepoStatus
-from .services import remove_binding_files
+from .services import analyze_binding, remove_binding_files
 from .tasks import analyze_repository
 
-PATTERN_RULES = {
-    pattern: rule
-    for rule in load_catalog().rules
-    for pattern in rule.code_patterns
-}
+PATTERN_RULES = {pattern: rule for rule in load_catalog().rules for pattern in rule.code_patterns}
 
 
 def _origin(url: str) -> str:
@@ -56,6 +53,7 @@ def codebase_page(request: HttpRequest) -> HttpResponse:
             "patterns": patterns,
             "journeys": journeys,
             "allowed_hosts": settings.REPO_ALLOWED_HOSTS,
+            "has_demo": any(item.is_bundled for item in bindings),
             "refresh": active is not None
             and active.status in {RepoStatus.PENDING, RepoStatus.CLONING},
         },
@@ -92,7 +90,11 @@ def add_binding(request: HttpRequest) -> HttpResponse:
         messages.error(request, str(error))
         return redirect(reverse("codebase:page"))
     problem = validate_api_key(token) if token else None
-    if problem is None and live_site_url and urlparse(live_site_url).scheme not in {"http", "https"}:
+    if (
+        problem is None
+        and live_site_url
+        and urlparse(live_site_url).scheme not in {"http", "https"}
+    ):
         problem = "The live site address must start with http:// or https://."
     if problem:
         messages.error(request, problem.replace("API key", "access token"))
@@ -136,6 +138,10 @@ def reanalyze_binding(request: HttpRequest, binding_id: int) -> HttpResponse:
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
     binding = get_object_or_404(RepoBinding, pk=binding_id, owner=request.user)
+    if binding.is_bundled:
+        analyze_binding(binding)  # A local copy: quick, and needs no worker.
+        messages.success(request, "Refreshed the demo copy.")
+        return redirect(f"{reverse('codebase:page')}?binding={binding.pk}")
     token = request.POST.get("token", "").strip()
     if token and validate_api_key(token):
         messages.error(request, "The access token must not contain spaces.")
@@ -144,6 +150,28 @@ def reanalyze_binding(request: HttpRequest, binding_id: int) -> HttpResponse:
         binding.save(update_fields=["status", "updated_at"])
         _queue(request, binding, token)
         messages.success(request, f"Pulling the latest commit of {binding.short_name}.")
+    return redirect(f"{reverse('codebase:page')}?binding={binding.pk}")
+
+
+def use_demo(request: HttpRequest) -> HttpResponse:
+    """Add the bundled demo repository for this person and link the demo journeys."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    binding, linked = ensure_demo_binding(request.user)
+    if binding.status == RepoStatus.READY and not linked:
+        messages.success(
+            request,
+            "Your demo repository is ready, but the demo journeys are already linked to another "
+            "repository; link them from “Journeys using this repository” if they are yours.",
+        )
+    elif binding.status == RepoStatus.READY:
+        messages.success(
+            request,
+            f"The demo repository is ready and linked to {linked} demo journey"
+            f"{'s' if linked != 1 else ''}. Run one, then open its report to see where to fix.",
+        )
+    else:
+        messages.error(request, f"The demo copy could not be prepared: {binding.error}")
     return redirect(f"{reverse('codebase:page')}?binding={binding.pk}")
 
 

@@ -99,7 +99,9 @@ class Command(BaseCommand):
             met = summary["gate_1"]["met"][name]
             verdict = "not measured" if met is None else "met" if met else "NOT met"
             self.stdout.write(f"{LABELS[name]:<40} {shown:>6}  (target {target:.0%}, {verdict})")
-        self.stdout.write(f"{'Runs matching the expected result':<40} {metrics['expected_result_rate']:.0%}")
+        self.stdout.write(
+            f"{'Runs matching the expected result':<40} {metrics['expected_result_rate']:.0%}"
+        )
         output = Path(
             options["output"]
             or Path(settings.MEDIA_ROOT)

@@ -32,8 +32,13 @@ def other_user(db, django_user_model):
 
 def _journey(name: str = "Clinic", **extra) -> Journey:
     return Journey.objects.create(
-        name=name, goal="Book an appointment by keyboard.", start_url="http://127.0.0.1:8001/broken/",
-        allowed_origins=["http://127.0.0.1:8001"], completion_policy={}, evaluation_config={}, **extra,
+        name=name,
+        goal="Book an appointment by keyboard.",
+        start_url="http://127.0.0.1:8001/broken/",
+        allowed_origins=["http://127.0.0.1:8001"],
+        completion_policy={},
+        evaluation_config={},
+        **extra,
     )
 
 
@@ -55,15 +60,30 @@ def test_adding_a_repo_never_takes_over_another_persons_journey(client, other_us
 
 @pytest.mark.django_db
 def test_code_locations_are_shown_only_to_the_repository_owner(client, user, other_user) -> None:
-    binding = RepoBinding.objects.create(owner=user, repo_url="https://github.com/me/private",
-                                         status=RepoStatus.READY)
-    run = Run.objects.create(journey=_journey(repo_binding=binding), planner_provider="fixture",
-                             status="succeeded", outcome="blocked")
+    binding = RepoBinding.objects.create(
+        owner=user, repo_url="https://github.com/me/private", status=RepoStatus.READY
+    )
+    run = Run.objects.create(
+        journey=_journey(repo_binding=binding),
+        planner_provider="fixture",
+        status="succeeded",
+        outcome="blocked",
+    )
     Finding.objects.create(
-        run=run, finding_id="f" * 16, rule_id="keyboard-operable", severity="critical", status="confirmed",
-        title="t", summary="s", url="http://127.0.0.1:8001/",
-        data={"locations": {"exact": [{"path": "src/secret.js", "line": 3, "snippet": "PRIVATE-CODE"}],
-                            "fix": {"path": "src/secret.js", "patch": "PRIVATE-PATCH"}}},
+        run=run,
+        finding_id="f" * 16,
+        rule_id="keyboard-operable",
+        severity="critical",
+        status="confirmed",
+        title="t",
+        summary="s",
+        url="http://127.0.0.1:8001/",
+        data={
+            "locations": {
+                "exact": [{"path": "src/secret.js", "line": 3, "snippet": "PRIVATE-CODE"}],
+                "fix": {"path": "src/secret.js", "patch": "PRIVATE-PATCH"},
+            }
+        },
     )
     assert build_report(run, user)["findings"][0]["locations"]
     assert build_report(run, other_user)["findings"][0]["locations"] is None
@@ -74,12 +94,17 @@ def test_code_locations_are_shown_only_to_the_repository_owner(client, user, oth
     for name in ("runs:detail", "runs:report_json", "runs:report_html"):
         body = stranger.get(reverse(name, kwargs={"run_id": run.id})).content.decode()
         assert "PRIVATE-CODE" not in body and "PRIVATE-PATCH" not in body
-    assert "PRIVATE-PATCH" in client.get(reverse("runs:report_json", kwargs={"run_id": run.id})).content.decode()
+    assert (
+        "PRIVATE-PATCH"
+        in client.get(reverse("runs:report_json", kwargs={"run_id": run.id})).content.decode()
+    )
 
     response = stranger.post(reverse("runs:map_code", kwargs={"run_id": run.id}))
     assert response.status_code == 302
     finding = Finding.objects.get()
-    finding.data = {"locations": {"fix": {"path": "fixtures/clinic/broken/slots.html", "edits": {"6": "x"}}}}
+    finding.data = {
+        "locations": {"fix": {"path": "fixtures/clinic/broken/slots.html", "edits": {"6": "x"}}}
+    }
     finding.save()
     stranger.post(reverse("runs:verify_fix", args=[finding.pk]))
     finding.refresh_from_db()
@@ -99,7 +124,8 @@ def test_secrets_spanning_lines_are_redacted_without_moving_line_numbers(tmp_pat
 
 def test_index_snippets_are_redacted(tmp_path: Path) -> None:
     (tmp_path / "App.jsx").write_text(
-        '<div tabIndex="-1" data-key="AKIAABCDEFGHIJKLMNOP" onClick={go}>ghp_abcdefghijklmnopqrstuvwxyz0123456789</div>\n',
+        '<div tabIndex="-1" data-key="AKIAABCDEFGHIJKLMNOP" '
+        'onClick={go}>ghp_abcdefghijklmnopqrstuvwxyz0123456789</div>\n',
         encoding="utf-8",
     )
     snippets = " ".join(item["snippet"] for item in build_index(tmp_path).patterns)
@@ -125,7 +151,9 @@ def test_page_supplied_line_numbers_are_clamped(tmp_path: Path) -> None:
 def _git(*args: str, cwd: Path) -> None:
     subprocess.run(
         ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
-        cwd=cwd, check=True, capture_output=True,
+        cwd=cwd,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -152,9 +180,32 @@ def test_ai_code_search_only_runs_for_the_repository_owner(user, other_user) -> 
 
     binding = RepoBinding.objects.create(owner=user, repo_url="https://github.com/me/private")
     journey = _journey(repo_binding=binding)
-    mine = Run.objects.create(journey=journey, planner_provider="groq", planner_metadata={"started_by": user.pk})
-    theirs = Run.objects.create(journey=journey, planner_provider="groq",
-                                planner_metadata={"started_by": other_user.pk})
+    mine = Run.objects.create(
+        journey=journey, planner_provider="groq", planner_metadata={"started_by": user.pk}
+    )
+    theirs = Run.objects.create(
+        journey=journey, planner_provider="groq", planner_metadata={"started_by": other_user.pk}
+    )
     unknown = Run.objects.create(journey=journey, planner_provider="groq")
     assert started_by_repo_owner(mine)
     assert not started_by_repo_owner(theirs) and not started_by_repo_owner(unknown)
+
+
+def test_websockets_to_other_origins_are_blocked(tmp_path: Path) -> None:
+    from page_server import executor_for, serve_pages
+
+    from engine.contracts import ActionKind, ProposedActionV1
+
+    html = (
+        "<!doctype html><html lang='en'><head><title>ws</title></head><body><button>Go</button>"
+        "<script>new WebSocket('ws://203.0.113.7:9/leak');</script></body></html>"
+    )
+    steps = []
+    with serve_pages({"/": html}) as origin:
+        executor_for(origin, tmp_path, on_step=lambda step, artifacts: steps.append(step)).run(
+            [ProposedActionV1(action=ActionKind.TAB)]
+        )
+    events = [event for step in steps for event in step.policy_events]
+    assert any(event.startswith("WEBSOCKET_RESOURCE_ORIGIN_NOT_ALLOWED") for event in events), (
+        events
+    )

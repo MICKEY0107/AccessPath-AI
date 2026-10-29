@@ -20,6 +20,7 @@ Safety rules, in order:
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import re
 import shutil
@@ -32,7 +33,11 @@ from urllib.parse import urlparse
 
 BRANCH_PATTERN = re.compile(r"^(?!-)(?!.*\.\.)(?!.*//)[A-Za-z0-9._/-]{1,100}(?<!/)(?<!\.lock)$")
 REPO_PATH_PATTERN = re.compile(r"^/[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}(\.git)?/?$")
-TOKEN_USERS = {"github.com": "x-access-token", "gitlab.com": "oauth2", "bitbucket.org": "x-token-auth"}
+TOKEN_USERS = {
+    "github.com": "x-access-token",
+    "gitlab.com": "oauth2",
+    "bitbucket.org": "x-token-auth",
+}
 
 
 class RepoCloneError(ValueError):
@@ -103,8 +108,15 @@ def _git_env(url: str, token: str, home: str) -> dict[str, str]:
         "GIT_CONFIG_GLOBAL": os.devnull,
         "LC_ALL": "C",
     }
-    for name in ("HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy", "SSL_CERT_FILE",
-                 "GIT_SSL_CAINFO", "REQUESTS_CA_BUNDLE"):
+    for name in (
+        "HTTPS_PROXY",
+        "https_proxy",
+        "NO_PROXY",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "GIT_SSL_CAINFO",
+        "REQUESTS_CA_BUNDLE",
+    ):
         if name in os.environ:
             env[name] = os.environ[name]
     if token:
@@ -124,16 +136,18 @@ def _git_env(url: str, token: str, home: str) -> dict[str, str]:
 def _run_git(command: list[str], env: dict[str, str], timeout_seconds: int):
     """Run git in its own process group so a time-out kills its helpers too."""
     process = subprocess.Popen(
-        command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        command,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
         start_new_session=True,
     )
     try:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
-        try:
+        with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
         process.communicate()
         raise
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
@@ -164,19 +178,34 @@ def clone_snapshot(
     with tempfile.TemporaryDirectory(prefix="accesspath-git-home-") as home:
         safety = [
             "git",
-            "-c", "core.hooksPath=" + os.devnull,
-            "-c", "core.symlinks=false",
-            "-c", "core.fsmonitor=false",
-            "-c", "credential.helper=",
-            "-c", "submodule.recurse=false",
-            "-c", "protocol.allow=never",
-            "-c", "protocol.https.allow=always",
-            "-c", "http.followRedirects=false",
+            "-c",
+            "core.hooksPath=" + os.devnull,
+            "-c",
+            "core.symlinks=false",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "credential.helper=",
+            "-c",
+            "submodule.recurse=false",
+            "-c",
+            "protocol.allow=never",
+            "-c",
+            "protocol.https.allow=always",
+            "-c",
+            "http.followRedirects=false",
         ]
         if allow_file_urls:
             safety += ["-c", "protocol.file.allow=always"]
-        command = safety + ["clone", "--no-checkout", "--depth", "1", "--single-branch",
-                            "--no-tags", "--no-recurse-submodules"]
+        command = safety + [
+            "clone",
+            "--no-checkout",
+            "--depth",
+            "1",
+            "--single-branch",
+            "--no-tags",
+            "--no-recurse-submodules",
+        ]
         if branch:
             command += ["--branch", branch]
         command += ["--", url, str(destination)]
@@ -189,8 +218,10 @@ def clone_snapshot(
         if completed.returncode != 0:
             shutil.rmtree(destination, ignore_errors=True)
             stderr = _scrub(completed.stderr or "", token)
-            if "Authentication failed" in stderr or "could not read Username" in stderr or (
-                "403" in stderr or "401" in stderr
+            if (
+                "Authentication failed" in stderr
+                or "could not read Username" in stderr
+                or ("403" in stderr or "401" in stderr)
             ):
                 raise RepoCloneError(
                     "The repository needs a valid access token (or the token cannot read it)."
@@ -200,12 +231,20 @@ def clone_snapshot(
             raise RepoCloneError(f"git could not clone the repository: {stderr.strip()[-300:]}")
         sha = subprocess.run(
             ["git", "-C", str(destination), "rev-parse", "HEAD"],
-            env=env, capture_output=True, text=True, timeout=30, check=False,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         ).stdout.strip()
         # Check the tree's size before writing any file out.
         tree = subprocess.run(
             ["git", "-C", str(destination), "ls-tree", "-r", "-l", "-z", "HEAD"],
-            env=env, capture_output=True, text=True, timeout=60, check=False,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
         )
         planned_files = planned_bytes = 0
         for entry in filter(None, tree.stdout.split("\0")):
@@ -221,7 +260,8 @@ def clone_snapshot(
         try:
             checkout = _run_git(
                 safety + ["-C", str(destination), "checkout", "--quiet", "HEAD", "--", "."],
-                env, timeout_seconds,
+                env,
+                timeout_seconds,
             )
         except subprocess.TimeoutExpired as error:
             shutil.rmtree(destination, ignore_errors=True)

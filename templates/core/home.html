@@ -6,7 +6,7 @@
   <div class="page-head">
     <div>
       <h1 id="page-title">Can a keyboard user finish the journey?</h1>
-      <p class="muted">Current implementation: keyboard-only motor accessibility. AccessPath AI uses bounded AI planning, deterministic keyboard policy checks, and browser evidence to evaluate a declared task.</p>
+      <p class="muted">AccessPath checks keyboard-only motor accessibility. It runs a task on a website using only the keyboard, confirms every barrier before blaming the site, maps it to WCAG 2.2, and points developers to the line of code to fix.</p>
     </div>
   </div>
 
@@ -15,41 +15,42 @@
       <section class="panel" aria-labelledby="get-started">
         <div class="panel-section">
           <h2 id="get-started">Get started</h2>
-          <div class="tile-grid">
-            <a class="tile" href="{% url 'runs:list' %}#journeys-title">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-              <strong>Run a journey</strong>
-              <span class="muted">Start a reference or website journey.</span>
-            </a>
-            <a class="tile" href="{% url 'runs:list' %}#add-website">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-              <strong>Add a real website</strong>
-              <span class="muted">Evaluate a live public site, read-only.</span>
-            </a>
-            <a class="tile" href="{% url 'runs:list' %}#recent-runs-title">
-              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-6"/></svg>
-              <strong>Review evidence</strong>
-              <span class="muted">Steps, focus path, and screenshots.</span>
-            </a>
-          </div>
+          <p class="muted small progress-note">{{ steps_done }} of {{ steps|length }} done. Everything below works offline with the demo; AI keys are optional.</p>
+          <ol class="checklist">
+            {% for step in steps %}
+              <li class="{% if step.done %}done{% endif %}">
+                <span class="mark" aria-hidden="true">{% if step.done %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+                <div>
+                  <strong>{{ step.title }}<span class="visually-hidden">{% if step.done %} (done){% else %} (to do){% endif %}</span></strong>
+                  <p class="muted small">{{ step.text }}</p>
+                </div>
+                {% if step.action == "seed" %}
+                  <form method="post" action="{% url 'core:load_demo' %}">{% csrf_token %}<button type="submit" class="{% if step.done %}secondary{% endif %}">{% if step.done %}Reload demo{% else %}Load the demo{% endif %}</button></form>
+                {% else %}
+                  <a class="pill-button step-action" href="{{ step.url }}">{% if step.done %}Open{% else %}Start{% endif %}</a>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ol>
         </div>
 
         <div class="panel-section">
-          <h2 id="how-it-works">How the evaluation works</h2>
+          <h2 id="how-it-works">How it works</h2>
           <ol class="steps-list">
-            <li>A configured journey defines an approved target, goal, keyboard profile, and completion policy.</li>
-            <li>A separate worker opens a browser and observes the target state.</li>
-            <li>The planner proposes one keyboard action; deterministic policy either rejects or authorizes it.</li>
-            <li>The system records focus, state changes, and evidence before reporting a verified outcome or uncertainty.</li>
+            <li><strong>Run the journey.</strong> An AI planner (or a scripted plan) proposes one key press at a time; a fixed policy approves each before the browser presses it.</li>
+            <li><strong>Check every step.</strong> Visible and unhidden focus, control names, skip links, focus order, focus that changes the page, your team's own rules, and axe-core when installed.</li>
+            <li><strong>Confirm before blaming.</strong> If the task fails, keyboard-only probes re-test the control. Only a confirmed barrier counts against the site; otherwise the report says the AI or the provider failed.</li>
+            <li><strong>Report and fix.</strong> A verdict in plain words for product managers, findings by WCAG rule, and — with the code linked — the file, the line and a patch, which can be re-checked on a copy.</li>
           </ol>
         </div>
 
         <div class="panel-section">
           <h2>Planners you can use</h2>
           <div class="tile-grid">
-            <div class="tile"><strong>Gemini</strong><span class="muted">Google structured-action planning.</span></div>
-            <div class="tile"><strong>OpenRouter</strong><span class="muted">Many hosted models; pin one for reliable runs.</span></div>
-            <div class="tile"><strong>Groq</strong><span class="muted">Fast responses on a free tier with per-minute limits.</span></div>
+            <div class="tile"><strong>Scripted plan</strong><span class="muted">Reviewed plans for the demo journeys. No AI, no key.</span></div>
+            <div class="tile"><strong>Groq</strong><span class="muted">Fast, generous free tier. Allowed to read private code.</span></div>
+            <div class="tile"><strong>Local Ollama</strong><span class="muted">Runs on your machine; nothing leaves it.</span></div>
+            <div class="tile"><strong>Gemini · OpenRouter</strong><span class="muted">Hosted options; free tiers are kept away from private code.</span></div>
           </div>
         </div>
       </section>
@@ -60,10 +61,11 @@
       <div class="feature-copy">
         <h2>Focus you can audit</h2>
         <p>Every key press is approved by policy first, then recorded with the focused control, the address, and before-and-after screenshots.</p>
+        <p><a href="{% url 'core:status' %}">Check the system status</a> to see what is set up.</p>
       </div>
       <div class="promo">
-        <h2 id="scope">Current safety boundary</h2>
-        <p>Evaluations never log in, submit forms, send messages, or make payments. Real-website runs are read-only, and results do not claim complete WCAG conformance.</p>
+        <h2 id="scope">Safety boundary</h2>
+        <p>Evaluations never log in, submit forms, send messages, or make payments. Real-website runs are read-only. Linked repositories are copied read-only and never run. Results do not claim full WCAG conformance.</p>
         <a class="pill-button" href="{% url 'runs:list' %}">Open the workspace</a>
       </div>
     </aside>

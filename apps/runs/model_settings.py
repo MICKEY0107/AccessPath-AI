@@ -82,7 +82,9 @@ def model_settings(request: HttpRequest) -> HttpResponse:
     cards = []
     for provider in LIVE_PROVIDERS:
         item = saved.get(provider)
-        safety = code_safety(provider, item.default_model if item else "", settings.CODE_SAFE_PROVIDERS)
+        safety = code_safety(
+            provider, item.default_model if item else "", settings.CODE_SAFE_PROVIDERS
+        )
         cards.append(
             {
                 "value": provider,
@@ -95,7 +97,9 @@ def model_settings(request: HttpRequest) -> HttpResponse:
                 "safety": safety,
             }
         )
-    selected = request.GET.get("provider") or (preferred.provider if preferred else LIVE_PROVIDERS[0])
+    selected = request.GET.get("provider") or (
+        preferred.provider if preferred else LIVE_PROVIDERS[0]
+    )
     if selected not in LIVE_PROVIDERS:
         selected = LIVE_PROVIDERS[0]
     return render(
@@ -139,7 +143,9 @@ def save_model_settings(request: HttpRequest) -> HttpResponse:
     item.is_preferred = True
     item.save()
     label = PlannerProvider(provider).label
-    messages.success(request, f"Runs you start now default to {label}{f' · {model}' if model else ''}.")
+    messages.success(
+        request, f"Runs you start now default to {label}{f' · {model}' if model else ''}."
+    )
     return redirect(f"{reverse('runs:model_settings')}?provider={provider}")
 
 

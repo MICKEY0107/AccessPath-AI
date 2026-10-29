@@ -193,7 +193,9 @@
       .check-row { display: inline-flex; gap: .4rem; align-items: center; font-size: .84rem; }
       .check-row input { width: auto; flex: none; margin: 0; }
       .disable-reason { margin-top: .4rem; }
-      .disable-reason[hidden] { display: none; }
+      .disable-reason[hidden], .form-field[hidden] { display: none; }
+      .ignore-row .row-sub { white-space: normal; }
+      pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
       .rules-table select { min-width: 7.5rem; }
       .rules-table td:nth-child(3) { white-space: nowrap; }
       .ignore-add { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; border: 1px solid var(--line); border-radius: .7rem; margin: .8rem 0 0; padding: .8rem; }
@@ -293,6 +295,28 @@
       .repo-chips a { color: var(--ink); text-decoration: none; }
       .repo-chips a[aria-current="true"] { color: var(--accent-strong); font-weight: 600; }
       .repo-chips form { margin: 0; }
+      .demo-offer { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; justify-content: space-between; border: 1px dashed var(--line-strong); border-radius: .6rem; padding: .7rem .9rem; margin: 0 0 1rem; background: var(--surface-soft); }
+      .demo-offer p { margin: 0; flex: 1 1 18rem; }
+      .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+      .checklist li { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .2rem .7rem; align-items: start; border: 1px solid var(--line); border-radius: .6rem; padding: .65rem .8rem; background: var(--surface); }
+      .checklist li.done { background: var(--surface-soft); }
+      .checklist .mark { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; border: 2px solid var(--line-strong); color: var(--muted); font-size: .78rem; font-weight: 700; }
+      .checklist li.done .mark { border-color: var(--success); background: var(--success); color: #fff; }
+      .checklist strong { display: block; }
+      .checklist p { margin: .1rem 0 0; }
+      .checklist form, .checklist .step-action { margin: 0; align-self: center; }
+      .progress-note { margin: 0 0 .8rem; }
+      .status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+      .status-list li { display: grid; grid-template-columns: 4.2rem 1fr; gap: .15rem .7rem; border-bottom: 1px solid var(--line); padding: .5rem 0; }
+      .status-list li:last-child { border-bottom: 0; }
+      .status-list .fix { grid-column: 2; margin: 0; font-size: .82rem; color: var(--muted); }
+      .status-list .fix code { overflow-wrap: anywhere; }
+      .status-pill { display: inline-block; text-align: center; border-radius: .35rem; font-size: .7rem; font-weight: 700; letter-spacing: .03em; padding: .14rem .4rem; text-transform: uppercase; align-self: start; }
+      .status-ok { background: var(--success-soft); color: var(--success); }
+      .status-warn { background: var(--warn-soft); color: var(--warn); }
+      .status-error { background: var(--issue-soft); color: var(--issue); }
+      .status-info { background: #eef0f6; color: #454b66; }
+      @media (max-width: 560px) { .checklist li { grid-template-columns: 1.6rem 1fr; } .checklist form, .checklist .step-action { grid-column: 2; } }
       .chip-remove { border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 1rem; line-height: 1; padding: .15rem .45rem; }
       .chip-remove:hover { background: var(--issue-soft); color: var(--issue); }
       @media (max-width: 40rem) { .repo-form { grid-template-columns: 1fr; } }
@@ -433,6 +457,11 @@
                 <button class="secondary" type="submit">Sign out</button>
               </form>
             {% endif %}
+            {% if user.is_authenticated %}
+              <a class="chip" href="{% url 'core:status' %}" {% if request.resolver_match.url_name == 'status' %}aria-current="page"{% endif %}>
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Status
+              </a>
+            {% endif %}
             <a class="chip" href="{% url 'admin:index' %}">
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Admin
             </a>
@@ -444,7 +473,7 @@
         <nav aria-label="Primary navigation">
           <ul class="tabs">
             <li>
-              <a class="tab tab-home" href="{% url 'core:home' %}" {% if request.resolver_match.namespace == 'core' %}aria-current="page"{% endif %}>
+              <a class="tab tab-home" href="{% url 'core:home' %}" {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}>
                 <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>
                 <span class="visually-hidden">Overview</span>
               </a>

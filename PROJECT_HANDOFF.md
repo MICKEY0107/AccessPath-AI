@@ -1,6 +1,6 @@
 # AccessPath AI — Project Handoff
 
-**Updated:** 29 October 2026, late evening IST (web implementation stages 1–6 built, tested and committed locally; stage 7 docs done; live runs and the course matrix still need the owner's machine and keys)
+**Updated:** 29 October 2026, night IST (stages 1–7 done; stage 8 product pass done: team rules, one-command offline demo, Status page, scripts, CI, guides; live runs and the course matrix still need the owner's machine and keys)
 **Read this first in a new chat.** It is the single source of truth for where the project stands. Times in this file are IST unless marked UTC; the app's database stores UTC (IST = UTC + 5:30).
 
 ## 1. What the project is
@@ -68,6 +68,7 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | `eb1a4cd` Stage 5 | 29 Oct | Sign-in, Models page (encrypted remembered keys, List models, code-safety badge), Ollama provider, Code page (secure clone, index, secret scan) |
 | `ef40c57` Stage 6 | 29 Oct | Where to fix (`engine/code_locator.py`), policy-bound AI search (`engine/locator_ai.py`), fix verification (`engine/fix_verify.py`) |
 | Stage 7 | 29 Oct | Security review fixes (`tests/test_security_review.py`), README, runbook, presentation outline, architecture, backlog and this handoff |
+| Stage 8 | 29 Oct | Product pass: team rules (`CustomRuleV1`, Rules page), `demo_setup` and the bundled demo repository (`RepoBinding.source`, migration codebase 0002), demo-site fallback server (`engine/fixture_site.py`), Status page and `check_setup`, overview checklist, WebSocket policy, `scripts/dev.ps1`/`dev.sh`, CI workflow, `docs/QUICKSTART.md`, `docs/USER_GUIDE.md`, `docs/ADAPTING.md`; ruff clean |
 
 Development note: these stages were built in a cloud workspace with copies of the project's `.venv` packages, tested there (Playwright Chromium, SQLite test settings), and copied back here before each commit. `ruff` was not available there; run it locally.
 
@@ -99,7 +100,8 @@ Development note: these stages were built in a cloud workspace with copies of th
 | Remembered encrypted keys, Ollama, code-safety badge | Done (stage 5) | |
 | Active codebase (secure clone + index) | Done (stage 5) | Needs the rebuilt Docker image (git) |
 | Where to fix, patches, AI search, fix verification | Done (stage 6) | Verification only for the bundled fixture pages |
-| Custom rules from a fixed set of checks | Not started | Mentioned in the design; not built |
+| Team rules from a fixed set of checks | Done (stage 8) | Four checks: reachable with Tab, has a name, reached within N Tab presses, must not appear |
+| One-command offline demo, Status page, getting-started checklist | Done (stage 8) | `./scripts/dev.ps1 setup`; `demo_setup`; `/status/`; `check_setup` |
 | Cut planner cost further: prompt caching | Planned | Not done |
 | Stop early when the model repeats actions | Planned | Not done; today only the focus-cycle detector (`no_progress_limit`) and the policy rule exist |
 | Staging writes, saved-session logins, baselines | Future scope | |
@@ -140,7 +142,20 @@ Times are from the run records (UTC) with IST in brackets.
 - **Wikipedia:** posts telemetry (`/ins-502b/v2/events`, `intake-analytics.wikimedia.org`); blocked as non-fatal policy events.
 - **GOV.UK** was probed (cookie banner first, then skip link, search at the 7th–8th Tab) but not used: search results need many Tabs, which is slow on free tiers.
 - **Steps are saved only when a run ends**, so the run page shows no steps while running.
-- **Security review (29 Oct, fixed in the stage 7 commit):** an independent review of the code side found 8 issues. All are fixed with tests in `tests/test_security_review.py`. Fixed: another person's journey could be re-linked; verification served fixture files from the clone; code locations were visible to everyone; multi-line private keys slipped past redaction; index snippets were not redacted; bad ports caused a 500; size was only checked after checkout; and page line numbers were not clamped. Hardening added: no git redirects, and the whole process group is killed on time-out. Open: WebSocket traffic is not covered by the origin policy (it matters only for live sites, since clones are never served).
+- **Security review (29 Oct, fixed in the stage 7 commit):** an independent review of the code side found 8 issues. All are fixed with tests in `tests/test_security_review.py`. Fixed: another person's journey could be re-linked; verification served fixture files from the clone; code locations were visible to everyone; multi-line private keys slipped past redaction; index snippets were not redacted; bad ports caused a 500; size was only checked after checkout; and page line numbers were not clamped. Hardening added: no git redirects, and the whole process group is killed on time-out. WebSockets are now under the same origin policy (stage 8): a socket to another origin is never connected, and the step's policy events record it.
+- **Stage 8 review (29 Oct, fixed in the stage 8 commit):** a second independent review found 13 issues. All are fixed, with tests in `tests/test_custom_rules.py` and `tests/test_product.py`:
+  - team-rule Tab checks now compare elements by a marker set during the Tab walk, not by CSS path (focus classes broke the paths)
+  - a failing team rule no longer skips axe-core
+  - disabled team rules and severity overrides are respected
+  - every match is checked, not only the first ten
+  - the fallback server refuses encoded hidden paths and is shared by overlapping runs
+  - removing a team rule drops its ignores
+  - the Status page fails fast when Redis is down
+  - the image uses `uv sync --locked`, and setup renews the virtual-environment volume
+  - "Load the demo" never rewrites existing journeys for non-staff and never takes journeys linked to another repository, and each person can have only one demo copy
+  - `dev.ps1` passes `-v` and other flags through and tolerates stderr on Windows PowerShell 5.1
+  - `tasks.verify_fix` falls back to the default rules
+- **Demo journeys linked to someone else:** a journey links to one repository. When a second person loads the demo, their demo copy is not linked, and those reports show code only to the first person.
 - **Checks change focus briefly:** focus checks blur and re-focus the control once, and page checks run a Tab walk, then restore focus exactly (verified by the scripted clinic plan). On real sites a blur handler (for example form validation) could react; the walk reloads the page if Tab itself navigates.
 - **axe-core is not vendored:** neither PyPI nor npm was reachable from the build workspace. Run `install_axe_core` once (it downloads the pinned version from jsDelivr into `vendor/`, which git ignores).
 - **Changing `DJANGO_SECRET_KEY` makes saved keys unreadable**; people must save them again.
@@ -150,10 +165,10 @@ Times are from the run records (UTC) with IST in brackets.
 
 ## 8. What I was in the middle of, and the exact next step
 
-Nothing is half-done in code: stages 1–6 are committed and the suite passes in the build workspace (see section 9 for the count). Everything below needs the owner's machine, Docker and API keys:
+Nothing is half-done in code: stages 1–8 are committed and the suite passes in the build workspace (see section 9 for the count). Everything below needs the owner's machine, Docker and API keys:
 
-1. Rebuild and migrate: `docker compose up -d --build`, `migrate`, `createsuperuser`, `seed_fixture_journeys`, optionally `install_axe_core`.
-2. Run the tests in the container and `ruff check .` on the host.
+1. `./scripts/dev.ps1 setup` (rebuilds the image with git and the test tools, migrates, installs axe-core, runs `demo_setup`, prints the status check). Note the demo password it prints. `createsuperuser` is still needed for the admin.
+2. `./scripts/dev.ps1 test` and `./scripts/dev.ps1 lint` in the container.
 3. Live Gate 1 numbers: `docker compose exec worker python manage.py run_benchmark --provider groq --model openai/gpt-oss-120b --repeat 3`.
 4. Course matrix: `run_fixture_matrix --provider groq --accessible-count 3 --broken-count 5`.
 5. Rehearse `docs/DEMONSTRATION_RUNBOOK.md`; push when ready so the Code page can bind the benchmark pages; tag the release.
@@ -176,7 +191,7 @@ docker compose exec web python manage.py install_axe_core       # optional
   `services: { web: { ports: !override ["127.0.0.1:8010:8000"] } }`, then open http://127.0.0.1:8010/runs/.
 - Restart the worker after engine changes: `docker compose restart worker`.
 - `.env` holds `GEMINI_*`, `OPENROUTER_*`, `GROQ_*` keys and models (currently `models/gemini-3.5-flash-lite`, `openrouter/free`, `openai/gpt-oss-20b`). Never print or commit it.
-- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **214 passed, 9 skipped** in the build workspace (live-site tests are opt-in).
+- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **235 passed, 9 skipped** in the build workspace (`./scripts/dev.ps1 test`) (live-site tests are opt-in).
 - Host lint: `UV_CACHE_DIR=.uv-cache uv run ruff check .`
 
 ## 10. Where the code is

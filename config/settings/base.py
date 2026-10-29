@@ -166,6 +166,13 @@ REPO_MAX_FILES = int(os.environ.get("REPO_MAX_FILES", "20000"))
 REPO_CLONE_TIMEOUT_SECONDS = int(os.environ.get("REPO_CLONE_TIMEOUT_SECONDS", "120"))
 # Tests clone from local folders; production only clones https URLs from the hosts above.
 REPO_ALLOW_FILE_URLS = False
+# The demo repository is a copy of the bundled fixture site; this is the address shown
+# for it (the project's own public repository, where the same files live).
+# Where people open the app; used in links printed by commands such as demo_setup.
+DEMO_SITE_URL = os.environ.get("DEMO_SITE_URL", "http://127.0.0.1:8000")
+DEMO_REPOSITORY_URL = os.environ.get(
+    "DEMO_REPOSITORY_URL", "https://github.com/MICKEY0107/AccessPath-AI"
+)
 # Use the run's AI provider to search the code when nothing exact is found, but only
 # when that provider is allowed to read private code (engine/code_safety.py).
 CODE_LOCATOR_USE_AI = os.environ.get("CODE_LOCATOR_USE_AI", "true").lower() == "true"

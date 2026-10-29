@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}System status — AccessPath AI{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">System status</p>
+      <h1>{% if overall == "error" %}Something needs fixing{% elif overall == "warn" %}Ready, with warnings{% else %}Everything is ready{% endif %}</h1>
+      <p class="muted">What AccessPath needs, checked just now. Each item that is not ready says exactly how to fix it. The same check runs in a terminal with <code>python manage.py check_setup</code>.</p>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div>
+      {% for group, checks in groups.items %}
+        <section class="panel" aria-labelledby="group-{{ forloop.counter }}">
+          <h2 id="group-{{ forloop.counter }}">{{ group }}</h2>
+          <ul class="status-list">
+            {% for check in checks %}
+              <li>
+                <span class="status-pill status-{{ check.status }}">{% if check.pill %}{{ check.pill }}{% elif check.status == "ok" %}Ready{% elif check.status == "warn" %}Warning{% elif check.status == "error" %}Fix{% else %}Optional{% endif %}</span>
+                <div><strong>{{ check.label }}</strong> <span class="muted small">{{ check.detail }}</span></div>
+                {% if check.fix and check.status != "ok" %}<p class="fix">Fix: <code>{{ check.fix }}</code></p>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+    </div>
+    <aside>
+      <section class="panel" aria-labelledby="demo-title">
+        <h2 id="demo-title">One-command demo</h2>
+        <p class="small">Sets up a demo account, the demo journeys, the bundled demo repository and six finished reports:</p>
+        <pre class="patch wrap">docker compose exec web python manage.py demo_setup</pre>
+        <p class="muted small">No AI key and no GitHub needed. Safe to run again.</p>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

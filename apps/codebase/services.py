@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import shutil
 from datetime import UTC, datetime
+from pathlib import Path
 
 from django.conf import settings
 
 from apps.runs.credentials import scrub
 from engine.code_index import build_index, save_index
+from engine.fixture_site import copy_bundled_site
 from engine.repo_clone import RepoCloneError, clone_snapshot, validate_branch, validate_repo_url
 
 from .models import RepoBinding, RepoStatus
@@ -19,6 +21,8 @@ def analyze_binding(binding: RepoBinding, *, token: str = "") -> RepoBinding:
     binding.status = RepoStatus.CLONING
     binding.error = ""
     binding.save(update_fields=["status", "error", "updated_at"])
+    if binding.is_bundled:
+        return _analyze_bundled(binding)
     try:
         url = validate_repo_url(
             binding.repo_url,
@@ -51,6 +55,24 @@ def analyze_binding(binding: RepoBinding, *, token: str = "") -> RepoBinding:
             "repo_files": snapshot.file_count,
             "repo_bytes": snapshot.total_bytes,
         }
+        binding.analysed_at = datetime.now(UTC)
+    binding.save()
+    return binding
+
+
+def _analyze_bundled(binding: RepoBinding) -> RepoBinding:
+    """The demo repository: a copy of AccessPath's own fixture site; nothing is fetched."""
+    try:
+        files, size = copy_bundled_site(Path(settings.BASE_DIR), binding.source_dir)
+        index = build_index(binding.source_dir)
+        save_index(index, binding.index_path)
+    except Exception as error:
+        binding.status = RepoStatus.FAILED
+        binding.error = f"{type(error).__name__}: {error}"[:600]
+    else:
+        binding.status = RepoStatus.READY
+        binding.commit_sha = ""
+        binding.summary = {**index.summary(), "repo_files": files, "repo_bytes": size}
         binding.analysed_at = datetime.now(UTC)
     binding.save()
     return binding

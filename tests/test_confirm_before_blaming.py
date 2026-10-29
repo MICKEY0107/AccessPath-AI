@@ -86,7 +86,8 @@ def test_real_keyboard_trap_is_confirmed(tmp_path: Path) -> None:
         "<a href='/b'>After the widget</a>"
         "<script>const trap = document.getElementById('trap');"
         "trap.addEventListener('keydown', (event) => {"
-        " if (event.key === 'Tab' || event.key === 'Escape') { event.preventDefault(); trap.focus(); }"
+        " if (event.key === 'Tab' || event.key === 'Escape') {"
+        " event.preventDefault(); trap.focus(); }"
         "});</script>"
     )
     with serve_pages({"/": page}) as origin:
@@ -140,7 +141,12 @@ def test_collector_merges_repeats_and_applies_ignores() -> None:
         {
             "preset": "wcag22-aa",
             "ignores": [
-                {"id": "name-role-value", "match": "toggle", "reason": "A11Y-12", "until": "2099-01-01"}
+                {
+                    "id": "name-role-value",
+                    "match": "toggle",
+                    "reason": "A11Y-12",
+                    "until": "2099-01-01",
+                }
             ],
         }
     )

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from engine.rules import SEVERITY_ORDER, load_catalog
+from engine.rules import SEVERITY_ORDER, rules_for_metadata
 
 from .models import JourneyOutcome, Run, RunStatus
 
@@ -61,20 +61,23 @@ METHOD_LABELS = {
 }
 
 
-def _rule_index() -> dict[str, Any]:
-    return {rule.id: rule for rule in load_catalog().rules}
+def _rule_index(run: Run) -> dict[str, Any]:
+    """Catalog rules plus the team's custom rules this run used."""
+    return rules_for_metadata((run.planner_metadata or {}).get("rules"))
 
 
 def can_view_code(run: Run, viewer: Any) -> bool:
     """Code from a linked repository is shown only to the person who linked it."""
     binding = run.journey.repo_binding
     return bool(
-        binding is not None and viewer is not None and getattr(viewer, "pk", None) == binding.owner_id
+        binding is not None
+        and viewer is not None
+        and getattr(viewer, "pk", None) == binding.owner_id
     )
 
 
 def _finding_rows(run: Run, show_code: bool = False) -> list[dict[str, Any]]:
-    rules = _rule_index()
+    rules = _rule_index(run)
     rows = []
     for finding in run.findings.all():
         data = finding.data or {}
@@ -92,7 +95,9 @@ def _finding_rows(run: Run, show_code: bool = False) -> list[dict[str, Any]]:
                 "can_verify": bool(
                     locations
                     and (locations.get("fix") or {}).get("edits")
-                    and str((locations.get("fix") or {}).get("path", "")).startswith("fixtures/clinic/")
+                    and str((locations.get("fix") or {}).get("path", "")).startswith(
+                        "fixtures/clinic/"
+                    )
                 ),
                 "id": finding.finding_id,
                 "rule_id": finding.rule_id,
@@ -196,7 +201,7 @@ def _duration(run: Run) -> str:
 
 
 def _rule_rows(run: Run) -> list[dict[str, Any]]:
-    rules = _rule_index()
+    rules = _rule_index(run)
     rows = []
     for item in run.rule_results or []:
         rule = rules.get(item.get("rule_id", ""))
@@ -284,8 +289,12 @@ def build_report(run: Run, viewer: Any = None) -> dict[str, Any]:
     return {
         "schema_version": "accesspath_report.v1",
         "run_id": str(run.id),
-        "journey": {"id": run.journey_id, "name": run.journey.name, "goal": run.journey.goal,
-                    "start_url": run.journey.start_url},
+        "journey": {
+            "id": run.journey_id,
+            "name": run.journey.name,
+            "goal": run.journey.goal,
+            "start_url": run.journey.start_url,
+        },
         "verdict": {"key": verdict, "label": label, "tone": tone, "explanation": explanation},
         "summary_line": " · ".join(summary_parts),
         "plain_words": _plain_words(run, verdict, findings),

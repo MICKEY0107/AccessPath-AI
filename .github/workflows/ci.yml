@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+      - name: Install Python and dependencies
+        run: |
+          uv python install 3.13
+          uv sync --frozen
+      - name: Install Chromium for Playwright
+        run: uv run python -m playwright install --with-deps chromium
+      - name: Lint
+        run: uv run ruff check .
+      - name: Tests
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: uv run python -m pytest -q

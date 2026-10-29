@@ -7,11 +7,11 @@ from .views import (
     export_report_html,
     export_report_json,
     map_to_code,
-    verify_fix_view,
     remove_real_site_journey,
     run_detail,
     run_list,
     start_run,
+    verify_fix_view,
 )
 
 app_name = "runs"

@@ -13,9 +13,10 @@ from apps.journeys.rule_settings import (
     RuleSettingsError,
     config_from_form,
     current_config,
+    custom_rows,
     rule_rows,
 )
-from engine.rules import load_catalog
+from engine.rules import CUSTOM_CHECKS, load_catalog, wcag_choices
 
 
 def rules_page(request: HttpRequest) -> HttpResponse:
@@ -61,6 +62,9 @@ def _render(request, catalog, journeys, journey, status: int = 200) -> HttpRespo
             "rows": rule_rows(config, catalog),
             "severity_choices": SEVERITY_CHOICES,
             "ignores": list(enumerate(config.ignores)),
+            "custom_rows": custom_rows(config),
+            "custom_checks": CUSTOM_CHECKS,
+            "wcag_choices": wcag_choices(catalog),
         },
         status=status,
     )

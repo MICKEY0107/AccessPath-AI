@@ -12,7 +12,7 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 |---|---|---|---|
 | Rules catalog (`rules/catalog.json`) with WCAG/ACT sources and presets Essential, WCAG 2.2 AA, Strict | 1 | done | Shipped with the code, reviewed and versioned; never fetched at run time |
 | Rules settings page: toggles, disable with reason, ignores with an expiry date | 1 | done | No arbitrary code in rule config |
-| Custom rules from a fixed set of checks | 1 | agreed, not started | The only stage 1 item not built |
+| Team rules from a fixed set of checks | 1 → 8 | done | Four declarative checks with a CSS selector; on the Rules page and in reports |
 | `Finding` type and table; confirm before blaming | 2 | done | Site barrier vs agent failure vs provider failure vs environment |
 | Report shows each rule as passed, failed, not applicable, needs a human, not checked or disabled | 3-4 | done | A pass never means "not checked" |
 | Focus visible, focus obscured, skip link, focus order, unnamed controls, on-focus checks; optional axe-core | 3 | done | `install_axe_core` downloads the pinned version |
@@ -26,7 +26,10 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 | Code-safety badge per provider | 5 | done | Gemini free tier and `openrouter/free` blocked from private code ([Gemini terms](https://ai.google.dev/terms)) |
 | Where to fix: Exact match, Likely cause, Also affected; fixes with patches; policy-bound AI search | 6 | done | Patches never applied to the user's repo; code shown only to the repository owner |
 | Verify a fix on the clinic fixture | 6 | done | Serves only AccessPath's own fixture pages |
-| Security review of the code side | 7 | done | 8 issues fixed, `tests/test_security_review.py` |
+| Security review of the code side | 7 | done | 8 issues fixed, `tests/test_security_review.py`; WebSocket gap closed in stage 8 |
+| One-command offline demo (`demo_setup`, bundled demo repository, demo-site fallback) | 8 | done | No AI key or GitHub needed |
+| Status page, `check_setup`, getting-started checklist | 8 | done | Every item says how to fix it |
+| `scripts/dev.ps1` / `dev.sh`, CI workflow, Quickstart / User guide / Adapting guide | 8 | done | Dev image now includes pytest and ruff |
 | Use CodeImpact (`C:\code\RepoPilot`) as a read-only reference for cloning and code mapping | 5-6 | no reply | Built without it; still blocked on access |
 | CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future | postponed | Replaces the VS Code assistant idea |
 

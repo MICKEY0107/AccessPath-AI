@@ -102,7 +102,7 @@
                           <input id="api-key-{{ journey.id }}" name="api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false" aria-describedby="api-key-help-{{ journey.id }}">
                           <p class="muted" id="api-key-help-{{ journey.id }}">Used only for this run. It is encrypted on its way to the worker, never saved, and masked in the evidence.</p>
                         </div>
-                        <p class="muted">Choose Gemini, OpenRouter, Groq or local Ollama for live planning (set defaults under <a href="{% url 'runs:model_settings' %}">Models</a>). The deterministic fixture is clearly labelled contingency evidence.</p>
+                        <p class="muted">Choose Gemini, OpenRouter, Groq or local Ollama for live planning (set defaults under <a href="{% url 'runs:model_settings' %}">Models</a>). “Scripted plan (no AI)” replays a reviewed plan for the demo journeys and is labelled as such.</p>
                         <div><button type="submit">Start keyboard evaluation</button></div>
                       </form>
                       {% if journey.is_real_site %}

@@ -17,3 +17,6 @@ __pycache__
 playwright-report
 test-results
 blob-report
+.runtime
+.tmp
+.artifacts

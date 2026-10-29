@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager, suppress
@@ -15,6 +16,7 @@ from uuid import UUID
 from playwright.sync_api import BrowserContext, Download, Page, Route, sync_playwright
 
 from .artifacts import LocalArtifactStore, StoredArtifact
+from .checks import CheckRunner, page_key
 from .contracts import (
     ActionKind,
     ActionResultV1,
@@ -28,7 +30,6 @@ from .contracts import (
     StepEvidenceV1,
     TargetPolicyV1,
 )
-from .checks import CheckRunner, page_key
 from .findings import FindingCollector, element_signature
 from .planner import Planner
 from .policy import KeyboardActionPolicy
@@ -218,7 +219,23 @@ class KeyboardExecutor:
             accept_downloads=False,
         )
         context.route("**/*", self._route_request)
+        # WebSockets bypass context.route, so they get the same origin policy here.
+        context.route_web_socket(re.compile(r".*"), self._route_web_socket)
         return context
+
+    def _route_web_socket(self, socket_route) -> None:
+        url = socket_route.url
+        http_url = "http" + url[2:] if url.startswith("ws") else url
+        decision = self.target_policy.decide_request(http_url, method="GET", is_navigation=False)
+        if self._probing:
+            self._probe_requests += 1
+        if decision.allowed:
+            socket_route.connect_to_server()
+            return
+        if not self._probing:
+            self._record_policy_event(f"WEBSOCKET_{decision.code}", "WEBSOCKET", url)
+        # Not connecting is the block: the page talks to a stub and nothing reaches the
+        # server. (Closing from inside this handler deadlocks Playwright's sync API.)
 
     def _configure_page_events(self, context: BrowserContext, page: Page) -> None:
         context.on("page", self._handle_popup)
@@ -235,7 +252,9 @@ class KeyboardExecutor:
             self._probe_requests += 1
             if not decision.allowed:
                 if len(self.probe_events) < 20:
-                    self.probe_events.append(f"PROBE_{decision.code} {request.method} {request.url}"[:512])
+                    self.probe_events.append(
+                        f"PROBE_{decision.code} {request.method} {request.url}"[:512]
+                    )
                 route.abort("blockedbyclient")
                 return
         if decision.allowed:
@@ -657,9 +676,13 @@ class KeyboardExecutor:
             ):
                 self._record_tab_navigation(before_focus, before_url, after_url, step_number)
             if executed_action is not None and after_focus is not None:
-                self._safe_check("focus", lambda: self.checks.check_focus(page, step_number))
+                self._safe_check(
+                    "focus", lambda number=step_number: self.checks.check_focus(page, number)
+                )
             if page_key(page.url) != page_key(before_url) and self._origin_is_allowed(page.url):
-                self._safe_check("page", lambda: self.checks.check_page(page, step_number))
+                self._safe_check(
+                    "page", lambda number=step_number: self.checks.check_page(page, number)
+                )
             if planner is not None and observation is not None:
                 planner.record_outcome(observation, action, decision, action_result)
             history.append(

@@ -37,9 +37,8 @@ class BenchmarkResult:
 
     @property
     def matches(self) -> bool:
-        return (
-            self.outcome == self.expected_outcome
-            and sorted(self.confirmed_rules) == sorted(self.expected_rules)
+        return self.outcome == self.expected_outcome and sorted(self.confirmed_rules) == sorted(
+            self.expected_rules
         )
 
 
@@ -49,7 +48,9 @@ def result_for(run: Run) -> BenchmarkResult:
         {
             finding.rule_id
             for finding in run.findings.all()
-            if finding.status == "confirmed" and not finding.ignored and finding.source == "accesspath"
+            if finding.status == "confirmed"
+            and not finding.ignored
+            and finding.source == "accesspath"
         }
     )
     expected_rules = sorted(expected.get("confirmed_rules", []))

@@ -30,7 +30,12 @@ def test_presets_grow_from_essential_to_strict() -> None:
     strict = resolve_rules({"preset": "strict"})
     ids = lambda rule_set: {rule.id for rule in rule_set.rules}  # noqa: E731
     assert ids(essential) < ids(aa) < ids(strict)
-    assert ids(essential) == {"keyboard-operable", "no-keyboard-trap", "focus-order", "name-role-value"}
+    assert ids(essential) == {
+        "keyboard-operable",
+        "no-keyboard-trap",
+        "focus-order",
+        "name-role-value",
+    }
     assert "focus-appearance" in ids(strict) and "focus-appearance" not in ids(aa)
     assert essential.axe_tags == []
     assert "wcag22aa" in aa.axe_tags
@@ -50,8 +55,18 @@ def test_disable_override_and_ignores_apply() -> None:
             "disabled": [{"id": "bypass-blocks", "reason": "Single-page tool"}],
             "severity": {"focus-visible": "critical"},
             "ignores": [
-                {"id": "name-role-value", "match": ".toggle", "reason": "A11Y-12", "until": "2027-01-31"},
-                {"id": "name-role-value", "match": ".old", "reason": "Expired one", "until": "2026-01-01"},
+                {
+                    "id": "name-role-value",
+                    "match": ".toggle",
+                    "reason": "A11Y-12",
+                    "until": "2027-01-31",
+                },
+                {
+                    "id": "name-role-value",
+                    "match": ".old",
+                    "reason": "Expired one",
+                    "until": "2026-01-01",
+                },
             ],
         },
         today=today,

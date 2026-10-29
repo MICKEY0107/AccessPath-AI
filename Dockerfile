@@ -14,11 +14,13 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir "uv==0.8.22"
 
-COPY pyproject.toml README.md ./
-RUN uv sync --no-dev --no-install-project
+COPY pyproject.toml uv.lock README.md ./
+# The development image includes the test and lint tools (pytest, ruff), so
+# `docker compose exec web python -m pytest` works without installing anything.
+RUN uv sync --locked --no-install-project
 
 COPY . .
-RUN uv sync --no-dev --no-install-project \
+RUN uv sync --locked --no-install-project \
     && .venv/bin/python -m playwright install --with-deps chromium \
     && mkdir -p /app/output/runs /app/.runtime/repos \
     && groupadd --system app \

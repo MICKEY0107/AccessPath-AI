@@ -23,10 +23,14 @@ def test_service_saves_findings_rule_results_and_diagnosis() -> None:
         start_url="http://127.0.0.1:8001/accessible/index.html",
         allowed_origins=["http://127.0.0.1:8001"],
         completion_policy={},
-        evaluation_config={"planner": {"kind": "gemini.v1", "fallback": {"kind": "fixture_plan.v1"}}},
+        evaluation_config={
+            "planner": {"kind": "gemini.v1", "fallback": {"kind": "fixture_plan.v1"}}
+        },
         rule_config={"preset": "essential"},
     )
-    run = Run.objects.create(journey=journey, planner_provider=PlannerProvider.GROQ, planner_model="m")
+    run = Run.objects.create(
+        journey=journey, planner_provider=PlannerProvider.GROQ, planner_model="m"
+    )
     finding = FindingV1(
         id="abc123def4567890",
         rule_id="keyboard-operable",

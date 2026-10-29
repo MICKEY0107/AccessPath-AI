@@ -32,8 +32,11 @@ class FindingCollector:
         """Record that a rule's check ran; ``applicable`` means the page had something to test."""
         state = self._states.setdefault(rule_id, _RuleState())
         state.checked = True
-        state.applicable = state.applicable or applicable
-        if detail and not state.detail:
+        if applicable and not state.applicable:
+            # A "nothing to check here" note from an earlier page no longer applies.
+            state.applicable = True
+            state.detail = detail[:400]
+        elif detail and not state.detail and applicable == state.applicable:
             state.detail = detail[:400]
 
     def not_checked(self, rule_id: str, reason: str) -> None:
@@ -129,7 +132,10 @@ class FindingCollector:
         """One result per catalog rule, so a pass never secretly means 'not checked'."""
         catalog = load_catalog()
         results: list[RuleResultV1] = []
-        for rule in catalog.rules:
+        custom = [
+            catalog_rule for item in self.rule_set.custom if (catalog_rule := item.as_rule(catalog))
+        ]
+        for rule in [*catalog.rules, *custom]:
             if rule.id in self.rule_set.disabled:
                 results.append(
                     RuleResultV1(
@@ -153,7 +159,12 @@ class FindingCollector:
                 result = "not_applicable"
             else:
                 result = "not_checked"
-            detail = state.detail or state.not_checked_reason
+            # A pass or "not applicable" note never explains a failure.
+            detail = (
+                ""
+                if result in {"failed", "needs_review"}
+                else (state.detail or state.not_checked_reason)
+            )
             if result == "not_checked" and not detail:
                 detail = "The run ended before this rule could be checked."
             results.append(

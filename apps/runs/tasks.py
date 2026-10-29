@@ -80,7 +80,6 @@ def verify_fix(finding_pk: int) -> str:
     from django.conf import settings
 
     from engine.fix_verify import verify_fixture_fix
-    from engine.rules import resolve_rules
 
     from .models import Finding
 
@@ -102,7 +101,7 @@ def verify_fix(finding_pk: int) -> str:
             completion_policy=journey.completion_policy,
             barrier_check=journey.evaluation_config.get("barrier_check"),
             plan=plan,
-            rule_set=resolve_rules(journey.rule_config),
+            rule_set=_rules_or_default(journey.rule_config),
             browser_executable_path=settings.EVALUATOR_BROWSER_EXECUTABLE,
         )
         verification = {
@@ -116,3 +115,13 @@ def verify_fix(finding_pk: int) -> str:
     finding.data = data
     finding.save(update_fields=["data"])
     return verification["status"]
+
+
+def _rules_or_default(rule_config):
+    """Settings saved against an older catalog fall back to the default preset."""
+    from engine.rules import resolve_rules
+
+    try:
+        return resolve_rules(rule_config)
+    except (ValueError, KeyError):
+        return resolve_rules({})

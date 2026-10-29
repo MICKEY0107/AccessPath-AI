@@ -18,7 +18,7 @@
         <div class="active-repo">
           <div>
             <h2 id="active-title" class="visually-hidden">Active repository</h2>
-            <p class="repo-path"><span aria-hidden="true">›</span> {% if active %}{{ active.short_name }}{% if active.branch %} · {{ active.branch }}{% endif %}{% else %}No repository yet{% endif %}</p>
+            <p class="repo-path"><span aria-hidden="true">›</span> {% if active %}{{ active.short_name }}{% if active.branch %} · {{ active.branch }}{% endif %}{% if active.is_bundled %} <span class="tag tag-neutral">Demo copy</span>{% endif %}{% else %}No repository yet{% endif %}</p>
             {% if active %}
               <p class="muted small">
                 <span class="tag {% if active.status == 'ready' %}tag-success{% elif active.status == 'failed' %}tag-issue{% else %}tag-neutral{% endif %}">{{ active.get_status_display }}</span>
@@ -26,6 +26,7 @@
                 {% if active.analysed_at %} · analysed {{ active.analysed_at|date:"j M, H:i" }}{% endif %}
                 {% if active.live_site_url %} · site <code>{{ active.live_site_url }}</code>{% endif %}
               </p>
+              {% if active.is_bundled %}<p class="muted small">A copy of AccessPath's own demo clinic site, shipped with the app. Nothing was downloaded; use it to try “Where to fix” and fix verification without GitHub.</p>{% endif %}
               {% if active.error %}<p class="error">{{ active.error }}</p>{% endif %}
             {% endif %}
           </div>
@@ -66,11 +67,19 @@
           <p class="muted small">Paste a {{ allowed_hosts|join:", " }} address to pull the latest commit and make it the active repository. The copy is never run, and secrets and build folders are skipped.</p>
         </form>
 
+        {% if not has_demo %}
+          <form method="post" action="{% url 'codebase:demo' %}" class="demo-offer">
+            {% csrf_token %}
+            <p class="small"><strong>No repository handy?</strong> Use the demo clinic site that ships with AccessPath. It links the demo journeys, so their reports show the exact file and line to fix.</p>
+            <button type="submit" class="secondary">Use the demo repository</button>
+          </form>
+        {% endif %}
+
         {% if bindings %}
           <ul class="repo-chips" aria-label="Your repositories">
             {% for item in bindings %}
               <li>
-                <a href="?binding={{ item.pk }}" {% if active and item.pk == active.pk %}aria-current="true"{% endif %}>{{ item.short_name }} · {{ item.branch|default:"default" }}</a>
+                <a href="?binding={{ item.pk }}" {% if active and item.pk == active.pk %}aria-current="true"{% endif %}>{{ item.short_name }} · {% if item.is_bundled %}demo copy{% else %}{{ item.branch|default:"default" }}{% endif %}</a>
                 <form method="post" action="{% url 'codebase:remove' item.pk %}">
                   {% csrf_token %}
                   <button type="submit" class="chip-remove" aria-label="Remove {{ item.short_name }} and delete its copy">×</button>
@@ -117,11 +126,13 @@
           </form>
         </section>
         <section class="panel" aria-labelledby="refresh-title">
-          <h2 id="refresh-title">Pull the latest commit</h2>
+          <h2 id="refresh-title">{% if active.is_bundled %}Refresh the demo copy{% else %}Pull the latest commit{% endif %}</h2>
           <form method="post" action="{% url 'codebase:analyze' active.pk %}" class="journey-links" autocomplete="off">
             {% csrf_token %}
-            <label for="refresh-token">Access token (private repos only)</label>
-            <input id="refresh-token" name="token" type="password" placeholder="Not stored" maxlength="512">
+            {% if not active.is_bundled %}
+              <label for="refresh-token">Access token (private repos only)</label>
+              <input id="refresh-token" name="token" type="password" placeholder="Not stored" maxlength="512">
+            {% endif %}
             <button type="submit" class="secondary">Re-analyse</button>
           </form>
         </section>

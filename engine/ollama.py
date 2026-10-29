@@ -9,7 +9,6 @@ another internal service.
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable
 from typing import Any
 from urllib.error import HTTPError, URLError

@@ -7,6 +7,7 @@ app_name = "codebase"
 urlpatterns = [
     path("", views.codebase_page, name="page"),
     path("add/", views.add_binding, name="add"),
+    path("demo/", views.use_demo, name="demo"),
     path("<int:binding_id>/analyze/", views.reanalyze_binding, name="analyze"),
     path("<int:binding_id>/journeys/", views.link_journeys, name="journeys"),
     path("<int:binding_id>/remove/", views.remove_binding, name="remove"),
