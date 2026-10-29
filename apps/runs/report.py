@@ -65,13 +65,21 @@ def _rule_index() -> dict[str, Any]:
     return {rule.id: rule for rule in load_catalog().rules}
 
 
-def _finding_rows(run: Run) -> list[dict[str, Any]]:
+def can_view_code(run: Run, viewer: Any) -> bool:
+    """Code from a linked repository is shown only to the person who linked it."""
+    binding = run.journey.repo_binding
+    return bool(
+        binding is not None and viewer is not None and getattr(viewer, "pk", None) == binding.owner_id
+    )
+
+
+def _finding_rows(run: Run, show_code: bool = False) -> list[dict[str, Any]]:
     rules = _rule_index()
     rows = []
     for finding in run.findings.all():
         data = finding.data or {}
         rule = rules.get(finding.rule_id)
-        locations = data.get("locations") or None
+        locations = (data.get("locations") or None) if show_code else None
         columns = [
             {"label": label, "help": help_text, "items": (locations or {}).get(key) or []}
             for key, label, help_text in LOCATION_COLUMNS
@@ -225,11 +233,12 @@ def _ai_reasoning(run: Run) -> list[dict[str, Any]]:
     return steps
 
 
-def _repository(run: Run) -> dict[str, Any] | None:
+def _repository(run: Run, show_code: bool = False) -> dict[str, Any] | None:
     binding = run.journey.repo_binding
     if binding is None:
         return None
     return {
+        "is_owner": show_code,
         "journeys": [
             {"id": journey.pk, "name": journey.name}
             for journey in binding.journeys.filter(is_active=True).exclude(pk=run.journey_id)[:10]
@@ -242,8 +251,10 @@ def _repository(run: Run) -> dict[str, Any] | None:
     }
 
 
-def build_report(run: Run) -> dict[str, Any]:
-    findings = _finding_rows(run)
+def build_report(run: Run, viewer: Any = None) -> dict[str, Any]:
+    """The report as ``viewer`` may see it; code locations only for the repository owner."""
+    show_code = can_view_code(run, viewer)
+    findings = _finding_rows(run, show_code)
     rules_meta = (run.planner_metadata or {}).get("rules") or {}
     fail_on = rules_meta.get("fail_on", "serious")
     verdict = _verdict_key(run, findings, fail_on)
@@ -303,7 +314,7 @@ def build_report(run: Run) -> dict[str, Any]:
             "fail_on": fail_on,
         },
         "axe": (metadata.get("executor") or {}).get("axe") or {},
-        "repository": _repository(run),
+        "repository": _repository(run, show_code),
         "planner": {
             "provider": run.planner_provider,
             "model": metadata.get("model") or run.planner_model,

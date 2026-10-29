@@ -1,41 +1,39 @@
 # AccessPath AI presentation outline
 
-## Slide 1: AccessPath AI
+Updated 29 October 2026 for the web product. Pair it with `DEMONSTRATION_RUNBOOK.md`.
 
-Keyboard-only accessibility evaluation for a declared appointment-booking journey.
+## Slide 1: The question
 
-Show the Evaluation runs screen and state the Phase 1 boundary: controlled fixture sites, motor accessibility, keyboard input, and auditable evidence.
+Can a keyboard user finish this task on this site, and if not, exactly where and why? Scanners check single pages; AccessPath walks the whole task.
 
-## Slide 2: The evaluation flow
+## Slide 2: How a run works
 
-Use the user-flow diagram from `ARCHITECTURE_AND_FLOW.md`.
+An AI planner proposes one keyboard action at a time; a deterministic policy approves it; Playwright presses the key. Checks run at every step (focus visible, focus hidden, names, skip links, focus order, focus that changes the page, axe-core).
 
-Explain that the evaluator selects the journey and the provider from one dropdown. Gemini and OpenRouter are live alternatives. Deterministic mode is a visibly labelled contingency, not hidden AI evidence.
+## Slide 3: Confirm before blaming
 
-## Slide 3: Backend safety boundary
+Show the broken clinic report. A failed run is re-checked with a Tab walk and key probes. Only a confirmed barrier is reported; otherwise the report says agent or provider failure and why. This is what makes the verdict trustworthy.
 
-Use the backend architecture diagram.
+## Slide 4: Rules teams can trust
 
-Emphasise that a model only proposes one typed action. The deterministic policy authorises it, Playwright executes keyboard input only, and the executor verifies the final state.
+The reviewed catalog: WCAG 2.2 criteria with their W3C ACT rule IDs, three presets, disable-with-reason, ignores that expire. A rule is never "passed" unless it was checked.
 
-## Slide 4: Evidence produced by each run
+## Slide 5: The report for product managers
 
-Show one completed run-detail page.
+Verdict, plain-language summary, findings by severity, exports. Show the HTML export opening as a standalone page.
 
-Point to the stored provider/model metadata, step sequence, screenshots, terminal outcome, and evidence hashes. Explain that a completion requires the fixture's declared completion signal.
+## Slide 6: Where to fix, for developers
 
-## Slide 5: Broken-site control
+Bind the repository. Exact match, likely cause, also affected; a reviewable patch; verification on a temporary copy. Show `fixtures/clinic/broken/slots.html` lines 6–8 and "resolved".
 
-Show a broken fixture run-detail page.
+## Slide 7: Security
 
-Explain that the keyboard barrier produces `blocked`, not `completed`. This is the safeguard against false-positive accessibility claims.
+Read-only clone that is never run, token never stored, secrets redacted, AI code search only with providers allowed to read private code, sign-in on every page.
 
-## Slide 6: Provider reliability and current limitation
+## Slide 8: Evidence
 
-Show the provider reliability guardrails from `ARCHITECTURE_AND_FLOW.md`.
+Benchmark of twelve journeys with known results and the Gate 1 measures. Report offline (checks) and live (AI planner) numbers separately.
 
-State the evidence accurately: Gemini hit quota after valid earlier runs. OpenRouter's free route returned an Nvidia temporary-overload error and one length-limited completion. Neither observed error was an HTTP 429 caused by rapid key reuse. The new process-wide pacing guard removes immediate request starts between runs, but cannot make a free upstream provider available.
+## Slide 9: Limits and future scope
 
-## Slide 7: Conclusion and next proof
-
-State the remaining live-evidence gate: one provider, a fixed preflight-verified model, three accessible completions, five broken runs, and zero false completions. Keep Gemini and OpenRouter evidence separate. Show deterministic runs only as the repeatable contingency demonstration.
+Keyboard profile only; read-only on real sites; code mapping strongest for static pages and React/Vue development builds. Future: CLI, MCP server for coding assistants, CI with SARIF and PR comments, record-and-replay, the voice Chrome extension (research).

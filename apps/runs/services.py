@@ -194,10 +194,12 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         result = executor.run_with_planner(planner, goal=run.journey.goal)
     finally:
         persist_steps()
+        started_by = (run.planner_metadata or {}).get("started_by")
         run.planner_metadata = scrub(
             {
                 **planner.runtime_metadata(),
                 **credential_metadata,
+                "started_by": started_by,
                 "executor": executor.runtime_metadata,
                 "rules": rule_set.to_metadata(),
                 "probe_events": executor.probe_events,
@@ -211,7 +213,9 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
     try:
         from .code_mapping import map_run_findings
 
-        map_run_findings(run, api_key=api_key)
+        # Code goes to an AI provider only when the repository's owner started the run.
+        owner_started = started_by_repo_owner(run)
+        map_run_findings(run, api_key=api_key if owner_started else "", use_ai=owner_started)
     except Exception as error:  # Mapping to code is extra; never lose the run's result.
         run.diagnosis = scrub(
             f"{run.diagnosis} Mapping findings to code failed ({type(error).__name__}).".strip(),
@@ -219,6 +223,13 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         )
         run.save(update_fields=["diagnosis"])
     return result
+
+
+def started_by_repo_owner(run: Run) -> bool:
+    """Whether the person who started ``run`` owns the journey's linked repository."""
+    binding = run.journey.repo_binding
+    started_by = (run.planner_metadata or {}).get("started_by")
+    return binding is not None and started_by is not None and started_by == binding.owner_id
 
 
 def _axe_source() -> str | None:

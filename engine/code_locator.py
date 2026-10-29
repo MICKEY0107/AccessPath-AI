@@ -89,7 +89,9 @@ class SourceReader:
                 return []
             if target.is_symlink() or not target.is_file():
                 return []
-            self._cache[path] = target.read_text(encoding="utf-8", errors="replace").splitlines()
+            text = target.read_text(encoding="utf-8", errors="replace")
+            # Redact the whole file first, so secrets spanning lines (PEM keys) never leak.
+            self._cache[path] = redact(text)[0].splitlines()
         return self._cache[path]
 
     def snippet(self, path: str, line: int, context: int = SNIPPET_CONTEXT) -> str:
@@ -136,7 +138,11 @@ def _match_source_hint(element: dict[str, Any], reader: SourceReader) -> CodeLoc
     hint = hint.replace("\\", "/")
     for path in reader.files:
         if hint.endswith(path) or path.endswith(hint.split("/src/", 1)[-1]):
-            line = int(element.get("source_line") or 1)
+            try:
+                line = int(element.get("source_line") or 1)
+            except (TypeError, ValueError):
+                line = 1
+            line = min(max(line, 1), max(len(reader.lines(path)), 1))
             return CodeLocation(path, line, "high", f"{element.get('framework', 'Framework')} source hint from the page")
     return None
 
@@ -293,7 +299,7 @@ def suggest_fix(
     if target is None:
         return None
     lines = reader.lines(target.path)
-    if not lines or target.line > len(lines):
+    if not lines or not 1 <= target.line <= len(lines):
         return None
     original = lines[target.line - 1]
     path, number = target.path, target.line

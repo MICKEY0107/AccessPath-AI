@@ -59,7 +59,8 @@ def redact(text: str) -> tuple[str, int]:
     """Replace secret-looking values; returns the cleaned text and how many were found."""
     count = 0
     for pattern in SECRET_PATTERNS:
-        text, found = pattern.subn(REDACTED, text)
+        # Keep the line breaks of multi-line secrets (PEM keys) so line numbers stay right.
+        text, found = pattern.subn(lambda match: REDACTED + "\n" * match.group(0).count("\n"), text)
         count += found
 
     def _assignment(match: re.Match) -> str:

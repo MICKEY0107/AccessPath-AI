@@ -34,7 +34,7 @@
           {% endfor %}
         </select>
       {% endif %}
-      {% if report.repository.ready and report.findings %}
+      {% if report.repository.ready and report.repository.is_owner and report.findings %}
         <form method="post" action="{% url 'runs:map_code' run.id %}">{% csrf_token %}<button type="submit" class="secondary">Map to code</button></form>
       {% elif not report.repository %}
         <a class="secondary" href="{% url 'codebase:page' %}">Link a repository</a>

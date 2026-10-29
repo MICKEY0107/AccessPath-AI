@@ -1,11 +1,13 @@
 # AccessPath AI — Project Handoff
 
-**Updated:** 29 October 2026, about 20:40 IST (product direction and web implementation plan agreed; no code changed since 26 October)
+**Updated:** 29 October 2026, late evening IST (web implementation stages 1–6 built, tested and committed locally; stage 7 docs done; live runs and the course matrix still need the owner's machine and keys)
 **Read this first in a new chat.** It is the single source of truth for where the project stands. Times in this file are IST unless marked UTC; the app's database stores UTC (IST = UTC + 5:30).
 
 ## 1. What the project is
 
 AccessPath AI checks whether a person using only a keyboard can finish a real task on a website. A live LLM planner proposes one keyboard action at a time (Tab, Shift+Tab, Enter, Space, arrows, Escape, or Type a permitted value). A deterministic policy approves each action before Playwright presses the key. Every step is saved with focus evidence and before/after screenshots, and the run ends in an evidence-backed outcome: completed, blocked, inconclusive, agent error, safety stopped, or environment blocked.
+
+**Product today:** a signed-in web app that runs a journey by keyboard, checks focus, names, skip links and focus order at every step, confirms any barrier with deterministic probes before blaming the site, maps findings to WCAG rules from a reviewed catalog, shows an accessibility report (with HTML/JSON export), and — when the site's repository is linked — points to the exact file and line with a reviewable patch.
 
 It is a 5-credit college project (three-member team per the progress log). First users are **developers and product managers**. Goal statement (from the plan doc): run a declared task on a live site keyboard-only and return a verdict a developer or PM can act on — completed, or blocked at a named step with the WCAG criterion, a screenshot and a reproduction path.
 
@@ -33,10 +35,11 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 
 ## 3. Open questions waiting for the owner
 
-- **Deadline:** the final submission date. It decides whether stage 6 (where to fix) is cut down.
+- **Deadline:** the final submission date (all stages are built; it now only decides how much live evidence to gather).
 - **CodeImpact reference:** the owner wants its repo-clone and code-mapping code used as a reference. `C:\code\RepoPilot` is not connected to the AccessPath chat (an access request was blocked); the owner can add the folder in the desktop app or attach its files. Read only; never modify it.
-- **Benchmark:** which further sites and journeys to add beyond the two demos (owner has none in mind).
-- **When to push** the local commits and update PR #1.
+- **Benchmark:** 12 fixture journeys exist with known results; which live public sites to add, if any (owner has none in mind).
+- **When to push** the local commits and update PR #1. The demo's Code page binding of `MICKEY0107/AccessPath-AI` only sees the benchmark pages once they are pushed (the clinic pages are already on GitHub).
+- **Release tag:** create it after the live course matrix, e.g. `git tag -a v1.0.0 -m "Phase 1 web product"` (not created yet).
 
 ## 4. Git state
 
@@ -57,6 +60,16 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | `c0033cc` Handoff rewrite | 05:05 | First version of this file; progress log entry 1.12 |
 | `7a43242` Handoff expanded | 05:19 | Decisions with reasons, open questions, ideas register, live run results, known issues, exact next step; progress log 1.12 dated 26 October (IST) |
 | `7d61d07` Improvements backlog | 05:21 | `IMPROVEMENTS_BACKLOG.md`: every idea, suggestion and warning from the project thread with status, effort and code locations; linked from section 1 |
+| `975fa2d` Web plan recorded | 29 Oct | Handoff, backlog and plan doc record the web-only plan and the 29 October decisions |
+| `dc91e99` Stage 1 | 29 Oct | Rules catalog (`rules/catalog.json`), presets, Rules page, `Journey.rule_config` |
+| `87e8476` Stage 2 | 29 Oct | Confirm before blaming (`engine/probes.py`), findings (`engine/findings.py`, `Finding` table), `Run.failure_kind/diagnosis/rule_results` |
+| `25db171` Stage 3 | 29 Oct | Focus and page checks (`engine/checks.py`), optional axe-core (`install_axe_core`) |
+| `d3ae6a0` Stage 4 | 29 Oct | Accessibility report page and exports (`apps/runs/report.py`), 12-journey benchmark and `run_benchmark` |
+| `eb1a4cd` Stage 5 | 29 Oct | Sign-in, Models page (encrypted remembered keys, List models, code-safety badge), Ollama provider, Code page (secure clone, index, secret scan) |
+| `ef40c57` Stage 6 | 29 Oct | Where to fix (`engine/code_locator.py`), policy-bound AI search (`engine/locator_ai.py`), fix verification (`engine/fix_verify.py`) |
+| Stage 7 | 29 Oct | Security review fixes (`tests/test_security_review.py`), README, runbook, presentation outline, architecture, backlog and this handoff |
+
+Development note: these stages were built in a cloud workspace with copies of the project's `.venv` packages, tested there (Playwright Chromium, SQLite test settings), and copied back here before each commit. `ruff` was not available there; run it locally.
 
 ## 5. Ideas and features register
 
@@ -75,15 +88,22 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | AI-only demo journeys | Done | Both pass live (section 6) |
 | Groq strict structured outputs | Done | For `openai/gpt-oss-*` models; others use JSON mode |
 | Smaller observations | Done | Focused control, next 18 and previous 4 tab stops, 1,500 characters of text, defaults omitted |
+| Rules catalog, presets, Rules page | Done (stage 1) | WCAG 2.2 + ACT IDs; disable needs a reason; ignores expire |
+| Confirm a barrier before reporting it | Done (stage 2) | Tab walk, key probe with click comparison, trap probe; agent vs site vs provider failure |
+| Map findings to WCAG with severity | Done (stages 2–3) | Every rule gets passed / failed / needs review / not applicable / not checked / disabled |
+| Focus visible, focus obscured, skip link, focus order, unnamed controls, on-focus | Done (stage 3) | Static scans are "needs review" only |
+| axe-core per page | Done (stage 3), optional | `python manage.py install_axe_core`; not installed means axe rules "not checked" |
+| Accessibility report page, HTML/JSON export | Done (stage 4) | CodeImpact structure, rule-based plain-words panel |
+| Benchmark of about 10 journeys | Done (stage 4) | 12 journeys; `run_benchmark`; 36/36 offline runs match |
+| Sign-in | Done (stage 5) | `LoginRequiredMiddleware`; journeys and runs shared, repos and keys per person |
+| Remembered encrypted keys, Ollama, code-safety badge | Done (stage 5) | |
+| Active codebase (secure clone + index) | Done (stage 5) | Needs the rebuilt Docker image (git) |
+| Where to fix, patches, AI search, fix verification | Done (stage 6) | Verification only for the bundled fixture pages |
+| Custom rules from a fixed set of checks | Not started | Mentioned in the design; not built |
 | Cut planner cost further: prompt caching | Planned | Not done |
 | Stop early when the model repeats actions | Planned | Not done; today only the focus-cycle detector (`no_progress_limit`) and the policy rule exist |
-| Confirm a barrier deterministically before reporting it | Planned | Phase 1 item 1; most important for trust |
-| Map findings to WCAG with severity | Planned | 2.1.1, 2.1.2, 2.4.1, 2.4.3, 2.4.7, 2.4.11, 3.2.1 |
-| Focus visible, focus obscured, skip link, focus order checks; unnamed controls | Planned | TodoMVC's unnamed checkboxes are a ready example |
-| axe-core scan at each new page state | Planned | |
-| Benchmark of about 10 journeys | Planned | Starts from the two demos |
-| Staging writes, saved-session logins, CLI, CI gate, reports, baselines | Planned (Phase 2) | |
-| VS Code developer assistant | Planned (Phase 3) | Built on the future CLI |
+| Staging writes, saved-session logins, baselines | Future scope | |
+| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future scope (29 Oct) | Replaces the VS Code assistant idea |
 | Chrome voice extension for motor-disabled users | Postponed (research only) | Acts with the user's own accounts, so it needs a different trust model and user research; OS voice control already exists |
 | Paid default model for benchmarks | Dropped | Owner has free tiers only |
 | Deterministic fixture fallback in demo journeys | Dropped for demos | Owner wants AI only; the clinic fixtures still keep their scripted fallback |
@@ -120,29 +140,43 @@ Times are from the run records (UTC) with IST in brackets.
 - **Wikipedia:** posts telemetry (`/ins-502b/v2/events`, `intake-analytics.wikimedia.org`); blocked as non-fatal policy events.
 - **GOV.UK** was probed (cookie banner first, then skip link, search at the 7th–8th Tab) but not used: search results need many Tabs, which is slow on free tiers.
 - **Steps are saved only when a run ends**, so the run page shows no steps while running.
+- **Security review (29 Oct, fixed in the stage 7 commit):** an independent review of the code side found 8 issues. All are fixed with tests in `tests/test_security_review.py`. Fixed: another person's journey could be re-linked; verification served fixture files from the clone; code locations were visible to everyone; multi-line private keys slipped past redaction; index snippets were not redacted; bad ports caused a 500; size was only checked after checkout; and page line numbers were not clamped. Hardening added: no git redirects, and the whole process group is killed on time-out. Open: WebSocket traffic is not covered by the origin policy (it matters only for live sites, since clones are never served).
+- **Checks change focus briefly:** focus checks blur and re-focus the control once, and page checks run a Tab walk, then restore focus exactly (verified by the scripted clinic plan). On real sites a blur handler (for example form validation) could react; the walk reloads the page if Tab itself navigates.
+- **axe-core is not vendored:** neither PyPI nor npm was reachable from the build workspace. Run `install_axe_core` once (it downloads the pinned version from jsDelivr into `vendor/`, which git ignores).
+- **Changing `DJANGO_SECRET_KEY` makes saved keys unreadable**; people must save them again.
+- **Code mapping** is strongest for static HTML and React/Vue development builds (source hints). Minified production bundles fall back to text and class search.
 - **Worker does not reload code:** restart it after engine changes.
 - **Environment:** port 8000 is taken by another local app (`orchestrator_api` uvicorn from a Codex runtime); `uv` needs `UV_CACHE_DIR=.uv-cache`; the host has no Playwright browsers (11 browser tests fail on the host, pass in the container); Python file I/O defaults to cp1252 on this machine. Docker was down at the start of 25 Oct and is now running.
 
 ## 8. What I was in the middle of, and the exact next step
 
-Nothing is half-done in code: all work is committed and 112 tests pass. The last finished task was this handoff.
+Nothing is half-done in code: stages 1–6 are committed and the suite passes in the build workspace (see section 9 for the count). Everything below needs the owner's machine, Docker and API keys:
 
-**Exact next step:** Phase 1 item 1, "confirm before blaming". When a run would end as `blocked` or `agent_error` on a real site, re-check deterministically: re-focus the target control named by the planner's last `target_hint`, test whether it is focusable with Tab and whether Enter or Space activates it, and report a barrier only when that check confirms it; otherwise report an agent failure. Start in `engine/executor.py` around `_execute_actions` (the terminal branches) and add tests in `tests/test_browser_fixture_flow.py` using the broken clinic fixture.
+1. Rebuild and migrate: `docker compose up -d --build`, `migrate`, `createsuperuser`, `seed_fixture_journeys`, optionally `install_axe_core`.
+2. Run the tests in the container and `ruff check .` on the host.
+3. Live Gate 1 numbers: `docker compose exec worker python manage.py run_benchmark --provider groq --model openai/gpt-oss-120b --repeat 3`.
+4. Course matrix: `run_fixture_matrix --provider groq --accessible-count 3 --broken-count 5`.
+5. Rehearse `docs/DEMONSTRATION_RUNBOOK.md`; push when ready so the Code page can bind the benchmark pages; tag the release.
 
 ## 9. Run it locally
 
 ```powershell
 docker compose -f docker-compose.yml -f <override> up -d      # see the port note
 docker compose exec web python manage.py migrate
-docker compose exec web python manage.py seed_fixture_journeys
+docker compose exec web python manage.py createsuperuser        # every page needs sign-in
+docker compose exec web python manage.py seed_fixture_journeys  # clinic + 10 benchmark journeys
 docker compose exec web python manage.py seed_public_journeys
+docker compose exec web python manage.py install_axe_core       # optional
 ```
+
+- **Rebuild once** (`--build`): the image now installs `git`, and compose adds a `repo_storage` volume for clones.
+- **Local Ollama:** `OLLAMA_BASE_URL=http://host.docker.internal:11434` and `OLLAMA_MODEL` in `.env`.
 
 - **Port:** map web to 8010 with an override file containing
   `services: { web: { ports: !override ["127.0.0.1:8010:8000"] } }`, then open http://127.0.0.1:8010/runs/.
 - Restart the worker after engine changes: `docker compose restart worker`.
 - `.env` holds `GEMINI_*`, `OPENROUTER_*`, `GROQ_*` keys and models (currently `models/gemini-3.5-flash-lite`, `openrouter/free`, `openai/gpt-oss-20b`). Never print or commit it.
-- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **112 passed, 9 skipped** (live-site tests are opt-in).
+- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **214 passed, 9 skipped** in the build workspace (live-site tests are opt-in).
 - Host lint: `UV_CACHE_DIR=.uv-cache uv run ruff check .`
 
 ## 10. Where the code is
@@ -151,9 +185,10 @@ docker compose exec web python manage.py seed_public_journeys
 - `apps/runs/` — views, `services.py` (`execute_configured_run`), `tasks.py`, `credentials.py`.
 - `apps/journeys/real_sites.py` — add-website form and public-host check.
 - `fixtures/public/journey-manifest.json` — demo journeys (`demo-simple-wikipedia-search`, `demo-complex-todomvc`) and the older reviewed pilots.
-- `templates/` — `base.html` (theme), `runs/list.html`, `runs/detail.html`, `core/home.html`.
+- `templates/` — `base.html` (theme), `runs/list.html`, `runs/detail.html` (report), `runs/rules.html`, `runs/model_settings.html`, `runs/report_export.html`, `codebase/code.html`, `registration/login.html`.
+- New in October: `rules/catalog.json`, `engine/rules.py`, `engine/probes.py`, `engine/findings.py`, `engine/checks.py`, `engine/dom.py`, `engine/ollama.py`, `engine/provider_models.py`, `engine/code_safety.py`, `engine/repo_clone.py`, `engine/code_index.py`, `engine/secret_scan.py`, `engine/code_locator.py`, `engine/locator_ai.py`, `engine/fix_verify.py`; `apps/codebase/` (repo bindings); `apps/runs/report.py`, `benchmark.py`, `code_mapping.py`, `model_settings.py`, `rule_views.py`; `fixtures/benchmark/journey-manifest.json` and `fixtures/clinic/benchmark/`. Architecture: `docs/ARCHITECTURE_AND_FLOW.md` (October section).
 
-## 11. What is next: web implementation plan (agreed 29 October 2026)
+## 11. Web implementation plan (agreed 29 October 2026) — stages 1–6 done, stage 7 docs done
 
 Full plan with the team split: the plan doc, section "Web implementation plan". The earlier three-phase plan is marked superseded there.
 

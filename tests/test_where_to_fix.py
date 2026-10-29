@@ -234,11 +234,13 @@ def test_findings_are_mapped_to_the_linked_repository_and_shown(client, user, tm
 
 
 @pytest.mark.django_db
-def test_verify_button_queues_the_check_and_refuses_non_fixture_fixes(client) -> None:
+def test_verify_button_queues_the_check_and_refuses_non_fixture_fixes(client, user) -> None:
     from unittest.mock import patch
 
+    binding = RepoBinding.objects.create(owner=user, repo_url="https://github.com/o/r", status="ready")
     journey = Journey.objects.create(name="v", goal="Book an appointment by keyboard.", start_url="http://h/",
-                                     allowed_origins=["http://h"], completion_policy={}, evaluation_config={})
+                                     allowed_origins=["http://h"], completion_policy={}, evaluation_config={},
+                                     repo_binding=binding)
     run = Run.objects.create(journey=journey, planner_provider="fixture")
     fixture_fix = {"locations": {"fix": {"path": "fixtures/clinic/broken/slots.html", "edits": {"6": "x"}}}}
     other_fix = {"locations": {"fix": {"path": "src/App.jsx", "edits": {"6": "x"}}}}

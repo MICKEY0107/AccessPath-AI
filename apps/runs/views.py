@@ -249,9 +249,10 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
         journey=journey,
         planner_provider=selected_provider,
         planner_model=model,
-        planner_metadata=(
-            {"credential_source": credential_source} if selected_option["live"] else {}
-        ),
+        planner_metadata={
+            **({"credential_source": credential_source} if selected_option["live"] else {}),
+            "started_by": request.user.pk,
+        },
     )
     try:
         if user_api_key:
@@ -394,7 +395,7 @@ def run_detail(request: HttpRequest, run_id) -> HttpResponse:
         "runs/detail.html",
         {
             "run": run,
-            "report": build_report(run),
+            "report": build_report(run, request.user),
             "recent_runs": Run.objects.filter(journey=run.journey).order_by("-created_at")[:10],
             "run_brief": describe_run(run),
             "failure_kind_label": FAILURE_KIND_LABELS.get(run.failure_kind, run.failure_kind),
@@ -406,7 +407,9 @@ def run_detail(request: HttpRequest, run_id) -> HttpResponse:
 def export_report_json(request: HttpRequest, run_id) -> HttpResponse:
     """Download the report as JSON for other tools."""
     run = _load_run(run_id)
-    response = JsonResponse(report_json(build_report(run)), json_dumps_params={"indent": 2})
+    response = JsonResponse(
+        report_json(build_report(run, request.user)), json_dumps_params={"indent": 2}
+    )
     response["Content-Disposition"] = f'attachment; filename="accesspath-report-{run.id}.json"'
     return response
 
@@ -443,7 +446,7 @@ def _embedded_screenshots(run: Run, steps: set[int]) -> list[dict[str, str]]:
 def export_report_html(request: HttpRequest, run_id) -> HttpResponse:
     """Download a standalone HTML report a product manager can open or forward."""
     run = _load_run(run_id)
-    report = build_report(run)
+    report = build_report(run, request.user)
     steps = {row["step_number"] for row in report["findings"] if row["step_number"]}
     html = render_to_string(
         "runs/report_export.html",
@@ -466,6 +469,10 @@ def map_to_code(request: HttpRequest, run_id) -> HttpResponse:
     from .code_mapping import map_run_findings
 
     run = _load_run(run_id)
+    binding = run.journey.repo_binding
+    if binding is not None and binding.owner_id != request.user.pk:
+        messages.error(request, "Only the person who linked this repository can map findings to it.")
+        return redirect(reverse("runs:detail", kwargs={"run_id": run.id}))
     mapped = map_run_findings(run, use_ai=False)
     if mapped:
         messages.success(request, f"Mapped {mapped} finding(s) to {run.journey.repo_binding.short_name}.")
@@ -484,7 +491,13 @@ def verify_fix_view(request: HttpRequest, finding_id: int) -> HttpResponse:
     from .models import Finding
     from .tasks import verify_fix
 
-    finding = get_object_or_404(Finding.objects.select_related("run"), pk=finding_id)
+    finding = get_object_or_404(
+        Finding.objects.select_related("run__journey__repo_binding"), pk=finding_id
+    )
+    binding = finding.run.journey.repo_binding
+    if binding is None or binding.owner_id != request.user.pk:
+        messages.error(request, "Only the person who linked this repository can verify its fixes.")
+        return redirect(reverse("runs:detail", kwargs={"run_id": finding.run_id}))
     data = dict(finding.data or {})
     locations = data.get("locations") or {}
     if not can_verify(locations.get("fix")):

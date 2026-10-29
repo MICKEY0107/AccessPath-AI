@@ -470,6 +470,7 @@ Next action and owner:
 
 | Version | Date | Summary |
 |---|---|---|
+| 1.13 | 29 October 2026 (IST) | Web product stages 1–6: reviewed rule catalog with presets and a Rules page; confirm-before-blaming probes and saved findings; focus, name, skip-link, focus-order and on-focus checks plus optional axe-core; accessibility report page with HTML/JSON export; 12-journey benchmark and run_benchmark (36/36 offline runs match); sign-in, model settings with encrypted remembered keys and local Ollama; secure repository clone and index; where-to-fix with patches, policy-bound AI search and verified fixes; security review fixes; 214 tests pass. See PROJECT_HANDOFF.md |
 | 1.12 | 26 October 2026 (IST) | Per-run provider/model/API-key picker with encrypted key handling; resilient live planning (retries, Retry-After, provider error text, Groq strict outputs); real-website journeys; UI redesign; AI-only Wikipedia and TodoMVC demo journeys passing live on free Groq models; 112 tests pass. See PROJECT_HANDOFF.md |
 | 1.11 | 28 September 2026 | Clarified accessible versus blocked fixture behavior, improved blocked-result wording, added live run filters, and changed filter refresh to preserve page position |
 | 1.10 | 28 September 2026 | Added a required provider dropdown, cross-run process-wide pacing, architecture/run-flow diagrams, presentation outline, live OpenRouter diagnosis, and consolidated teammate handoff; 48 tests pass while the final provider-pure live matrix remains pending |

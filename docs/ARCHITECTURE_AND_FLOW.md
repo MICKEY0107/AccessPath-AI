@@ -79,3 +79,34 @@ flowchart TD
 - Gemini and OpenRouter outcomes remain separate evidence sets. Deterministic runs are useful repeatable demonstrations but never count as live-model evidence.
 - Completion requires the declared completion signal. A broken site with a keyboard barrier must remain `blocked`; it must never be reported as a completion.
 - `openrouter/free` is suitable for smoke testing only because it can choose different upstream models. Repeatable evidence should use a preflight-verified, fixed model.
+
+## October 2026: from a verdict to a fix
+
+```mermaid
+flowchart LR
+    Run[Keyboard run] --> Checks[Focus and page checks]
+    Checks --> Findings[(Findings with rule, WCAG criterion, element)]
+    Run -->|fails| Probe[Confirm before blaming: Tab walk, key probe, trap probe]
+    Probe -->|confirmed| Findings
+    Probe -->|not confirmed| Agent[Agent or provider failure, with diagnosis]
+    Repo[Bound repository] --> Clone[Read-only clone, never run] --> Index[Front-end index]
+    Findings --> Locator[Code locator]
+    Index --> Locator
+    Locator --> Exact[Exact match]
+    Locator --> Likely[Likely cause, optional AI search]
+    Locator --> Related[Also affected]
+    Locator --> Patch[Reviewable patch]
+    Patch --> Verify[Verify on a temporary fixture copy]
+```
+
+| Module | Responsibility |
+|---|---|
+| `rules/catalog.json`, `engine/rules.py` | Reviewed rule catalog (WCAG 2.2 + ACT IDs), presets, per-journey settings |
+| `engine/checks.py` | Focus visible, focus obscured, unnamed controls, skip links, focus order, on-focus, axe-core |
+| `engine/probes.py` | Tab walk, target probe, trap probe used to confirm a barrier |
+| `engine/findings.py` | Collects findings, groups copies, applies ignores, gives every rule a result |
+| `apps/runs/report.py` | One report for the page and the HTML/JSON exports |
+| `engine/repo_clone.py`, `engine/code_index.py`, `engine/secret_scan.py` | Safe clone, front-end index, secret redaction |
+| `engine/code_locator.py`, `engine/locator_ai.py` | Where to fix, patches, policy-bound AI search |
+| `engine/fix_verify.py` | Re-run a journey against a patched temporary fixture copy |
+| `apps/runs/benchmark.py` | Gate 1 measures over the benchmark journeys |

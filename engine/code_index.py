@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .secret_scan import is_blocked_path
+from .secret_scan import is_blocked_path, redact
 
 INDEX_VERSION = "code_index.v1"
 SOURCE_EXTENSIONS = {
@@ -99,7 +99,8 @@ def _add(store: dict[str, list[list[Any]]], value: str, path: str, line: int) ->
 
 def _pattern(index: CodeIndex, kind: str, path: str, line: int, text: str) -> None:
     if len(index.patterns) < 2000:
-        index.patterns.append({"kind": kind, "path": path, "line": line, "snippet": text.strip()[:240]})
+        snippet = redact(text.strip()[:240])[0]
+        index.patterns.append({"kind": kind, "path": path, "line": line, "snippet": snippet})
 
 
 def _index_markup(index: CodeIndex, path: str, lines: list[str]) -> None:
@@ -171,7 +172,7 @@ def build_index(root: Path) -> CodeIndex:
         if path.stat().st_size > MAX_FILE_BYTES:
             index.skipped["large"] += 1
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = redact(path.read_text(encoding="utf-8", errors="replace"))[0]
         lines = text.splitlines()
         index.files.append(
             {

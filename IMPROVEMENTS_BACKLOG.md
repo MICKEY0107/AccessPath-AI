@@ -6,25 +6,29 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 
 ## Web product plan (agreed 29 October 2026)
 
-The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.md` and the plan doc. All items below are **agreed, not started**.
+The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.md` and the plan doc. Status as of 29 October 2026 (late evening): stages 1–6 **done** (commits `dc91e99` … `ef40c57`), stage 7 docs and the security review fixes **done**. Live AI measurements still need the owner's machine.
 
-| Item | Stage | Notes |
-|---|---|---|
-| Rules catalog (`rules/catalog.json`) with WCAG/ACT sources and presets Essential, WCAG 2.2 AA, Strict | 1 | Shipped with the code, reviewed and versioned; never fetched at run time |
-| Rules settings page: toggles, disable with reason, ignores with an expiry date, custom rules from a fixed set of checks | 1 | No arbitrary code in rule config |
-| `Finding` type and table; confirm before blaming | 2 | Site barrier vs agent failure |
-| Report shows each rule as passed, failed, not applicable or needs a human | 3-4 | A pass never means "not checked" |
-| Accessibility report page in CodeImpact's structure, with an "In plain words" panel for PMs | 4 | Label says whether the text is rule-based or AI |
-| Sign-in for the web app | 5 | Needed before storing repos or keys |
-| Active codebase panel: repo URL, branch, one-time token, live site URL, Clone & analyze, recent repos, Remove clone | 5 | Modelled on CodeImpact's repo binding screen |
-| Secure clone and front-end index | 5 | Shallow, read-only, never run; symlink, size and blocked-path checks; secret scan |
-| Model settings upgrade: List models, Save & use, Forget key, opt-in encrypted remembered keys | 5 | Decided 29 Oct |
-| Local Ollama provider | 5 | Decided 29 Oct |
-| Code-safety badge per provider | 5 | Gemini free tier and `openrouter/free` blocked from private code ([Gemini terms](https://ai.google.dev/terms): do not submit confidential information to unpaid services) |
-| Where to fix: Exact match, Likely cause, Also affected; fixes with patches and Re-run | 6 | Patches never applied to the user's repo |
-| Verify a fix on the clinic fixture | 6 | First thing to cut if time is short |
-| Use CodeImpact (`C:\code\RepoPilot`) as a read-only reference for cloning and code mapping | 5-6 | Waiting for the folder to be connected or files attached |
-| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future | Replaces the VS Code assistant idea |
+| Item | Stage | Status | Notes |
+|---|---|---|---|
+| Rules catalog (`rules/catalog.json`) with WCAG/ACT sources and presets Essential, WCAG 2.2 AA, Strict | 1 | done | Shipped with the code, reviewed and versioned; never fetched at run time |
+| Rules settings page: toggles, disable with reason, ignores with an expiry date | 1 | done | No arbitrary code in rule config |
+| Custom rules from a fixed set of checks | 1 | agreed, not started | The only stage 1 item not built |
+| `Finding` type and table; confirm before blaming | 2 | done | Site barrier vs agent failure vs provider failure vs environment |
+| Report shows each rule as passed, failed, not applicable, needs a human, not checked or disabled | 3-4 | done | A pass never means "not checked" |
+| Focus visible, focus obscured, skip link, focus order, unnamed controls, on-focus checks; optional axe-core | 3 | done | `install_axe_core` downloads the pinned version |
+| Accessibility report page in CodeImpact's structure, "In plain words" panel, HTML/JSON export | 4 | done | Labelled rule-based |
+| 12-journey benchmark and `run_benchmark` (Gate 1 measures) | 4 | done offline | 36/36 scripted runs match; live run still to do |
+| Sign-in for the web app | 5 | done | `LoginRequiredMiddleware` |
+| Active codebase panel: repo URL, branch, one-time token, live site URL, Clone & analyze, recent repos, Remove clone | 5 | done | `/code/` |
+| Secure clone and front-end index | 5 | done | Tree size checked before checkout; no redirects; secret scan on whole files |
+| Model settings: List models, Save & use, Forget key, opt-in encrypted remembered keys | 5 | done | `/models/` |
+| Local Ollama provider | 5 | done | Not measured live here |
+| Code-safety badge per provider | 5 | done | Gemini free tier and `openrouter/free` blocked from private code ([Gemini terms](https://ai.google.dev/terms)) |
+| Where to fix: Exact match, Likely cause, Also affected; fixes with patches; policy-bound AI search | 6 | done | Patches never applied to the user's repo; code shown only to the repository owner |
+| Verify a fix on the clinic fixture | 6 | done | Serves only AccessPath's own fixture pages |
+| Security review of the code side | 7 | done | 8 issues fixed, `tests/test_security_review.py` |
+| Use CodeImpact (`C:\code\RepoPilot`) as a read-only reference for cloning and code mapping | 5-6 | no reply | Built without it; still blocked on access |
+| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future | postponed | Replaces the VS Code assistant idea |
 
 ## Planner and models
 

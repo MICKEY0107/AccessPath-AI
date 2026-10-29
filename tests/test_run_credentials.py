@@ -60,7 +60,7 @@ def test_scrub_and_mask_hide_the_key() -> None:
 
 
 @override_settings(GROQ_API_KEY="", GROQ_MODEL="")
-def test_start_run_with_typed_key_and_model_seals_the_key_for_the_worker(client, db) -> None:
+def test_start_run_with_typed_key_and_model_seals_the_key_for_the_worker(client, user, db) -> None:
     journey = _journey()
     task = Mock(id="celery-task-1")
 
@@ -74,7 +74,7 @@ def test_start_run_with_typed_key_and_model_seals_the_key_for_the_worker(client,
     assert response.status_code == 302
     assert run.planner_provider == "groq"
     assert run.planner_model == "llama-3.3-70b"
-    assert run.planner_metadata == {"credential_source": "user_supplied"}
+    assert run.planner_metadata == {"credential_source": "user_supplied", "started_by": user.pk}
     token = delay.call_args.kwargs["credential_token"]
     assert open_api_key(token) == USER_KEY
     stored = json.dumps(list(Run.objects.values()), default=str)
@@ -82,7 +82,7 @@ def test_start_run_with_typed_key_and_model_seals_the_key_for_the_worker(client,
 
 
 @override_settings(GROQ_API_KEY="server-key", GROQ_MODEL="server-model")
-def test_start_run_falls_back_to_server_key_and_model(client, db) -> None:
+def test_start_run_falls_back_to_server_key_and_model(client, user, db) -> None:
     journey = _journey()
     task = Mock(id="celery-task-1")
 
@@ -94,7 +94,7 @@ def test_start_run_falls_back_to_server_key_and_model(client, db) -> None:
 
     run = Run.objects.get(journey=journey)
     assert run.planner_model == "server-model"
-    assert run.planner_metadata == {"credential_source": "environment"}
+    assert run.planner_metadata == {"credential_source": "environment", "started_by": user.pk}
     delay.assert_called_once_with(str(run.id))
 
 

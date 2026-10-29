@@ -9,8 +9,12 @@ Safety rules, in order:
 * git runs with hooks disabled, symlinks checked out as plain text files, no
   submodules, no LFS downloads, no tags, depth 1, a time limit, and no access to
   the server's own git configuration or credential helpers.
-* After cloning, the .git folder is deleted, so what remains is plain files. Size
-  and file-count limits are enforced, and nothing in the copy is ever run.
+* git never follows redirects (so the token header cannot follow one), and on a
+  time-out the whole git process group is killed.
+* The clone is made without a checkout first; file count and total size are read
+  from the tree and checked *before* any file is written out, then checked again.
+* After checkout, the .git folder is deleted, so what remains is plain files.
+  Nothing in the copy is ever run.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import base64
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -57,7 +62,11 @@ def validate_repo_url(
     if parsed.query or parsed.fragment or parsed.params:
         raise RepoCloneError("Remove the ?query or #fragment from the address.")
     host = (parsed.hostname or "").lower()
-    if host not in allowed_hosts or parsed.port not in (None, 443):
+    try:
+        port = parsed.port
+    except ValueError:
+        raise RepoCloneError("That repository address has an invalid port.") from None
+    if host not in allowed_hosts or port not in (None, 443):
         raise RepoCloneError(f"Only {', '.join(allowed_hosts)} repositories can be added.")
     if not REPO_PATH_PATTERN.match(parsed.path):
         raise RepoCloneError("Use the repository address, like https://github.com/owner/repo.")
@@ -112,6 +121,31 @@ def _git_env(url: str, token: str, home: str) -> dict[str, str]:
     return env
 
 
+def _run_git(command: list[str], env: dict[str, str], timeout_seconds: int):
+    """Run git in its own process group so a time-out kills its helpers too."""
+    process = subprocess.Popen(
+        command, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.communicate()
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def _too_large(max_files: int, max_bytes: int) -> RepoCloneError:
+    return RepoCloneError(
+        f"The repository is too large to analyse (limit {max_files} files, "
+        f"{max_bytes // (1024 * 1024)} MB)."
+    )
+
+
 def clone_snapshot(
     url: str,
     destination: Path,
@@ -128,7 +162,7 @@ def clone_snapshot(
         shutil.rmtree(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="accesspath-git-home-") as home:
-        command = [
+        safety = [
             "git",
             "-c", "core.hooksPath=" + os.devnull,
             "-c", "core.symlinks=false",
@@ -137,20 +171,18 @@ def clone_snapshot(
             "-c", "submodule.recurse=false",
             "-c", "protocol.allow=never",
             "-c", "protocol.https.allow=always",
+            "-c", "http.followRedirects=false",
         ]
         if allow_file_urls:
-            command += ["-c", "protocol.file.allow=always"]
-        command += ["clone", "--depth", "1", "--single-branch", "--no-tags",
-                    "--no-recurse-submodules"]
+            safety += ["-c", "protocol.file.allow=always"]
+        command = safety + ["clone", "--no-checkout", "--depth", "1", "--single-branch",
+                            "--no-tags", "--no-recurse-submodules"]
         if branch:
             command += ["--branch", branch]
         command += ["--", url, str(destination)]
         env = _git_env(url, token, home)
         try:
-            completed = subprocess.run(
-                command, env=env, capture_output=True, text=True, timeout=timeout_seconds,
-                check=False,
-            )
+            completed = _run_git(command, env, timeout_seconds)
         except subprocess.TimeoutExpired as error:
             shutil.rmtree(destination, ignore_errors=True)
             raise RepoCloneError(f"Cloning took longer than {timeout_seconds} seconds.") from error
@@ -170,6 +202,35 @@ def clone_snapshot(
             ["git", "-C", str(destination), "rev-parse", "HEAD"],
             env=env, capture_output=True, text=True, timeout=30, check=False,
         ).stdout.strip()
+        # Check the tree's size before writing any file out.
+        tree = subprocess.run(
+            ["git", "-C", str(destination), "ls-tree", "-r", "-l", "-z", "HEAD"],
+            env=env, capture_output=True, text=True, timeout=60, check=False,
+        )
+        planned_files = planned_bytes = 0
+        for entry in filter(None, tree.stdout.split("\0")):
+            meta = entry.split("\t", 1)[0].split()
+            if len(meta) >= 4 and meta[1] == "blob":
+                planned_files += 1
+                planned_bytes += int(meta[3]) if meta[3].isdigit() else 0
+        if tree.returncode != 0 or planned_files > max_files or planned_bytes > max_bytes:
+            shutil.rmtree(destination, ignore_errors=True)
+            if tree.returncode != 0:
+                raise RepoCloneError("git could not read the repository's files.")
+            raise _too_large(max_files, max_bytes)
+        try:
+            checkout = _run_git(
+                safety + ["-C", str(destination), "checkout", "--quiet", "HEAD", "--", "."],
+                env, timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as error:
+            shutil.rmtree(destination, ignore_errors=True)
+            raise RepoCloneError(f"Cloning took longer than {timeout_seconds} seconds.") from error
+        if checkout.returncode != 0:
+            shutil.rmtree(destination, ignore_errors=True)
+            raise RepoCloneError(
+                f"git could not check out the files: {_scrub(checkout.stderr or '', token)[-300:]}"
+            )
     shutil.rmtree(destination / ".git", ignore_errors=True)
     total_bytes = 0
     file_count = 0
@@ -182,10 +243,7 @@ def clone_snapshot(
             total_bytes += path.stat().st_size
         if file_count > max_files or total_bytes > max_bytes:
             shutil.rmtree(destination, ignore_errors=True)
-            raise RepoCloneError(
-                f"The repository is too large to analyse (limit {max_files} files, "
-                f"{max_bytes // (1024 * 1024)} MB)."
-            )
+            raise _too_large(max_files, max_bytes)
     return RepoSnapshot(
         path=destination, commit_sha=sha[:40], file_count=file_count, total_bytes=total_bytes
     )

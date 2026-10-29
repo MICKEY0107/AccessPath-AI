@@ -112,7 +112,7 @@ def add_binding(request: HttpRequest) -> HttpResponse:
 
 def _link_journeys(request: HttpRequest, binding: RepoBinding) -> int:
     chosen = {int(value) for value in request.POST.getlist("journeys") if value.isdigit()}
-    journeys = Journey.objects.filter(is_active=True)
+    journeys = Journey.objects.filter(is_active=True).select_related("repo_binding")
     if chosen:
         selected = [journey for journey in journeys if journey.pk in chosen]
     elif binding.live_site_url:
@@ -120,10 +120,15 @@ def _link_journeys(request: HttpRequest, binding: RepoBinding) -> int:
         selected = [journey for journey in journeys if _origin(journey.start_url) == origin]
     else:
         selected = []
+    linked = 0
     for journey in selected:
+        current = journey.repo_binding
+        if current is not None and current.pk != binding.pk and current.owner_id != request.user.pk:
+            continue  # Never take over a journey someone else linked to their repository.
         journey.repo_binding = binding
         journey.save(update_fields=["repo_binding", "updated_at"])
-    return len(selected)
+        linked += 1
+    return linked
 
 
 @sensitive_post_parameters("token")

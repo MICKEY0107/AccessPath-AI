@@ -1,8 +1,10 @@
 """Check a suggested fix on a temporary copy of a fixture site.
 
-Only the project's own fixture pages (``fixtures/clinic/``) are ever served this
-way: they are static HTML that AccessPath ships with. Code from a user's repository
-is never served or run; for those, the patch is shown for people to apply.
+Only the project's own fixture pages (``fixtures/clinic/`` in AccessPath's own
+folder, passed as ``snapshot_root``) are ever served this way: they are static HTML
+that AccessPath ships with. Files from a cloned repository are never served or run,
+even when the repository has a folder of the same name; for those, the patch is
+shown for people to apply.
 """
 
 from __future__ import annotations
@@ -65,7 +67,10 @@ def verify_fixture_fix(
         target.relative_to(site.resolve())  # Refuse anything outside the copy.
         lines = target.read_text(encoding="utf-8").splitlines()
         for number, replacement in fix["edits"].items():
-            lines[int(number) - 1] = replacement
+            index = int(number) - 1
+            if not 0 <= index < len(lines):
+                raise ValueError("The fix names a line that is not in the file.")
+            lines[index] = replacement
         target.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
         handler = functools.partial(_Quiet, directory=str(site))

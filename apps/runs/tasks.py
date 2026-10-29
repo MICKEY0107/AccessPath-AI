@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from celery import shared_task
 
 from .credentials import CredentialError, open_api_key, scrub
@@ -92,7 +94,8 @@ def verify_fix(finding_pk: int) -> str:
         if binding is None or not isinstance(plan, dict):
             raise ValueError("This journey has no repository or scripted plan to verify with.")
         outcome = verify_fixture_fix(
-            snapshot_root=binding.source_dir,
+            # AccessPath's own fixture pages, never files from the cloned repository.
+            snapshot_root=Path(settings.BASE_DIR),
             fix=locations.get("fix") or {},
             finding=data,
             start_url=journey.start_url,
