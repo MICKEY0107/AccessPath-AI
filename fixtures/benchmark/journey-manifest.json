@@ -1,0 +1,646 @@
+{
+  "schema_version": "journey-manifest.v1",
+  "fixture_version": "benchmark-1.0.0",
+  "description": "Benchmark journeys with known expected results, served by the fixture server under /benchmark/. The two clinic journeys are part of the benchmark too.",
+  "clinic_expected": {
+    "clinic-accessible-booking": {
+      "outcome": "completed",
+      "confirmed_rules": []
+    },
+    "clinic-keyboard-trap-control": {
+      "outcome": "blocked",
+      "confirmed_rules": [
+        "keyboard-operable"
+      ]
+    }
+  },
+  "journeys": [
+    {
+      "key": "bench-newsletter-accessible",
+      "name": "Benchmark — newsletter sign-up (accessible reference)",
+      "goal": "Subscribe to the newsletter with the email address provided, using only the keyboard.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/newsletter-accessible.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "subscribed",
+            "type": "text_present",
+            "expected": "Subscribed"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus the email field",
+                "target_hint": "Email address"
+              },
+              {
+                "action": "type",
+                "purpose": "enter the synthetic email",
+                "target_hint": "Email address",
+                "value": "{email}"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus Subscribe",
+                "target_hint": "Subscribe"
+              },
+              {
+                "action": "enter",
+                "purpose": "subscribe",
+                "target_hint": "Subscribe"
+              }
+            ],
+            "synthetic_values": {
+              "email": "asha.test@example.invalid"
+            }
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": []
+      }
+    },
+    {
+      "key": "bench-newsletter-div-button",
+      "name": "Benchmark — newsletter sign-up with a div button",
+      "goal": "Subscribe to the newsletter with the email address provided, using only the keyboard.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/newsletter-div-button.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "subscribed",
+            "type": "text_present",
+            "expected": "Subscribed"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus the email field",
+                "target_hint": "Email address"
+              },
+              {
+                "action": "type",
+                "purpose": "enter the synthetic email",
+                "target_hint": "Email address",
+                "value": "{email}"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus Subscribe",
+                "target_hint": "Subscribe"
+              },
+              {
+                "action": "enter",
+                "purpose": "subscribe",
+                "target_hint": "Subscribe"
+              }
+            ],
+            "synthetic_values": {
+              "email": "asha.test@example.invalid"
+            }
+          }
+        }
+      },
+      "expected": {
+        "outcome": "blocked",
+        "confirmed_rules": [
+          "keyboard-operable"
+        ]
+      }
+    },
+    {
+      "key": "bench-cookie-trap",
+      "name": "Benchmark — cookie dialog keyboard trap",
+      "goal": "Move past the cookie dialog and open the article.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/cookie-trap.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              },
+              {
+                "action": "tab",
+                "purpose": "move toward the article link",
+                "target_hint": "Continue to the article"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "blocked",
+        "confirmed_rules": [
+          "no-keyboard-trap"
+        ]
+      }
+    },
+    {
+      "key": "bench-no-focus-style",
+      "name": "Benchmark — order confirmation without a focus outline",
+      "goal": "Confirm the order.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/no-focus-style.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus Confirm order",
+                "target_hint": "Confirm order"
+              },
+              {
+                "action": "enter",
+                "purpose": "confirm",
+                "target_hint": "Confirm order"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": [
+          "focus-visible"
+        ]
+      }
+    },
+    {
+      "key": "bench-sticky-header",
+      "name": "Benchmark — story link hidden under a fixed header",
+      "goal": "Open today's story.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/sticky-header.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "move past the header link"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus the story link",
+                "target_hint": "Read today's story"
+              },
+              {
+                "action": "enter",
+                "purpose": "open the story",
+                "target_hint": "Read today's story"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": [
+          "focus-not-obscured"
+        ]
+      }
+    },
+    {
+      "key": "bench-unnamed-icons",
+      "name": "Benchmark — gallery with unnamed icon buttons",
+      "goal": "Go to the next photo.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/unnamed-icons.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "move through the icon buttons"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the icon buttons"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus Next photo",
+                "target_hint": "Next photo"
+              },
+              {
+                "action": "enter",
+                "purpose": "go to the next photo",
+                "target_hint": "Next photo"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": [
+          "name-role-value"
+        ]
+      }
+    },
+    {
+      "key": "bench-nav-no-skip",
+      "name": "Benchmark — library page without a skip link",
+      "goal": "Apply for a library card.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/nav-no-skip.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "move through the navigation"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus Apply for a card",
+                "target_hint": "Apply for a card"
+              },
+              {
+                "action": "enter",
+                "purpose": "apply",
+                "target_hint": "Apply for a card"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": [
+          "bypass-blocks"
+        ]
+      }
+    },
+    {
+      "key": "bench-focus-navigates",
+      "name": "Benchmark — pricing link that navigates on focus",
+      "goal": "Start the free trial.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/focus-navigates.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus Start free trial",
+                "target_hint": "Start free trial"
+              },
+              {
+                "action": "enter",
+                "purpose": "start the trial",
+                "target_hint": "Start free trial"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": [
+          "on-focus"
+        ]
+      }
+    },
+    {
+      "key": "bench-span-button",
+      "name": "Benchmark — receipt download that only works with a mouse",
+      "goal": "Download the receipt.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/span-button.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus Download receipt",
+                "target_hint": "Download receipt"
+              },
+              {
+                "action": "enter",
+                "purpose": "download",
+                "target_hint": "Download receipt"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "blocked",
+        "confirmed_rules": [
+          "keyboard-operable"
+        ]
+      }
+    },
+    {
+      "key": "bench-accessible-tabs",
+      "name": "Benchmark — settings tabs (accessible reference)",
+      "goal": "Open the Export tab and start the export.",
+      "execution_mode": "fixture",
+      "start_path": "/benchmark/accessible-tabs.html",
+      "allowed_origins": [
+        "{fixture_base_url}"
+      ],
+      "completion_policy": {
+        "schema_version": "completion_policy.v1",
+        "mode": "all",
+        "signals": [
+          {
+            "id": "done_page",
+            "type": "url_path_equals",
+            "expected": "/benchmark/done.html"
+          }
+        ],
+        "stability": {
+          "consecutive_observations": 2,
+          "interval_ms": 500
+        }
+      },
+      "evaluation_config": {
+        "planner": {
+          "kind": "gemini.v1",
+          "fallback": {
+            "kind": "fixture_plan.v1",
+            "actions": [
+              {
+                "action": "tab",
+                "purpose": "focus the Profile tab",
+                "target_hint": "Profile"
+              },
+              {
+                "action": "arrow_right",
+                "purpose": "move to Privacy",
+                "target_hint": "Privacy"
+              },
+              {
+                "action": "arrow_right",
+                "purpose": "move to Export",
+                "target_hint": "Export"
+              },
+              {
+                "action": "tab",
+                "purpose": "move into the Export panel"
+              },
+              {
+                "action": "tab",
+                "purpose": "focus Start export",
+                "target_hint": "Start export"
+              },
+              {
+                "action": "enter",
+                "purpose": "start the export",
+                "target_hint": "Start export"
+              }
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "completed",
+        "confirmed_rules": []
+      }
+    }
+  ]
+}

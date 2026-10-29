@@ -415,7 +415,6 @@ class KeyboardExecutor:
                         outcome="blocked",
                         terminal_reason="KEYBOARD_TRAP_CONFIRMED",
                         failure_kind="site_barrier",
-                        detail=trap.detail,
                     )
                 return replace(result, failure_kind="agent_failure", diagnosis=trap.diagnosis)
             test_id = (
@@ -464,7 +463,6 @@ class KeyboardExecutor:
                     else "KEYBOARD_TARGET_NOT_OPERABLE"
                 ),
                 failure_kind="site_barrier",
-                detail=probe.detail,
             )
         if result.outcome == "blocked":
             return replace(

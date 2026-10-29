@@ -232,9 +232,11 @@ def tab_walk(page: Page, *, max_stops: int = 80, settle_ms: int = 30) -> TabWalk
                 if info.get("tag") == "iframe" and frame_repeats < 30:
                     frame_repeats += 1
                     continue
-                if seen[path] == 0:
+                if seen[path] == 0 and int(page.evaluate(_FOCUSABLE_COUNT)) <= len(walk.stops):
+                    # Back to the first control after visiting every one: a normal wrap.
                     walk.completed = True
                 else:
+                    # Focus came back early without leaving the page: a possible trap.
                     walk.cycle_paths = [stop["css_path"] for stop in walk.stops[seen[path] :]]
                 break
             frame_repeats = 0

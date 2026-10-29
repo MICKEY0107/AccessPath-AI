@@ -1,0 +1,20 @@
+<li class="finding-card severity-border-{{ finding.severity }}{% if finding.ignored %} is-ignored{% endif %}">
+  <div class="finding-head">
+    <span class="tag severity-{{ finding.severity }}">{{ finding.severity }}</span>
+    {% if finding.wcag_criterion %}<a class="tag tag-neutral" href="{{ finding.help_url|default:'#' }}">WCAG {{ finding.wcag_criterion }}{% if finding.wcag_level %} · {{ finding.wcag_level }}{% endif %}</a>{% endif %}
+    {% if finding.ignored %}<span class="tag tag-neutral">Ignored</span>{% elif finding.status == "confirmed" %}<span class="tag tag-issue">Confirmed</span>{% else %}<span class="tag">Needs review</span>{% endif %}
+    {% if finding.source == "axe" %}<span class="tag tag-neutral">axe-core</span>{% endif %}
+  </div>
+  <h3>{{ finding.rule_title }}</h3>
+  <p>{{ finding.summary }}</p>
+  {% if finding.ignored and finding.ignore_reason %}<p class="muted small">Ignored: {{ finding.ignore_reason }}</p>{% endif %}
+  <dl class="finding-facts">
+    {% if finding.element.name %}<div><dt>Control</dt><dd>{{ finding.element.name }}</dd></div>{% endif %}
+    {% if finding.element.css_path %}<div><dt>Selector</dt><dd><code>{{ finding.element.css_path }}</code></dd></div>{% endif %}
+    {% if finding.element.html_snippet %}<div><dt>HTML</dt><dd><code class="snippet">{{ finding.element.html_snippet }}</code></dd></div>{% endif %}
+    {% if finding.element.source_file %}<div><dt>Source hint</dt><dd><code>{{ finding.element.source_file }}{% if finding.element.source_line %}:{{ finding.element.source_line }}{% endif %}</code> ({{ finding.element.framework }})</dd></div>{% endif %}
+    {% if finding.occurrences > 1 %}<div><dt>Elements</dt><dd>{{ finding.occurrences }} on this page</dd></div>{% endif %}
+    <div><dt>Checked by</dt><dd>{{ finding.method_label|default:finding.confirmation.method|default:"—" }}{% if finding.step_number %} · <a href="#step-{{ finding.step_number }}" data-show-evidence>step {{ finding.step_number }}</a>{% endif %}</dd></div>
+  </dl>
+  {% if finding.locations %}{% include "runs/_finding_locations.html" %}{% endif %}
+</li>

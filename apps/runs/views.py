@@ -1,7 +1,10 @@
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+import base64
+
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
+from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.debug import sensitive_post_parameters
@@ -11,6 +14,7 @@ from apps.journeys.real_sites import RealSiteJourneyForm
 
 from .credentials import scrub, seal_api_key, validate_api_key, validate_model
 from .models import JourneyOutcome, PlannerProvider, Run
+from .report import build_report, report_json
 from .tasks import execute_run
 
 ISSUE_OUTCOMES = {
@@ -334,19 +338,82 @@ FAILURE_KIND_LABELS = {
 }
 
 
-def run_detail(request: HttpRequest, run_id) -> HttpResponse:
-    run = get_object_or_404(
-        Run.objects.select_related("journey").prefetch_related("steps", "artifacts__step"),
+def _load_run(run_id) -> Run:
+    return get_object_or_404(
+        Run.objects.select_related("journey").prefetch_related(
+            "steps", "artifacts__step", "findings"
+        ),
         pk=run_id,
     )
+
+
+def run_detail(request: HttpRequest, run_id) -> HttpResponse:
+    run = _load_run(run_id)
     return render(
         request,
         "runs/detail.html",
         {
             "run": run,
+            "report": build_report(run),
+            "recent_runs": Run.objects.filter(journey=run.journey).order_by("-created_at")[:10],
             "run_brief": describe_run(run),
-            "findings": list(run.findings.all()),
             "failure_kind_label": FAILURE_KIND_LABELS.get(run.failure_kind, run.failure_kind),
             "evidence_artifacts": build_evidence_artifacts(run),
         },
     )
+
+
+def export_report_json(request: HttpRequest, run_id) -> HttpResponse:
+    """Download the report as JSON for other tools."""
+    run = _load_run(run_id)
+    response = JsonResponse(report_json(build_report(run)), json_dumps_params={"indent": 2})
+    response["Content-Disposition"] = f'attachment; filename="accesspath-report-{run.id}.json"'
+    return response
+
+
+MAX_EXPORT_IMAGES = 6
+MAX_EXPORT_IMAGE_BYTES = 2_000_000
+
+
+def _embedded_screenshots(run: Run, steps: set[int]) -> list[dict[str, str]]:
+    images = []
+    for artifact in run.artifacts.all():
+        if len(images) >= MAX_EXPORT_IMAGES:
+            break
+        if artifact.kind != "screenshot_after" or artifact.step is None:
+            continue
+        if artifact.step.step_number not in steps:
+            continue
+        path = settings.MEDIA_ROOT / artifact.relative_path
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if len(data) > MAX_EXPORT_IMAGE_BYTES:
+            continue
+        images.append(
+            {
+                "step": str(artifact.step.step_number),
+                "src": "data:image/png;base64," + base64.b64encode(data).decode("ascii"),
+            }
+        )
+    return images
+
+
+def export_report_html(request: HttpRequest, run_id) -> HttpResponse:
+    """Download a standalone HTML report a product manager can open or forward."""
+    run = _load_run(run_id)
+    report = build_report(run)
+    steps = {row["step_number"] for row in report["findings"] if row["step_number"]}
+    html = render_to_string(
+        "runs/report_export.html",
+        {
+            "run": run,
+            "report": report,
+            "screenshots": _embedded_screenshots(run, steps),
+            "report_data": report_json(report),
+        },
+    )
+    response = HttpResponse(html, content_type="text/html; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="accesspath-report-{run.id}.html"'
+    return response

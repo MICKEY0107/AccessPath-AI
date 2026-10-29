@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accessibility report — {{ run.journey.name }}</title>
+<style>
+  :root { --ink:#14162b; --muted:#5d6280; --line:#e4e5f1; --soft:#f7f7fc; --accent:#4f46e5;
+    --issue:#b42318; --issue-soft:#fee4e2; --success:#15803d; --success-soft:#dcfce7; --warn:#9a3412; --warn-soft:#fff7ed; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f1f0ff; color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 64rem; margin: 1.5rem auto; background: #fff; border-radius: 1rem; padding: clamp(1rem, 3vw, 2rem); }
+  h1 { font-size: 1.6rem; margin: .2rem 0; } h2 { font-size: 1.1rem; margin: 1.8rem 0 .6rem; } h3 { font-size: .98rem; margin: .3rem 0; }
+  .eyebrow { color: var(--accent); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+  .muted { color: var(--muted); } .small { font-size: .82rem; }
+  .verdict { display: inline-block; border-radius: .4rem; font-size: .78rem; font-weight: 700; padding: .15rem .55rem; text-transform: uppercase; vertical-align: middle; }
+  .verdict-issue { background: var(--issue-soft); color: var(--issue); } .verdict-success { background: var(--success-soft); color: var(--success); }
+  .verdict-warn { background: var(--warn-soft); color: var(--warn); } .verdict-neutral { background: #eef0f6; color: #454b66; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin: 1rem 0; }
+  .stat { border: 1px solid var(--line); border-radius: .6rem; background: var(--soft); padding: .6rem .7rem; }
+  .stat small { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+  .stat strong { font-size: 1.25rem; }
+  .plain { border-left: 4px solid var(--accent); background: var(--soft); border-radius: .5rem; padding: .8rem 1rem; }
+  .finding { border: 1px solid var(--line); border-left: 4px solid var(--muted); border-radius: .6rem; padding: .7rem .9rem; margin: .6rem 0; list-style: none; }
+  .finding.critical, .finding.serious { border-left-color: var(--issue); } .finding.moderate { border-left-color: #c2410c; }
+  .tag { display: inline-block; border-radius: .3rem; background: #eef0f6; font-size: .7rem; font-weight: 700; padding: .1rem .4rem; text-transform: uppercase; margin-right: .25rem; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; background: var(--soft); border-radius: .25rem; padding: .05rem .3rem; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; } th, td { text-align: left; border-bottom: 1px solid var(--line); padding: .45rem .3rem; vertical-align: top; }
+  ul { padding: 0; } img { max-width: 100%; border: 1px solid var(--line); border-radius: .5rem; }
+  figure { margin: .8rem 0; } figcaption { color: var(--muted); font-size: .8rem; }
+  footer { margin-top: 2rem; color: var(--muted); font-size: .78rem; }
+  @media (max-width: 40rem) { .stats { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">AccessPath AI · Accessibility report</p>
+  <h1>{{ run.journey.name }} <span class="verdict verdict-{{ report.verdict.tone }}">{{ report.verdict.label }}</span></h1>
+  <p class="muted">{{ report.summary_line }}</p>
+  <p class="muted small">Goal: {{ run.journey.goal }}<br>Start page: <code>{{ run.journey.start_url }}</code><br>Run {{ run.id }}{% if run.started_at %} · {{ run.started_at|date:"j M Y, H:i e" }}{% endif %}{% if report.rules.preset %} · Rules: {{ report.rules.preset }} (catalog {{ report.rules.catalog_version }}){% endif %}</p>
+
+  <div class="stats">
+    <div class="stat"><small>Confirmed</small><strong>{{ report.stats.confirmed }}</strong></div>
+    <div class="stat"><small>Need review</small><strong>{{ report.stats.review }}</strong></div>
+    <div class="stat"><small>Rules passed</small><strong>{{ report.stats.rules_passed }} / {{ report.stats.rules_checked }}</strong></div>
+    <div class="stat"><small>Keyboard steps</small><strong>{{ report.stats.steps }}</strong></div>
+  </div>
+
+  <div class="plain">
+    <p class="eyebrow">In plain words · {{ report.plain_words_source }}</p>
+    <p>{{ report.plain_words }}</p>
+    {% if run.diagnosis %}<p class="small muted">{{ run.diagnosis }}</p>{% endif %}
+  </div>
+
+  <h2>Findings</h2>
+  {% if report.findings %}
+    <ul>
+      {% for finding in report.findings %}
+        <li class="finding {{ finding.severity }}">
+          <span class="tag">{{ finding.severity }}</span>{% if finding.wcag_criterion %}<span class="tag">WCAG {{ finding.wcag_criterion }}{% if finding.wcag_level %} {{ finding.wcag_level }}{% endif %}</span>{% endif %}<span class="tag">{% if finding.ignored %}Ignored{% elif finding.status == "confirmed" %}Confirmed{% else %}Needs review{% endif %}</span>
+          <h3>{{ finding.rule_title }}</h3>
+          <p>{{ finding.summary }}</p>
+          {% if finding.element.css_path %}<p class="small">Selector: <code>{{ finding.element.css_path }}</code></p>{% endif %}
+          {% if finding.element.html_snippet %}<p class="small">HTML: <code>{{ finding.element.html_snippet }}</code></p>{% endif %}
+          {% if finding.fix_hints %}<p class="small"><strong>How to fix:</strong> {{ finding.fix_hints|join:" " }}</p>{% endif %}
+          {% if finding.help_url %}<p class="small"><a href="{{ finding.help_url }}">Rule guidance</a></p>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No findings.</p>
+  {% endif %}
+
+  <h2>Rules checked</h2>
+  <table>
+    <thead><tr><th>Rule</th><th>WCAG</th><th>Result</th></tr></thead>
+    <tbody>
+      {% for row in report.rule_results %}
+        <tr><td>{{ row.rule.title }}{% if row.detail %}<br><span class="muted small">{{ row.detail }}</span>{% endif %}</td><td>{{ row.rule.wcag.criterion }}</td><td>{{ row.label }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if screenshots %}
+    <h2>Screenshots of the findings</h2>
+    {% for shot in screenshots %}
+      <figure><img src="{{ shot.src }}" alt="Page after step {{ shot.step }}"><figcaption>After step {{ shot.step }}</figcaption></figure>
+    {% endfor %}
+  {% endif %}
+
+  <footer>Generated by AccessPath AI. Findings marked “Confirmed” were re-checked with deterministic keyboard probes or by axe-core; “Needs review” items need a person. The full data is embedded below as JSON.</footer>
+</main>
+{{ report_data|json_script:"accesspath-report" }}
+</body>
+</html>

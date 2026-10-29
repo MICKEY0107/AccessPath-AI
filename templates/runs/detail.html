@@ -1,65 +1,184 @@
 {% extends "base.html" %}
 
-{% block title %}Run {{ run.id }} — AccessPath AI{% endblock %}
+{% block title %}Accessibility report — {{ run.journey.name }} — AccessPath AI{% endblock %}
 
 {% block extra_tabs %}
   <li>
     <a class="tab" href="{% url 'runs:detail' run.id %}" aria-current="page">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg>
-      <span class="tab-text"><small>Run</small><span>{{ run.journey.name }}</span></span>
+      <span class="tab-text"><small>Report</small><span>{{ run.journey.name }}</span></span>
     </a>
   </li>
 {% endblock %}
 
 {% block content %}
-  <div class="page-head">
+  <div class="page-head report-page-head">
     <div>
-      <h1 id="run-title">{{ run.journey.name }}</h1>
+      <p class="eyebrow">Accessibility report</p>
+      <h1 id="run-title">{{ run.journey.name }} <span class="verdict verdict-{{ report.verdict.tone }}">{{ report.verdict.label }}</span></h1>
+      <p class="report-summary">{{ report.summary_line }}</p>
+      <p class="muted small report-meta">
+        {% if run.planner_provider == "fixture" %}Deterministic fixture planner{% else %}AI: {{ report.planner.model|default:"model not recorded" }} ({{ run.get_planner_provider_display }}){% endif %}
+        {% if report.rules.preset %} · Rules: {{ report.rules.preset }} (catalog {{ report.rules.catalog_version }}){% endif %}
+        {% if run.started_at %} · {{ run.started_at|date:"j M Y, H:i" }}{% endif %}
+      </p>
       <p class="run-brief">{{ run_brief }}</p>
     </div>
-    <a class="secondary" href="{% url 'runs:list' %}">Back to evaluation runs</a>
+    <div class="report-actions">
+      {% if recent_runs|length > 1 %}
+        <label class="visually-hidden" for="recent-reports">Recent reports for this journey</label>
+        <select id="recent-reports" data-recent-reports>
+          {% for item in recent_runs %}
+            <option value="{% url 'runs:detail' item.id %}" {% if item.id == run.id %}selected{% endif %}>{{ item.created_at|date:"j M, H:i" }} · {{ item.get_outcome_display }}</option>
+          {% endfor %}
+        </select>
+      {% endif %}
+      <a class="secondary" href="{% url 'runs:report_html' run.id %}">Export HTML</a>
+      <a class="secondary" href="{% url 'runs:report_json' run.id %}">Export JSON</a>
+    </div>
   </div>
+
+  {% if run.status == "queued" or run.status == "starting" or run.status == "running" %}
+    <p class="muted small">This page refreshes while the worker is evaluating the journey.</p>
+    <meta http-equiv="refresh" content="3">
+  {% endif %}
 
   <div class="workspace">
     <div>
       <section class="panel" aria-labelledby="result-title">
-        <h2 id="result-title">Result</h2>
-        <div class="stat-grid">
-          <div class="stat"><small>Status</small><strong><span class="tag {% if run.outcome == 'completed' %}tag-success{% elif run.outcome == 'blocked' or run.status == 'failed' %}tag-issue{% else %}tag-neutral{% endif %}">{{ run.get_status_display }}</span></strong></div>
-          <div class="stat"><small>Outcome</small><strong>{{ run.get_outcome_display }}</strong></div>
-          <div class="stat"><small>Keyboard steps</small><strong>{{ run.steps.all|length }}</strong></div>
+        <h2 id="result-title" class="visually-hidden">Result</h2>
+        <div class="stat-grid four">
+          <div class="stat"><small>Confirmed findings</small><strong class="stat-number">{{ report.stats.confirmed }}</strong></div>
+          <div class="stat"><small>Need review</small><strong class="stat-number">{{ report.stats.review }}</strong></div>
+          <div class="stat"><small>Rules passed</small><strong class="stat-number">{{ report.stats.rules_passed }} / {{ report.stats.rules_checked }}</strong></div>
+          <div class="stat"><small>Keyboard steps</small><strong class="stat-number">{{ report.stats.steps }}</strong></div>
         </div>
-        {% if run.status == "queued" or run.status == "starting" or run.status == "running" %}
-          <p class="muted small" style="margin-top: .9rem">This page refreshes while the worker is evaluating the journey.</p>
-          <meta http-equiv="refresh" content="3">
-        {% endif %}
-        {% if run.error_detail %}<p class="error" style="margin-top: .9rem"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
-        {% if run.failure_kind %}<p class="small" style="margin-top: .9rem"><strong>Who this points at:</strong> {{ failure_kind_label }}</p>{% endif %}
-        {% if run.diagnosis %}<p class="muted small">{{ run.diagnosis }}</p>{% endif %}
+        <div class="plain-words verdict-border-{{ report.verdict.tone }}">
+          <p class="plain-words-label"><span>In plain words</span> <span class="chip-small">{{ report.plain_words_source }}</span></p>
+          <p>{{ report.plain_words }}</p>
+          {% if run.failure_kind %}<p class="small"><strong>Who this points at:</strong> {{ failure_kind_label }}</p>{% endif %}
+          {% if run.error_detail %}<p class="error"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
+        </div>
       </section>
 
-      {% if findings %}
-        <section class="panel" aria-labelledby="findings-title">
-          <h2 id="findings-title">Findings</h2>
-          <ul class="row-list">
-            {% for finding in findings %}
-              <li class="finding-row">
-                <span class="tag {% if finding.severity == 'critical' or finding.severity == 'serious' %}tag-issue{% else %}tag-neutral{% endif %}">{{ finding.severity }}</span>
-                <strong>{{ finding.wcag_criterion }} {{ finding.title }}</strong>
-                <span class="row-sub">{{ finding.summary }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </section>
-      {% endif %}
+      <div class="report-tabs" role="tablist" aria-label="Report sections" data-report-tabs>
+        <button type="button" role="tab" id="tab-findings" aria-controls="panel-findings" aria-selected="true">Findings map</button>
+        <button type="button" role="tab" id="tab-fixes" aria-controls="panel-fixes" aria-selected="false" tabindex="-1">Fixes &amp; re-checks</button>
+        <button type="button" role="tab" id="tab-reasoning" aria-controls="panel-reasoning" aria-selected="false" tabindex="-1">AI reasoning</button>
+        <button type="button" role="tab" id="tab-evidence" aria-controls="panel-evidence" aria-selected="false" tabindex="-1">Evidence</button>
+      </div>
 
-      <section class="panel" aria-labelledby="steps-title">
+      <section class="panel report-panel" role="tabpanel" id="panel-findings" aria-labelledby="tab-findings" tabindex="0">
+        {% if report.confirmed %}
+          {% for level, rows in report.by_severity %}
+            <h2 class="severity-head">{{ level|capfirst }} <span class="count">{{ rows|length }}</span></h2>
+            <ul class="finding-list">
+              {% for finding in rows %}{% include "runs/_finding_card.html" %}{% endfor %}
+            </ul>
+          {% endfor %}
+        {% else %}
+          <p class="muted">No confirmed findings.{% if report.verdict.key == "passed" %} Every checked rule passed.{% endif %}</p>
+        {% endif %}
+        {% if report.review %}
+          <h2 class="severity-head">Needs a person to review <span class="count">{{ report.review|length }}</span></h2>
+          <p class="muted small">AccessPath could not prove these on its own. They are not counted as failures.</p>
+          <ul class="finding-list">
+            {% for finding in report.review %}{% include "runs/_finding_card.html" %}{% endfor %}
+          </ul>
+        {% endif %}
+        {% if report.ignored %}
+          <h2 class="severity-head">Ignored known issues <span class="count">{{ report.ignored|length }}</span></h2>
+          <ul class="finding-list">
+            {% for finding in report.ignored %}{% include "runs/_finding_card.html" %}{% endfor %}
+          </ul>
+        {% endif %}
+      </section>
+
+      <section class="panel report-panel" role="tabpanel" id="panel-fixes" aria-labelledby="tab-fixes" tabindex="0">
+        <div class="fix-columns">
+          <div>
+            <h2>Re-checks to run</h2>
+            <p class="muted small">Every rule this run applied, and what it found. A rule is never shown as passed unless it was checked.</p>
+            <table class="rule-results">
+              <caption class="visually-hidden">Rule results</caption>
+              <thead><tr><th scope="col">Rule</th><th scope="col">WCAG</th><th scope="col">Result</th></tr></thead>
+              <tbody>
+                {% for row in report.rule_results %}
+                  <tr>
+                    <td>{{ row.rule.title }}{% if row.detail %}<span class="row-sub">{{ row.detail }}</span>{% endif %}</td>
+                    <td><a href="{{ row.rule.wcag.url }}">{{ row.rule.wcag.criterion }}</a></td>
+                    <td><span class="tag result-{{ row.result }}">{{ row.label }}</span></td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="3" class="muted">No rule results recorded for this run.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% if report.axe.status %}
+              <p class="muted small">axe-core: {% if report.axe.status == "ran" %}ran on {{ report.axe.pages }} page{{ report.axe.pages|pluralize }} (version {{ report.axe.version }}){% elif report.axe.status == "not_installed" %}not installed, so its page rules were not checked{% elif report.axe.status == "not_in_preset" %}not part of this preset{% else %}{{ report.axe.status }}{% endif %}.</p>
+            {% endif %}
+            <form method="post" action="{% url 'runs:start' run.journey.id %}" class="rerun-form">
+              {% csrf_token %}
+              <input type="hidden" name="planner_provider" value="{{ run.planner_provider }}">
+              {% if run.planner_model %}<input type="hidden" name="planner_model" value="{{ run.planner_model }}">{% endif %}
+              <button type="submit">Re-run this journey</button>
+              {% if run.planner_metadata.credential_source == "user_supplied" %}<span class="muted small">Uses the server key; to use your own key again, start it from the workspace.</span>{% endif %}
+            </form>
+          </div>
+          <div>
+            <h2>Fixes to apply</h2>
+            {% for finding in report.confirmed|add:report.review %}
+              <article class="fix-card">
+                <h3>{{ finding.rule_title }} <span class="tag severity-{{ finding.severity }}">{{ finding.severity }}</span></h3>
+                {% if finding.element.css_path %}<p class="small"><code>{{ finding.element.css_path }}</code></p>{% endif %}
+                <ol class="fix-steps">
+                  {% for hint in finding.fix_hints %}<li>{{ hint }}</li>{% empty %}<li>See <a href="{{ finding.help_url }}">the rule's guidance</a>.</li>{% endfor %}
+                </ol>
+                <p class="muted small">What it fixes: {{ finding.summary }}</p>
+              </article>
+            {% empty %}
+              <p class="muted">Nothing to fix from this run.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="panel report-panel" role="tabpanel" id="panel-reasoning" aria-labelledby="tab-reasoning" tabindex="0">
+        <h2>How the run went</h2>
+        {% if run.diagnosis %}<p class="diagnosis">{{ run.diagnosis }}</p>{% endif %}
+        <p class="muted small">Planner used: {{ run.get_planner_provider_display }}{% if report.planner.model %} · {{ report.planner.model }}{% endif %}. The AI proposes each keyboard action; a deterministic policy approves it before the browser presses the key.</p>
+        {% if report.ai_steps %}
+          <table class="reasoning-table">
+            <caption class="visually-hidden">Each proposed action and what happened</caption>
+            <thead><tr><th scope="col">Step</th><th scope="col">Action</th><th scope="col">Aiming for</th><th scope="col">Result</th><th scope="col">Focus after</th></tr></thead>
+            <tbody>
+              {% for step in report.ai_steps %}
+                <tr>
+                  <td>{{ step.number }}</td>
+                  <td><code>{{ step.action }}</code></td>
+                  <td>{{ step.target_hint|default:"—" }}{% if step.purpose %}<span class="row-sub">{{ step.purpose }}</span>{% endif %}</td>
+                  <td>{{ step.result }}{% if step.policy and step.policy != "APPROVED" %}<span class="row-sub">{{ step.policy }}</span>{% endif %}</td>
+                  <td>{{ step.focus_after }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No steps recorded yet.</p>
+        {% endif %}
+        {% if report.probe_events %}
+          <h3>Requests blocked during re-checks</h3>
+          <ul class="small">{% for event in report.probe_events %}<li><code>{{ event }}</code></li>{% endfor %}</ul>
+        {% endif %}
+      </section>
+
+      <section class="panel report-panel" role="tabpanel" id="panel-evidence" aria-labelledby="tab-evidence" tabindex="0">
         <h2 id="steps-title">Keyboard evidence</h2>
         <p class="evidence-intro">Each entry records the action requested, whether policy allowed it, and the observed focus and page state after the action.</p>
         {% if run.steps.all %}
           <ol class="steps">
             {% for step in run.steps.all %}
-              <li>
+              <li id="step-{{ step.step_number }}">
                 <h3>Step {{ step.step_number }} — {{ step.evidence.proposed_action.action|upper }}
                   <span class="tag {% if step.evidence.action_result.meaningful_progress %}tag-success{% elif step.evidence.policy_decision.outcome == 'rejected' %}tag-issue{% else %}tag-neutral{% endif %}">{% if step.evidence.action_result.meaningful_progress %}Progress{% elif step.evidence.policy_decision.outcome == 'rejected' %}Rejected{% else %}No progress{% endif %}</span>
                 </h3>
@@ -80,38 +199,28 @@
         {% else %}
           <p class="muted">No step evidence has been recorded yet.</p>
         {% endif %}
+
+        <h2 id="artifacts-title" class="gallery-title">Captured screenshots</h2>
+        <p class="evidence-intro">Select any screenshot to review it in place. Use <kbd>←</kbd> and <kbd>→</kbd> to move through the evidence, or <kbd>Escape</kbd> to return to this run.</p>
+        {% if evidence_artifacts %}
+          <ul class="gallery-grid" aria-label="Captured evidence screenshots">
+            {% for artifact in evidence_artifacts %}
+              <li class="evidence-card {% if artifact.is_issue_evidence %}is-issue{% endif %}">
+                <button class="evidence-open" type="button" data-evidence-index="{{ forloop.counter0 }}" data-evidence-url="{{ artifact.url }}" data-evidence-label="{{ artifact.kind|title }} for step {{ artifact.step_number|default:'unassigned' }}" aria-label="Open {{ artifact.kind }} for step {{ artifact.step_number|default:'unassigned' }}">
+                  <img src="{{ artifact.url }}" alt="{{ artifact.kind|title }} screenshot for step {{ artifact.step_number|default:'unassigned' }}" loading="lazy">
+                  <span class="evidence-meta">
+                    <strong>Step {{ artifact.step_number|default:"—" }} · {{ artifact.kind|title }}</strong>
+                    {% if artifact.is_issue_evidence %}<span class="issue-label">{{ artifact.issue_label }}</span>{% endif %}
+                    <span class="muted">{{ artifact.sha256|slice:":12" }}…</span>
+                  </span>
+                </button>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>No screenshots have been captured yet.</p>
+        {% endif %}
       </section>
-
-      <section class="panel" aria-labelledby="artifacts-title">
-    <h2 id="artifacts-title">Captured screenshots</h2>
-    <p class="evidence-intro">Select any screenshot to review it in place. Use <kbd>←</kbd> and <kbd>→</kbd> to move through the evidence, or <kbd>Escape</kbd> to return to this run.</p>
-    {% if evidence_artifacts %}
-      <ul class="gallery-grid" aria-label="Captured evidence screenshots">
-        {% for artifact in evidence_artifacts %}
-          <li class="evidence-card {% if artifact.is_issue_evidence %}is-issue{% endif %}">
-            <button
-              class="evidence-open"
-              type="button"
-              data-evidence-index="{{ forloop.counter0 }}"
-              data-evidence-url="{{ artifact.url }}"
-              data-evidence-label="{{ artifact.kind|title }} for step {{ artifact.step_number|default:'unassigned' }}"
-              aria-label="Open {{ artifact.kind }} for step {{ artifact.step_number|default:'unassigned' }}"
-            >
-              <img src="{{ artifact.url }}" alt="{{ artifact.kind|title }} screenshot for step {{ artifact.step_number|default:'unassigned' }}" loading="lazy">
-              <span class="evidence-meta">
-                <strong>Step {{ artifact.step_number|default:"—" }} · {{ artifact.kind|title }}</strong>
-                {% if artifact.is_issue_evidence %}<span class="issue-label">{{ artifact.issue_label }}</span>{% endif %}
-                <span class="muted">{{ artifact.sha256|slice:":12" }}…</span>
-              </span>
-            </button>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p>No screenshots have been captured yet.</p>
-    {% endif %}
-  </section>
-
     </div>
 
     <aside>
@@ -139,6 +248,7 @@
               {% endif %}
             </dd>
           </div>
+          <div><dt>Status</dt><dd>{{ run.get_status_display }} · {{ run.get_outcome_display }}</dd></div>
           <div><dt>Terminal reason</dt><dd>{{ run.terminal_reason|default:"Pending" }}</dd></div>
           <div><dt>Started</dt><dd>{{ run.started_at|default:"Not started" }}</dd></div>
           <div><dt>Finished</dt><dd>{{ run.finished_at|default:"Not finished" }}</dd></div>
@@ -151,6 +261,7 @@
         <a class="pill-button" href="{% url 'runs:list' %}#journey-{{ run.journey.id }}">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Open this journey
         </a>
+        <a class="pill-button" href="{% url 'runs:rules' %}?journey={{ run.journey.id }}">Rules for this journey</a>
       </div>
     </aside>
   </div>
@@ -219,4 +330,38 @@
       })();
     </script>
   {% endif %}
+  <script>
+    (() => {
+      const tablist = document.querySelector("[data-report-tabs]");
+      const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+      const panels = tabs.map((tab) => document.getElementById(tab.getAttribute("aria-controls")));
+      const select = (index, focus) => {
+        tabs.forEach((tab, position) => {
+          const active = position === index;
+          tab.setAttribute("aria-selected", String(active));
+          tab.tabIndex = active ? 0 : -1;
+          panels[position].hidden = !active;
+        });
+        if (focus) tabs[index].focus();
+      };
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => select(index, false));
+        tab.addEventListener("keydown", (event) => {
+          const moves = {ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1};
+          if (event.key in moves) {
+            event.preventDefault();
+            select((moves[event.key] + tabs.length) % tabs.length, true);
+          }
+        });
+      });
+      const fromHash = tabs.findIndex((tab) => `#${tab.getAttribute("aria-controls")}` === location.hash);
+      select(fromHash >= 0 ? fromHash : 0, false);
+      document.querySelectorAll("[data-show-evidence]").forEach((link) => {
+        link.addEventListener("click", () => select(tabs.length - 1, false));
+      });
+      document.querySelector("[data-recent-reports]")?.addEventListener("change", (event) => {
+        window.location.href = event.target.value;
+      });
+    })();
+  </script>
 {% endblock %}

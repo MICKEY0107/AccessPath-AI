@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Settings — AccessPath benchmark</title><link rel="stylesheet" href="../styles.css"></head>
+<body><main><h1>Account settings</h1>
+<p class="fixture-note fixture-note--accessible">Reference page: tabs follow the ARIA pattern (arrow keys move between tabs); no barrier is expected.</p>
+<div role="tablist" aria-label="Settings sections">
+<button role="tab" id="t1" aria-selected="true" aria-controls="p1">Profile</button>
+<button role="tab" id="t2" aria-selected="false" aria-controls="p2" tabindex="-1">Privacy</button>
+<button role="tab" id="t3" aria-selected="false" aria-controls="p3" tabindex="-1">Export</button>
+</div>
+<div role="tabpanel" id="p1" aria-labelledby="t1" tabindex="0"><p>Your name and photo.</p></div>
+<div role="tabpanel" id="p2" aria-labelledby="t2" tabindex="0" hidden><p>Who can see your activity.</p></div>
+<div role="tabpanel" id="p3" aria-labelledby="t3" tabindex="0" hidden><button type="button" onclick="location.href='done.html'">Start export</button></div>
+</main>
+<script>(() => {
+  const tabs = Array.from(document.querySelectorAll('[role=tab]'));
+  const select = (index) => tabs.forEach((tab, position) => {
+    const active = position === index;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+    if (active) tab.focus();
+  });
+  tabs.forEach((tab, index) => tab.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight') { event.preventDefault(); select((index + 1) % tabs.length); }
+    if (event.key === 'ArrowLeft') { event.preventDefault(); select((index + tabs.length - 1) % tabs.length); }
+  }));
+})();</script></body></html>

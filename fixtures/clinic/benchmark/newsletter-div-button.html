@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Newsletter — AccessPath benchmark</title><link rel="stylesheet" href="../styles.css"></head>
+<body><main><h1>Join the newsletter</h1>
+<p class="fixture-note fixture-note--blocked">Known barrier: the Subscribe control is a div with a click handler, so Tab skips it (WCAG 2.1.1).</p>
+<label for="email">Email address</label> <input id="email" type="email" autocomplete="email">
+<div class="fake-button" style="display:inline-block;cursor:pointer;border:2px solid #365f91;padding:.4rem .8rem" onclick="document.getElementById('status').textContent='Subscribed'">Subscribe</div>
+<p id="status" role="status"></p></main></body></html>

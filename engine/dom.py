@@ -54,9 +54,13 @@ const __accName = (element) => {
   const fromContent = ['button', 'link', 'checkbox', 'radio', 'menuitem', 'tab', 'option',
     'switch', 'treeitem', 'heading', 'cell', 'gridcell', 'row', 'columnheader'];
   if (!['input', 'select', 'textarea'].includes(tag) && (fromContent.includes(role) || !role)) {
-    const images = Array.from(element.querySelectorAll('img[alt]'))
+    // Content hidden from assistive technology does not count towards the name.
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll('[aria-hidden="true"], script, style, template')
+      .forEach((node) => node.remove());
+    const images = Array.from(clone.querySelectorAll('img[alt]'))
       .map((image) => image.getAttribute('alt')).join(' ');
-    const text = __norm((element.innerText || element.textContent || '') + ' ' + images);
+    const text = __norm((clone.textContent || '') + ' ' + images);
     if (text) return text;
   }
   return __norm(element.getAttribute('title')) || __norm(element.getAttribute('placeholder'));

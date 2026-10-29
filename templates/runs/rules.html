@@ -59,7 +59,7 @@
                   <td><a href="{{ row.rule.wcag.url }}">{{ row.rule.wcag.criterion }} {{ row.rule.wcag.name }}</a> <span class="tag tag-neutral">{{ row.rule.wcag.level }}</span>{% if row.rule.advisory %} <span class="tag">Advisory</span>{% endif %}</td>
                   <td>
                     {% if row.in_preset %}
-                      <label class="check-row"><input type="checkbox" name="enabled-{{ row.rule.id }}" {% if row.enabled %}checked{% endif %} data-rule-toggle="{{ row.rule.id }}"> Check this rule</label>
+                      <label class="check-row"><input type="checkbox" name="enabled-{{ row.rule.id }}" {% if row.enabled %}checked{% endif %} data-rule-toggle="{{ row.rule.id }}"> Check</label>
                       <div class="form-field disable-reason" data-reason-for="{{ row.rule.id }}" {% if row.enabled %}hidden{% endif %}>
                         <label for="reason-{{ row.rule.id }}">Why is it off?</label>
                         <input id="reason-{{ row.rule.id }}" name="reason-{{ row.rule.id }}" value="{{ row.disabled_reason }}" maxlength="240">

@@ -29,4 +29,19 @@ def test_seed_fixture_journeys_is_idempotent(db) -> None:
     assert accessible.allowed_origins == [fixture_origin]
     assert accessible.evaluation_config["planner"]["kind"] == "gemini.v1"
     assert accessible.evaluation_config["planner"]["fallback"]["kind"] == "fixture_plan.v1"
-    assert Journey.objects.count() == 2
+    assert Journey.objects.count() == 12
+    assert accessible.evaluation_config["benchmark"] == {"outcome": "completed", "confirmed_rules": []}
+    trap = Journey.objects.get(name="Benchmark — cookie dialog keyboard trap")
+    assert trap.evaluation_config["benchmark"]["confirmed_rules"] == ["no-keyboard-trap"]
+    assert trap.start_url == f"{fixture_origin}/benchmark/cookie-trap.html"
+
+
+def test_benchmark_manifest_is_valid_and_every_journey_has_expectations() -> None:
+    path = Path(settings.BASE_DIR) / "fixtures" / "benchmark" / "journey-manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    assert len(manifest["journeys"]) == 10
+    for journey in manifest["journeys"]:
+        CompletionPolicyV1.model_validate(journey["completion_policy"])
+        assert journey["expected"]["outcome"] in {"completed", "blocked"}
+        page = Path(settings.BASE_DIR) / "fixtures" / "clinic" / journey["start_path"].lstrip("/")
+        assert page.is_file(), page

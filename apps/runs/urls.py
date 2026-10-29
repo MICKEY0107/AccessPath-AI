@@ -3,6 +3,8 @@ from django.urls import path
 from .rule_views import rules_page, save_journey_rules
 from .views import (
     create_real_site_journey,
+    export_report_html,
+    export_report_json,
     remove_real_site_journey,
     run_detail,
     run_list,
@@ -19,4 +21,6 @@ urlpatterns = [
     path("rules/", rules_page, name="rules"),
     path("journeys/<int:journey_id>/rules/", save_journey_rules, name="save_rules"),
     path("<uuid:run_id>/", run_detail, name="detail"),
+    path("<uuid:run_id>/report.json", export_report_json, name="report_json"),
+    path("<uuid:run_id>/report.html", export_report_html, name="report_html"),
 ]
