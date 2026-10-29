@@ -4,6 +4,28 @@ Collected on 26 October 2026 (IST) from the project thread of 25–26 October, p
 
 Status keys: **done** · **partly done** · **agreed, not started** · **postponed** · **rejected** · **no reply**.
 
+## Web product plan (agreed 29 October 2026)
+
+The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.md` and the plan doc. All items below are **agreed, not started**.
+
+| Item | Stage | Notes |
+|---|---|---|
+| Rules catalog (`rules/catalog.json`) with WCAG/ACT sources and presets Essential, WCAG 2.2 AA, Strict | 1 | Shipped with the code, reviewed and versioned; never fetched at run time |
+| Rules settings page: toggles, disable with reason, ignores with an expiry date, custom rules from a fixed set of checks | 1 | No arbitrary code in rule config |
+| `Finding` type and table; confirm before blaming | 2 | Site barrier vs agent failure |
+| Report shows each rule as passed, failed, not applicable or needs a human | 3-4 | A pass never means "not checked" |
+| Accessibility report page in CodeImpact's structure, with an "In plain words" panel for PMs | 4 | Label says whether the text is rule-based or AI |
+| Sign-in for the web app | 5 | Needed before storing repos or keys |
+| Active codebase panel: repo URL, branch, one-time token, live site URL, Clone & analyze, recent repos, Remove clone | 5 | Modelled on CodeImpact's repo binding screen |
+| Secure clone and front-end index | 5 | Shallow, read-only, never run; symlink, size and blocked-path checks; secret scan |
+| Model settings upgrade: List models, Save & use, Forget key, opt-in encrypted remembered keys | 5 | Decided 29 Oct |
+| Local Ollama provider | 5 | Decided 29 Oct |
+| Code-safety badge per provider | 5 | Gemini free tier and `openrouter/free` blocked from private code ([Gemini terms](https://ai.google.dev/terms): do not submit confidential information to unpaid services) |
+| Where to fix: Exact match, Likely cause, Also affected; fixes with patches and Re-run | 6 | Patches never applied to the user's repo |
+| Verify a fix on the clinic fixture | 6 | First thing to cut if time is short |
+| Use CodeImpact (`C:\code\RepoPilot`) as a read-only reference for cloning and code mapping | 5-6 | Waiting for the folder to be connected or files attached |
+| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future | Replaces the VS Code assistant idea |
+
 ## Planner and models
 
 ### Per-run provider, API key and model picker
@@ -276,13 +298,13 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 
 ### Final course matrix (from project chat)
 - **What:** 3 accessible + 5 broken clinic runs on one provider.
-- **Status:** agreed, not started; waiting on the mentor's answer about Gemini-only evidence.
+- **Status:** agreed, not started. Any one provider is acceptable (decided 29 Oct).
 
 ## Developer workflow (CLI, CI, tests, Docker)
 
 ### CLI and CI gate
 - **What:** `accesspath run journey.yaml` with exit codes and a GitHub Action.
-- **Status:** postponed (Phase 2).
+- **Status:** postponed to future scope (29 Oct: web only).
 - **Effort:** medium.
 
 ### Run the test suite in the container
@@ -315,7 +337,7 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 - **Status:** done (`MICKEY0107/AccessPath-AI`).
 
 ### Make the repo private (from project chat)
-- **Status:** no reply.
+- **Status:** rejected: the repo stays public (decided 29 Oct).
 
 ### Delete the already-pushed branch from GitHub
 - **What:** Remove `origin/claude/project-thread-w787he`.
@@ -334,7 +356,7 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 
 ### VS Code developer assistant
 - **What:** Extension that flags keyboard problems while coding and runs a journey against localhost through the CLI, showing results in the Problems panel.
-- **Status:** postponed (Phase 3, after the CLI).
+- **Status:** replaced (29 Oct) by a future MCP server, which works inside Claude Code, Cursor and Copilot agent mode.
 - **Effort:** medium (about 3–4 weeks once the CLI exists; estimate).
 
 ### Chrome voice extension for motor-disabled users
@@ -355,10 +377,9 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 
 ## Open questions I asked that you never answered
 
-- Should the repository stay public or become private?
 - Should the already-pushed branch be deleted from GitHub?
 - When should the local commits be pushed (to update PR #1)?
-- Does the mentor require Gemini-only evidence? (to be asked by you)
+- What is the final submission deadline?
 
 ## Broken or fragile, not fixed
 

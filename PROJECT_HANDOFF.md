@@ -1,6 +1,6 @@
 # AccessPath AI — Project Handoff
 
-**Updated:** 26 October 2026, about 05:30 IST (after the overnight session of 25–26 October)
+**Updated:** 29 October 2026, about 20:40 IST (product direction and web implementation plan agreed; no code changed since 26 October)
 **Read this first in a new chat.** It is the single source of truth for where the project stands. Times in this file are IST unless marked UTC; the app's database stores UTC (IST = UTC + 5:30).
 
 ## 1. What the project is
@@ -17,7 +17,12 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 
 | Decision | Why |
 |---|---|
-| Free model tiers only: Gemini, OpenRouter, Groq | College project; no paid API access. The owner has Antigravity Pro and free tiers only |
+| Free model tiers only: Gemini, OpenRouter, Groq, plus local Ollama (added 29 Oct) | College project; no paid API access. Ollama keeps private code on the machine |
+| Web interface only; CLI and MCP server are future scope (29 Oct) | One interface to build well; it serves product managers directly |
+| API keys may be remembered, encrypted and opt-in (29 Oct) | Replaces "never stored" for users who tick "Remember on this computer"; one-run keys keep the 1 h sealed path |
+| The repo `MICKEY0107/AccessPath-AI` stays public (29 Oct) | Owner's answer |
+| Course evidence may use any one provider (29 Oct) | Gemini was only the first choice; no Gemini-only requirement |
+| Product shape: find, confirm, map to WCAG, point to the code (29 Oct) | Screens follow CodeImpact's layout (active codebase panel, model settings, report with tabs); see section 11 |
 | AI only: demo journeys use a live planner, no deterministic or scripted steps | The point of the demo is AI planning on live or public-repo sites |
 | Demo journeys: one simple, one complex, easy to understand | Owner had no specific sites in mind; asked for one of each |
 | First users: developers and product managers | Owner's answer on 25 Oct |
@@ -28,8 +33,8 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 
 ## 3. Open questions waiting for the owner
 
-- **Repository visibility:** `MICKEY0107/AccessPath-AI` is public. This was flagged; no answer yet.
-- **Mentor check:** must the course evidence be Gemini-only, or is any one provider acceptable? Unconfirmed.
+- **Deadline:** the final submission date. It decides whether stage 6 (where to fix) is cut down.
+- **CodeImpact reference:** the owner wants its repo-clone and code-mapping code used as a reference. `C:\code\RepoPilot` is not connected to the AccessPath chat (an access request was blocked); the owner can add the folder in the desktop app or attach its files. Read only; never modify it.
 - **Benchmark:** which further sites and journeys to add beyond the two demos (owner has none in mind).
 - **When to push** the local commits and update PR #1.
 
@@ -50,6 +55,8 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | `c79fb84`, `6afc208` UI redesign | 02:21, 02:33 | Theme after the owner's reference image; wide layout |
 | `c0bd434` AI-only demo journeys | 04:41 | Two demo journeys, smaller observations, Groq strict outputs, typed-values memory, `COMMIT_TYPED_VALUE_FIRST` |
 | `c0033cc` Handoff rewrite | 05:05 | First version of this file; progress log entry 1.12 |
+| `7a43242` Handoff expanded | 05:19 | Decisions with reasons, open questions, ideas register, live run results, known issues, exact next step; progress log 1.12 dated 26 October (IST) |
+| `7d61d07` Improvements backlog | 05:21 | `IMPROVEMENTS_BACKLOG.md`: every idea, suggestion and warning from the project thread with status, effort and code locations; linked from section 1 |
 
 ## 5. Ideas and features register
 
@@ -146,17 +153,20 @@ docker compose exec web python manage.py seed_public_journeys
 - `fixtures/public/journey-manifest.json` — demo journeys (`demo-simple-wikipedia-search`, `demo-complex-todomvc`) and the older reviewed pilots.
 - `templates/` — `base.html` (theme), `runs/list.html`, `runs/detail.html`, `core/home.html`.
 
-## 11. What is next
+## 11. What is next: web implementation plan (agreed 29 October 2026)
 
-**Phase 1 (from the plan doc):**
+Full plan with the team split: the plan doc, section "Web implementation plan". The earlier three-phase plan is marked superseded there.
 
-1. Confirm before blaming (section 8).
-2. Map findings to WCAG with severity.
-3. Add focus visible, focus obscured, skip link and focus order checks; flag unnamed controls.
-4. Run axe-core on each new page state.
-5. Cut planner cost further: prompt caching, and stop early when the model repeats actions.
-6. Grow the benchmark from the two demos to about 10 journeys on free tiers.
+1. **Rules catalog and rules settings (week 1):** `rules/catalog.json` (2.1.1, 2.1.2, 2.4.1, 2.4.3, 2.4.7, 2.4.11, 3.2.1, 4.1.2; 2.4.13 advisory) with WCAG/ACT sources, loader `engine/rules.py`, presets Essential / WCAG 2.2 AA / Strict, a Rules page (toggles, disable with reason, expiring ignores).
+2. **Confirmed findings (weeks 1-2):** `Finding` type in `engine/contracts.py` and a table in `apps/runs`; confirm before blaming in `engine/executor.py` (section 8); site barrier vs agent failure.
+3. **Keyboard checks and axe-core (weeks 2-3):** focus visible, focus obscured, skip link, focus order, unnamed controls; axe-core per page state; richer element details (`id`, classes, HTML snippet, DOM path).
+4. **Accessibility report and Gate 1 (weeks 3-4):** `templates/runs/detail.html` in CodeImpact's structure (verdict badge, stat tiles, tabs Findings map / Fixes & re-checks / AI reasoning / Evidence, "In plain words" panel labelled rule-based or AI), recent reports, HTML/JSON export; benchmark of about 10 journeys; measure Gate 1.
+5. **Active codebase and model settings (weeks 4-5):** Django sign-in first (no view requires login today; the app is safe only because it binds to 127.0.0.1). Repo URL, branch, one-time token, live site URL, Clone & analyze, recent repo chips, Remove clone; `RepoBinding` model; secure read-only shallow clone (no submodules or LFS, never run, symlink and size checks, `.env` and similar blocked, secret scan) and a front-end index. Model settings: recommended models, List, Save & use, Forget key, opt-in encrypted remembered keys, Ollama, a code-safety badge per provider (Gemini free tier and `openrouter/free` may not read private code).
+6. **Where to fix (weeks 5-6):** findings map columns Exact match (rule-based index lookup), Likely cause (AI search agent: search/read/answer, each step approved by a policy) and Also affected; per-file fixes with a copyable patch (never applied to the user's repo) and Re-run; verify on the clinic fixture. The report must still work with no AI.
+7. **Course deliverables (week 7):** final 3 accessible + 5 broken clinic runs on any one provider, write-up, presentation and demo script, release tag.
+
+Team split: Engine (1 catalog, 2, 3) · Web UI (1 Rules page, 4, model settings in 5) · Code side (sign-in, clone and index in 5, then 6).
 
 Gate 1 targets: 80% of live runs end in a trustworthy outcome; 90% of reported barriers confirmed real.
 
-**Open course items:** confirm with the mentor whether evidence must be Gemini-only; the final 3 accessible + 5 broken clinic runs on one provider; the write-up; the second-person review; the release tag.
+**Future scope:** CLI, MCP server for coding assistants, CI with SARIF and PR comments, record-and-replay, the Chrome voice extension for disabled users (research only).
