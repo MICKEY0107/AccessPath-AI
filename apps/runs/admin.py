@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Run, RunArtifact, RunStep
+from .models import Finding, Run, RunArtifact, RunStep
 
 
 @admin.register(Run)
@@ -24,3 +24,11 @@ class RunArtifactAdmin(admin.ModelAdmin):
     list_filter = ("kind",)
     search_fields = ("run__id", "relative_path")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Finding)
+class FindingAdmin(admin.ModelAdmin):
+    list_display = ("rule_id", "wcag_criterion", "severity", "status", "ignored", "run", "created_at")
+    list_filter = ("severity", "status", "rule_id", "ignored")
+    search_fields = ("title", "summary", "url")
+    readonly_fields = ("data",)

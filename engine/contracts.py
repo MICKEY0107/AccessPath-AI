@@ -331,3 +331,91 @@ class TargetPolicyV1(BaseModel):
         if any(not value.startswith("/") or "?" in value or "#" in value for value in values):
             raise ValueError("navigation path prefixes must be absolute paths")
         return list(dict.fromkeys(values))
+
+
+class ElementDetailsV1(BaseModel):
+    """Element facts that let a person (or the code mapper) find it in the source.
+
+    Never includes typed values: input values and password fields are stripped from
+    the HTML snippet before it leaves the browser.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tag: str | None = Field(default=None, max_length=32)
+    role: str | None = Field(default=None, max_length=64)
+    name: str = Field(default="", max_length=200)
+    test_id: str | None = Field(default=None, max_length=128)
+    dom_id: str | None = Field(default=None, max_length=128)
+    classes: list[str] = Field(default_factory=list, max_length=12)
+    css_path: str = Field(default="", max_length=512)
+    html_snippet: str = Field(default="", max_length=400)
+    tabindex: str | None = Field(default=None, max_length=8)
+    rect: dict[str, float] | None = None
+    source_file: str | None = Field(default=None, max_length=300)
+    source_line: int | None = Field(default=None, ge=1)
+    framework: str | None = Field(default=None, max_length=16)
+
+    @field_validator("classes")
+    @classmethod
+    def classes_are_short(cls, values: list[str]) -> list[str]:
+        return [value[:64] for value in values if value][:12]
+
+
+FindingMethod = Literal[
+    "tab_walk",
+    "activation_probe",
+    "trap_probe",
+    "focus_diff",
+    "point_sample",
+    "dom_scan",
+    "observation",
+    "axe",
+]
+
+
+class FindingConfirmationV1(BaseModel):
+    """How AccessPath checked a finding before reporting it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    method: FindingMethod
+    confirmed: bool
+    detail: str = Field(default="", max_length=600)
+
+
+class FindingV1(BaseModel):
+    """One accessibility problem, tied to a catalog rule and its evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["finding.v1"] = "finding.v1"
+    id: str = Field(min_length=8, max_length=64)
+    rule_id: str = Field(max_length=96)
+    wcag_criterion: str = Field(default="", max_length=16)
+    wcag_level: str = Field(default="", max_length=4)
+    severity: Literal["critical", "serious", "moderate", "minor"]
+    status: Literal["confirmed", "needs_review"]
+    source: Literal["accesspath", "axe"] = "accesspath"
+    title: str = Field(max_length=200)
+    summary: str = Field(max_length=800)
+    step_number: int | None = Field(default=None, ge=1)
+    url: str = Field(max_length=1000)
+    element: ElementDetailsV1 | None = None
+    occurrences: int = Field(default=1, ge=1)
+    examples: list[ElementDetailsV1] = Field(default_factory=list, max_length=5)
+    confirmation: FindingConfirmationV1
+    ignored: bool = False
+    ignore_reason: str = Field(default="", max_length=240)
+    help_url: str | None = Field(default=None, max_length=500)
+
+
+class RuleResultV1(BaseModel):
+    """Whether one rule passed, failed, did not apply, or was not checked in a run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_id: str = Field(max_length=96)
+    result: Literal["passed", "failed", "needs_review", "not_applicable", "not_checked", "disabled"]
+    detail: str = Field(default="", max_length=400)
+    finding_count: int = Field(default=0, ge=0)

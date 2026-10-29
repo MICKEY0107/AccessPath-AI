@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Callable, Iterable
-from contextlib import suppress
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager, suppress
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -19,15 +19,20 @@ from .contracts import (
     ActionKind,
     ActionResultV1,
     ElementEvidenceV1,
+    FindingV1,
     PlannerHistoryEntryV1,
     PlannerInteractiveElementV1,
     PlannerObservationV1,
     ProposedActionV1,
+    RuleResultV1,
     StepEvidenceV1,
     TargetPolicyV1,
 )
+from .findings import FindingCollector
 from .planner import Planner
 from .policy import KeyboardActionPolicy
+from .probes import probe_target, probe_trap, tab_walk
+from .rules import ActiveRuleSet, resolve_rules
 from .target_policy import TargetPolicy
 
 StepCallback = Callable[[StepEvidenceV1, list[StoredArtifact]], None]
@@ -39,6 +44,13 @@ class EvaluationResult:
     terminal_reason: str
     steps_completed: int
     detail: str = ""
+    # Who the result points at: site_barrier, agent_failure, provider_failure,
+    # environment, or "" for a completed run.
+    failure_kind: str = ""
+    # Plain-language explanation when a run failed but the site was not blamed.
+    diagnosis: str = ""
+    findings: list[FindingV1] = field(default_factory=list)
+    rule_results: list[RuleResultV1] = field(default_factory=list)
 
 
 # Observation budget per planner turn. Free model tiers cap tokens per minute, so a
@@ -78,6 +90,7 @@ class KeyboardExecutor:
         browser_executable_path: str | None = None,
         artifact_store: LocalArtifactStore,
         on_step: StepCallback,
+        rule_set: ActiveRuleSet | None = None,
     ) -> None:
         self.run_id = run_id
         self.start_url = start_url
@@ -104,6 +117,14 @@ class KeyboardExecutor:
         self._pending_evidence_events: list[str] = []
         self.runtime_metadata: dict[str, object] = {}
         self._started_monotonic = 0.0
+        self.rule_set = rule_set or resolve_rules({})
+        self.findings = FindingCollector(self.rule_set)
+        self._history: list[PlannerHistoryEntryV1] = []
+        # While a probe re-checks a suspected barrier, blocked requests are counted as
+        # evidence that a key did something instead of being recorded as violations.
+        self._probing = False
+        self._probe_requests = 0
+        self.probe_events: list[str] = []
 
     def run(self, actions: Iterable[ProposedActionV1]) -> EvaluationResult:
         self._assert_safe_start_url()
@@ -163,6 +184,11 @@ class KeyboardExecutor:
         self._safety_violation_detail = ""
         self._pending_policy_events = []
         self._pending_evidence_events = []
+        self.findings = FindingCollector(self.rule_set)
+        self._history = []
+        self._probing = False
+        self._probe_requests = 0
+        self.probe_events = []
 
     def _record_browser_metadata(self, browser) -> None:
         self.runtime_metadata = {
@@ -198,6 +224,13 @@ class KeyboardExecutor:
             method=request.method,
             is_navigation=request.is_navigation_request(),
         )
+        if self._probing:
+            self._probe_requests += 1
+            if not decision.allowed:
+                if len(self.probe_events) < 20:
+                    self.probe_events.append(f"PROBE_{decision.code} {request.method} {request.url}"[:512])
+                route.abort("blockedbyclient")
+                return
         if decision.allowed:
             route.continue_()
             return
@@ -207,6 +240,10 @@ class KeyboardExecutor:
         route.abort("blockedbyclient")
 
     def _handle_popup(self, page: Page) -> None:
+        if self._probing:
+            self._probe_requests += 1
+            page.close()
+            return
         decision = self.target_policy.decide_popup()
         if not decision.allowed:
             self._record_policy_event(decision.code, "POPUP", page.url)
@@ -218,6 +255,10 @@ class KeyboardExecutor:
             page.close()
 
     def _handle_download(self, download: Download) -> None:
+        if self._probing:
+            self._probe_requests += 1
+            download.cancel()
+            return
         decision = self.target_policy.decide_download()
         if not decision.allowed:
             self._record_policy_event(decision.code, "DOWNLOAD", download.url)
@@ -269,9 +310,184 @@ class KeyboardExecutor:
         planner: Planner | None = None,
         goal: str = "",
     ) -> EvaluationResult:
+        result = self._run_loop(page, actions, planner=planner, goal=goal)
+        try:
+            result = self._confirm_result(page, result, planner)
+        except Exception as error:
+            note = f"The barrier re-check could not finish ({type(error).__name__})."
+            if result.outcome == "blocked":
+                # Only a confirmed barrier may be reported against the site.
+                result = replace(
+                    result,
+                    outcome="agent_error",
+                    terminal_reason="BARRIER_NOT_CONFIRMED",
+                    failure_kind="agent_failure",
+                    diagnosis=f"{note} The suspected barrier is not reported.",
+                )
+            else:
+                result = replace(
+                    result,
+                    failure_kind=result.failure_kind or _default_failure_kind(result),
+                    diagnosis=f"{result.diagnosis} {note}".strip(),
+                )
+        return replace(
+            result,
+            findings=self.findings.sorted_findings(),
+            rule_results=self.findings.results(),
+        )
+
+    @contextmanager
+    def _probe(self) -> Iterator[None]:
+        self._probing = True
+        try:
+            yield
+        finally:
+            self._probing = False
+
+    def _last_target_hint(self) -> str:
+        for entry in reversed(self._history):
+            if entry.target_hint.strip():
+                return entry.target_hint.strip()
+        return ""
+
+    def _confirm_result(
+        self, page: Page, result: EvaluationResult, planner: Planner | None
+    ) -> EvaluationResult:
+        """Re-check a failed run before it may blame the website.
+
+        A barrier is reported only when a deterministic probe confirms it; otherwise
+        the run is labelled an agent failure with the reason in plain words.
+        """
+        if result.outcome == "completed":
+            return result
+        if result.outcome in {"safety_stopped", "environment_blocked"}:
+            return replace(result, failure_kind="environment")
+        stop_reason = getattr(planner, "stop_reason", "") if planner is not None else ""
+        if result.outcome == "agent_error" and (stop_reason or result.steps_completed == 0):
+            return replace(
+                result,
+                failure_kind="provider_failure",
+                diagnosis=(
+                    "The AI planner stopped before the task could be judged"
+                    f" ({result.terminal_reason}). This says nothing about the website."
+                ),
+            )
+        if page.is_closed() or not self._origin_is_allowed(page.url):
+            return replace(result, failure_kind=_default_failure_kind(result))
+        with self._probe():
+            walk = tab_walk(page)
+            self._record_walk_results(walk, page.url)
+            if result.terminal_reason == "REPEATED_FOCUS_CYCLE":
+                trap = probe_trap(page, walk)
+                if trap.confirmed_trap:
+                    self.findings.add(
+                        "no-keyboard-trap",
+                        summary=trap.detail,
+                        url=page.url,
+                        method="trap_probe",
+                        detail=trap.detail,
+                        element=trap.element,
+                        step_number=result.steps_completed or None,
+                    )
+                    return replace(
+                        result,
+                        outcome="blocked",
+                        terminal_reason="KEYBOARD_TRAP_CONFIRMED",
+                        failure_kind="site_barrier",
+                        detail=trap.detail,
+                    )
+                return replace(result, failure_kind="agent_failure", diagnosis=trap.diagnosis)
+            test_id = (
+                self.barrier_check.get("required_focus_test_id")
+                if result.outcome == "blocked"
+                else None
+            )
+            hint = "" if test_id else self._last_target_hint()
+            if not test_id and not hint:
+                return replace(
+                    result,
+                    failure_kind=_default_failure_kind(result),
+                    diagnosis=(
+                        "The run ended without reaching its goal and named no target control, "
+                        "so no barrier is reported."
+                    ),
+                )
+            probe = probe_target(
+                page,
+                walk,
+                test_id=test_id,
+                hint=hint,
+                request_count=lambda: self._probe_requests,
+            )
+        if probe.confirmed_barrier:
+            self.findings.add(
+                "keyboard-operable",
+                summary=probe.detail,
+                url=page.url,
+                method=probe.method,
+                detail=probe.detail,
+                element=probe.element,
+                step_number=result.steps_completed or None,
+            )
+            return replace(
+                result,
+                outcome="blocked",
+                terminal_reason=(
+                    "KEYBOARD_TARGET_NOT_REACHABLE"
+                    if probe.method == "tab_walk"
+                    else "KEYBOARD_TARGET_NOT_OPERABLE"
+                ),
+                failure_kind="site_barrier",
+                detail=probe.detail,
+            )
+        if result.outcome == "blocked":
+            return replace(
+                result,
+                outcome="agent_error",
+                terminal_reason="BARRIER_NOT_CONFIRMED",
+                failure_kind="agent_failure",
+                diagnosis=probe.diagnosis,
+            )
+        return replace(
+            result, failure_kind=_default_failure_kind(result), diagnosis=probe.diagnosis
+        )
+
+    def _record_walk_results(self, walk, current_url: str) -> None:
+        """A Tab walk also tests the trap and on-focus rules for the page it walked."""
+        if walk.navigated_to:
+            self._record_on_focus_navigation(walk, current_url)
+        elif walk.stops:
+            self.findings.checked("on-focus", applicable=True)
+        if walk.completed and not walk.cycle_paths:
+            self.findings.checked("no-keyboard-trap", applicable=bool(walk.stops))
+
+    def _record_on_focus_navigation(self, walk, current_url: str) -> None:
+        stop = walk.navigation_stop
+        name = (stop or {}).get("name") or "a control"
+        summary = (
+            f"Moving focus onto “{name}” with Tab opened another page "
+            f"({walk.navigated_to}). Focus alone must not change the page."
+        )
+        self.findings.add(
+            "on-focus",
+            summary=summary,
+            url=current_url,
+            method="tab_walk",
+            detail=summary,
+            element=stop,
+        )
+
+    def _run_loop(
+        self,
+        page: Page,
+        actions: Iterable[ProposedActionV1] | None,
+        *,
+        planner: Planner | None = None,
+        goal: str = "",
+    ) -> EvaluationResult:
         rejection_counts: dict[str, int] = {}
         steps_run = 0
-        history: list[PlannerHistoryEntryV1] = []
+        history: list[PlannerHistoryEntryV1] = self._history
         state_visit_counts: dict[str, int] = {}
         action_iterator = iter(actions) if actions is not None else None
         while True:
@@ -801,3 +1017,13 @@ class KeyboardExecutor:
         if not isinstance(action_budget, int) or action_budget < 1:
             return False
         return steps_run >= action_budget and self._barrier_was_observed(page)
+
+
+def _default_failure_kind(result: EvaluationResult) -> str:
+    if result.outcome == "blocked":
+        return "site_barrier"
+    if result.outcome in {"agent_error", "inconclusive"}:
+        return "agent_failure"
+    if result.outcome in {"safety_stopped", "environment_blocked"}:
+        return "environment"
+    return ""

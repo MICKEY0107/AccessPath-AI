@@ -34,7 +34,24 @@
           <meta http-equiv="refresh" content="3">
         {% endif %}
         {% if run.error_detail %}<p class="error" style="margin-top: .9rem"><strong>Execution detail:</strong> {{ run.error_detail }}</p>{% endif %}
+        {% if run.failure_kind %}<p class="small" style="margin-top: .9rem"><strong>Who this points at:</strong> {{ failure_kind_label }}</p>{% endif %}
+        {% if run.diagnosis %}<p class="muted small">{{ run.diagnosis }}</p>{% endif %}
       </section>
+
+      {% if findings %}
+        <section class="panel" aria-labelledby="findings-title">
+          <h2 id="findings-title">Findings</h2>
+          <ul class="row-list">
+            {% for finding in findings %}
+              <li class="finding-row">
+                <span class="tag {% if finding.severity == 'critical' or finding.severity == 'serious' %}tag-issue{% else %}tag-neutral{% endif %}">{{ finding.severity }}</span>
+                <strong>{{ finding.wcag_criterion }} {{ finding.title }}</strong>
+                <span class="row-sub">{{ finding.summary }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
 
       <section class="panel" aria-labelledby="steps-title">
         <h2 id="steps-title">Keyboard evidence</h2>

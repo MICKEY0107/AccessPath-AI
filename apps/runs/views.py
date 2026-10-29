@@ -22,7 +22,10 @@ ISSUE_OUTCOMES = {
 }
 
 TERMINAL_REASON_LABELS = {
-    "KEYBOARD_TARGET_NOT_REACHABLE": "Keyboard focus could not reach the appointment time buttons.",
+    "KEYBOARD_TARGET_NOT_REACHABLE": "A control the task needs cannot be reached with the keyboard.",
+    "KEYBOARD_TARGET_NOT_OPERABLE": "A control the task needs does not respond to Enter or Space.",
+    "KEYBOARD_TRAP_CONFIRMED": "Keyboard focus is trapped and cannot leave a component.",
+    "BARRIER_NOT_CONFIRMED": "A suspected barrier was re-checked and not confirmed.",
     "COMPLETION_POLICY_SATISFIED": "The declared booking confirmation was verified.",
     "REPEATED_FOCUS_CYCLE": "The evaluator stopped after the configured focus cycle repeated.",
     "REQUEST_METHOD_NOT_ALLOWED": "A prohibited request method was blocked.",
@@ -323,6 +326,14 @@ def _planner_options() -> list[dict[str, object]]:
     return options
 
 
+FAILURE_KIND_LABELS = {
+    "site_barrier": "the website: a keyboard barrier was confirmed by a re-check",
+    "agent_failure": "the AI planner: the site was re-checked and not blamed",
+    "provider_failure": "the AI provider: the planner stopped before the task could be judged",
+    "environment": "the environment: a safety rule or the network stopped the run",
+}
+
+
 def run_detail(request: HttpRequest, run_id) -> HttpResponse:
     run = get_object_or_404(
         Run.objects.select_related("journey").prefetch_related("steps", "artifacts__step"),
@@ -334,6 +345,8 @@ def run_detail(request: HttpRequest, run_id) -> HttpResponse:
         {
             "run": run,
             "run_brief": describe_run(run),
+            "findings": list(run.findings.all()),
+            "failure_kind_label": FAILURE_KIND_LABELS.get(run.failure_kind, run.failure_kind),
             "evidence_artifacts": build_evidence_artifacts(run),
         },
     )

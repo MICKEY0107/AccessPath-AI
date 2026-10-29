@@ -54,6 +54,12 @@ class Run(models.Model):
     planner_metadata = models.JSONField(default=dict, blank=True)
     terminal_reason = models.CharField(max_length=128, blank=True)
     error_detail = models.TextField(blank=True)
+    # site_barrier, agent_failure, provider_failure, environment, or "" when completed.
+    failure_kind = models.CharField(max_length=24, blank=True)
+    # Why a failed run was not blamed on the site, in plain words.
+    diagnosis = models.TextField(blank=True)
+    # One engine.contracts.RuleResultV1 per rule the run applied.
+    rule_results = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
@@ -99,3 +105,39 @@ class RunArtifact(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class FindingSeverity(models.TextChoices):
+    CRITICAL = "critical", "Critical"
+    SERIOUS = "serious", "Serious"
+    MODERATE = "moderate", "Moderate"
+    MINOR = "minor", "Minor"
+
+
+class Finding(models.Model):
+    """One accessibility problem a run found, tied to a catalog rule and its evidence."""
+
+    run = models.ForeignKey(Run, on_delete=models.CASCADE, related_name="findings")
+    finding_id = models.CharField(max_length=64)
+    rule_id = models.CharField(max_length=96)
+    wcag_criterion = models.CharField(max_length=16, blank=True)
+    severity = models.CharField(max_length=16, choices=FindingSeverity.choices)
+    status = models.CharField(max_length=16)
+    source = models.CharField(max_length=16, default="accesspath")
+    title = models.CharField(max_length=200)
+    summary = models.TextField()
+    step_number = models.PositiveIntegerField(null=True, blank=True)
+    url = models.CharField(max_length=1000)
+    ignored = models.BooleanField(default=False)
+    # The full engine.contracts.FindingV1, including element details and confirmation.
+    data = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(fields=["run", "finding_id"], name="unique_run_finding"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.rule_id} — {self.title}"

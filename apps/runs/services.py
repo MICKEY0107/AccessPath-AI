@@ -17,9 +17,18 @@ from engine.gemini import GoogleGeminiActionClient
 from engine.groq import GroqActionClient
 from engine.openrouter import OpenRouterActionClient
 from engine.planner import planner_from_config
+from engine.rules import resolve_rules
 
 from .credentials import mask_api_key, scrub
-from .models import JourneyOutcome, PlannerProvider, Run, RunArtifact, RunStatus, RunStep
+from .models import (
+    Finding,
+    JourneyOutcome,
+    PlannerProvider,
+    Run,
+    RunArtifact,
+    RunStatus,
+    RunStep,
+)
 
 
 def _environment_api_key(provider: str) -> str:
@@ -140,6 +149,11 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         transient_backoff_seconds=settings.PLANNER_TRANSIENT_BACKOFF_SECONDS,
         max_invalid_retries=settings.PLANNER_MAX_INVALID_RETRIES,
     )
+    try:
+        rule_set = resolve_rules(run.journey.rule_config)
+    except (ValueError, KeyError):
+        # Settings saved against an older catalog fall back to the default preset.
+        rule_set = resolve_rules({})
     executor = KeyboardExecutor(
         run_id=run.id,
         start_url=run.journey.start_url,
@@ -153,6 +167,7 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         browser_executable_path=settings.EVALUATOR_BROWSER_EXECUTABLE,
         artifact_store=artifact_store,
         on_step=capture_step,
+        rule_set=rule_set,
     )
     try:
         result = executor.run_with_planner(planner, goal=run.journey.goal)
@@ -163,6 +178,8 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
                 **planner.runtime_metadata(),
                 **credential_metadata,
                 "executor": executor.runtime_metadata,
+                "rules": rule_set.to_metadata(),
+                "probe_events": executor.probe_events,
                 "journey_key": run.journey.evaluation_config.get("journey_key", ""),
                 "manifest_version": run.journey.evaluation_config.get("manifest_version", ""),
             },
@@ -173,7 +190,33 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
     return result
 
 
+def _save_findings(run: Run, result: EvaluationResult, *, secrets: list[str]) -> None:
+    with transaction.atomic():
+        Finding.objects.bulk_create(
+            [
+                Finding(
+                    run=run,
+                    finding_id=finding.id,
+                    rule_id=finding.rule_id,
+                    wcag_criterion=finding.wcag_criterion,
+                    severity=finding.severity,
+                    status=finding.status,
+                    source=finding.source,
+                    title=finding.title,
+                    summary=scrub(finding.summary, secrets),
+                    step_number=finding.step_number,
+                    url=finding.url,
+                    ignored=finding.ignored,
+                    data=scrub(finding.model_dump(mode="json"), secrets),
+                )
+                for finding in result.findings
+            ],
+            ignore_conflicts=True,
+        )
+
+
 def _complete_run(run: Run, result: EvaluationResult, *, secrets: list[str]) -> None:
+    _save_findings(run, result, secrets=secrets)
     outcome_map = {
         "completed": JourneyOutcome.COMPLETED,
         "blocked": JourneyOutcome.BLOCKED,
@@ -190,9 +233,21 @@ def _complete_run(run: Run, result: EvaluationResult, *, secrets: list[str]) -> 
     )
     run.terminal_reason = result.terminal_reason
     run.error_detail = scrub(result.detail, secrets)
+    run.failure_kind = result.failure_kind
+    run.diagnosis = scrub(result.diagnosis, secrets)
+    run.rule_results = [item.model_dump(mode="json") for item in result.rule_results]
     run.finished_at = datetime.now(UTC)
     run.save(
-        update_fields=["outcome", "status", "terminal_reason", "error_detail", "finished_at"]
+        update_fields=[
+            "outcome",
+            "status",
+            "terminal_reason",
+            "error_detail",
+            "failure_kind",
+            "diagnosis",
+            "rule_results",
+            "finished_at",
+        ]
     )
 
 

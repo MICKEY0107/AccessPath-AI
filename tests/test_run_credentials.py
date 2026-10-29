@@ -141,6 +141,7 @@ def test_run_form_offers_key_and_model_fields_without_leaking_server_keys(client
 def _run_service_with_fake_executor(run: Run, *, user_api_key: str, detail: str = ""):
     fake_executor = Mock()
     fake_executor.runtime_metadata = {}
+    fake_executor.probe_events = []
     fake_executor.run_with_planner.return_value = EvaluationResult(
         outcome="completed",
         terminal_reason="COMPLETION_POLICY_SATISFIED",
