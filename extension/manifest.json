@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "AccessPath Assist",
+  "version": "1.0.0",
+  "description": "Use any website by keyboard or voice: a strong focus ring, skip to content, landmarks, keyboard fixes for click-only controls, names for unnamed buttons, and voice commands.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "action": {
+    "default_title": "AccessPath Assist",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "skip-to-main": {
+      "suggested_key": {
+        "default": "Alt+Shift+M"
+      },
+      "description": "Skip to the main content"
+    },
+    "show-landmarks": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "List landmarks and headings"
+    },
+    "toggle-voice": {
+      "suggested_key": {
+        "default": "Alt+Shift+V"
+      },
+      "description": "Start or stop voice commands"
+    },
+    "check-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+C"
+      },
+      "description": "Check this page for keyboard problems"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

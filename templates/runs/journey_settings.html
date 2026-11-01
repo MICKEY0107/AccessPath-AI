@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Journey settings — {{ journey.name }} — AccessPath AI{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <p class="eyebrow">Journey settings</p>
+      <h1>{{ journey.name }}</h1>
+      <p class="muted">{{ journey.goal }}</p>
+      <p class="muted small">Start: <code>{{ journey.start_url }}</code> · <a href="{% url 'runs:list' %}#journey-{{ journey.id }}">Run this journey</a> · <a href="{% url 'runs:rules' %}?journey={{ journey.id }}">Rules</a></p>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <div>
+      <section class="panel settings-panel" aria-labelledby="session-title">
+        <h2 id="session-title">Signed-in pages</h2>
+        <p class="muted small">To test pages behind a login, sign in once in your own browser window with <code>python -m accesspath login {{ journey.start_url }}</code>, then upload the session file it saves. AccessPath never sees your password; the session is encrypted, limited to this journey’s sites, never shown back, and used only by runs you start.</p>
+        {% if session %}
+          <p><span class="tag tag-success">Saved</span> {{ session.summary }} · by {{ session.owner.get_username }} on {{ session.created_at|date:"j M Y" }}</p>
+          {% if session_is_mine %}
+            <form method="post" action="{% url 'runs:save_session' journey.id %}">{% csrf_token %}<input type="hidden" name="remove" value="1"><button type="submit" class="secondary">Remove the saved sign-in</button></form>
+          {% else %}
+            <p class="muted small">Someone else saved it, so runs you start are not signed in.</p>
+          {% endif %}
+        {% endif %}
+        {% if not session or session_is_mine %}
+          <form method="post" action="{% url 'runs:save_session' journey.id %}" enctype="multipart/form-data" class="inline-form">
+            {% csrf_token %}
+            <div class="form-field"><label for="session-file">Session file (JSON)</label><input id="session-file" name="state" type="file" accept="application/json,.json" required></div>
+            <button type="submit">{% if session %}Replace{% else %}Save{% endif %} sign-in</button>
+          </form>
+        {% endif %}
+      </section>
+
+      <section class="panel settings-panel" aria-labelledby="replay-title">
+        <h2 id="replay-title">Record and replay</h2>
+        {% if scripted_only %}
+          <p class="muted small">This journey runs a reviewed scripted plan; it is already replayable without AI.</p>
+        {% else %}
+          <p class="muted small">Save the keys of a run that completed the journey as its replay plan. “Scripted plan (no AI)” then repeats them exactly: a quick regression test after each change, with no AI calls. You can also record your own keys with <code>python -m accesspath record {{ journey.start_url }}</code>.</p>
+          {% if recorded %}<p><span class="tag tag-success">Replay plan</span> {{ recorded.steps }} keys from run <a href="{% url 'runs:detail' recorded.run %}">{{ recorded.run|slice:":8" }}</a> ({{ recorded.provider }}), saved by {{ recorded.by }}.</p>{% endif %}
+          {% if replay_candidates %}
+            <form method="post" action="{% url 'runs:save_replay' journey.id %}" class="inline-form">
+              {% csrf_token %}
+              <div class="form-field"><label for="replay-run">Completed run</label>
+                <select id="replay-run" name="run_id">{% for run in replay_candidates %}<option value="{{ run.id }}">{{ run.created_at|date:"j M, H:i" }} · {{ run.get_planner_provider_display }} · {{ run.steps.count }} steps</option>{% endfor %}</select></div>
+              <button type="submit">Save as replay plan</button>
+            </form>
+          {% else %}
+            <p class="muted small">No completed run yet. Run the journey with an AI planner first.</p>
+          {% endif %}
+        {% endif %}
+        <p class="small"><a href="{% url 'runs:journey_file' journey.id %}">Download as a journey file</a> for the command line and CI: <code>python -m accesspath run journey.json --repo .</code></p>
+      </section>
+
+      <section class="panel settings-panel" aria-labelledby="baseline-title">
+        <h2 id="baseline-title">Baseline</h2>
+        <p class="muted small">Pick a run as the baseline. Later reports mark which findings are new and which were fixed since then, so a team can stop new barriers without first fixing every old one.</p>
+        {% if baseline %}<p><span class="tag tag-neutral">Baseline</span> <a href="{% url 'runs:detail' baseline.id %}">{{ baseline.created_at|date:"j M Y, H:i" }}</a> · {% with n=baseline.findings.count %}{{ n }} finding{{ n|pluralize }}{% endwith %}</p>{% endif %}
+        <form method="post" action="{% url 'runs:save_baseline' journey.id %}" class="inline-form">
+          {% csrf_token %}
+          <div class="form-field"><label for="baseline-run">Run</label>
+            <select id="baseline-run" name="run_id"><option value="">No baseline</option>{% for run in candidates %}<option value="{{ run.id }}" {% if baseline and run.id == baseline.id %}selected{% endif %}>{{ run.created_at|date:"j M, H:i" }} · {{ run.get_outcome_display }}</option>{% endfor %}</select></div>
+          <button type="submit" class="secondary">Save baseline</button>
+        </form>
+      </section>
+
+      <section class="panel settings-panel" aria-labelledby="staging-title">
+        <h2 id="staging-title">Staging writes</h2>
+        {% if can_stage %}
+          <p class="muted small">By default, runs never submit forms. On a staging copy of your site, you can allow a few form submissions per run (POST to this site’s own address only), so journeys like sign-up or checkout can finish. Never turn this on for a live site.</p>
+          {% if staging.enabled %}<p><span class="tag tag-issue">On</span> Up to {{ staging.max_writes }} submissions per run · confirmed by {{ staging.confirmed_by }}</p>{% endif %}
+          <form method="post" action="{% url 'runs:save_staging' journey.id %}" class="settings-form">
+            {% csrf_token %}
+            <label class="check-row"><input type="checkbox" name="enable" {% if staging.enabled %}checked{% endif %}> Allow form submissions</label>
+            <div class="form-field"><label for="max-writes">Most submissions per run</label><input id="max-writes" name="max_writes" type="number" min="1" max="20" value="{{ staging.max_writes|default:5 }}" inputmode="numeric"></div>
+            <label class="check-row"><input type="checkbox" name="confirm"> I control this site and it is a staging or test copy, not production.</label>
+            <button type="submit" class="secondary">Save</button>
+          </form>
+        {% else %}
+          <p class="muted small">Only for websites you added yourself; the demo journeys stay read-only.</p>
+        {% endif %}
+      </section>
+    </div>
+    <aside>
+      <section class="panel" aria-labelledby="cli-title">
+        <h2 id="cli-title">Same journey in CI</h2>
+        <p class="small">Download the journey file, commit it under <code>journeys/</code>, and add the AccessPath GitHub Action: findings appear in code scanning at the line to fix, with one summary comment on each pull request.</p>
+        <pre class="patch wrap">- uses: ./.github/actions/accesspath
+  with:
+    journeys: journeys/*.json</pre>
+      </section>
+    </aside>
+  </div>
+{% endblock %}

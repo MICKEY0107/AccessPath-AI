@@ -72,10 +72,16 @@ After changing `.env`, restart with `docker compose up -d`.
 
 On macOS or Linux, use `./scripts/dev.sh` with the same command names.
 
+## Beyond the web app
+
+- **Command line and CI:** `python -m accesspath run journeys/clinic-broken.json --repo .`, plus a GitHub Action for pull requests. See [CLI_AND_CI.md](CLI_AND_CI.md).
+- **Coding assistants:** `python -m accesspath mcp`. See [CLI_AND_CI.md](CLI_AND_CI.md#mcp-server-for-coding-assistants).
+- **Chrome extension for keyboard and voice users:** load `extension/` unpacked. See [extension/README.md](../extension/README.md).
+
 ## If something is wrong
 
 Open **Status**, or run `./scripts/dev.ps1 check`. Every item that isn't ready shows its exact fix. Common cases:
 
 - **Runs stay queued:** the worker isn't running. Start it with `docker compose up -d worker`.
-- **Port 8000 is taken:** map the web app to another port with a Compose override file (see `PROJECT_HANDOFF.md`, section 9).
+- **Port 8000 is taken:** copy `docker-compose.override.example.yml` to `docker-compose.override.yml` (it moves the app to port 8010), then run `docker compose up -d`.
 - **Saved keys stop working** after changing `DJANGO_SECRET_KEY`: save them again on **Models**.

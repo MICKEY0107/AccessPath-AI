@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
+import os
+from contextlib import contextmanager, nullcontext, suppress
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
-from django.db import transaction
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 
 from apps.journeys.real_sites import host_is_public
 from engine.artifacts import LocalArtifactStore, StoredArtifact
@@ -65,14 +66,18 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
     artifact_store = LocalArtifactStore(settings.MEDIA_ROOT, run.id)
 
     pending_steps: list[tuple[StepEvidenceV1, list[StoredArtifact]]] = []
-
-    def capture_step(evidence, artifacts: list[StoredArtifact]) -> None:
-        """Buffer callback data; Playwright invokes callbacks inside its event loop."""
-        pending_steps.append((evidence, artifacts))
+    # Playwright's sync API runs our step callback in its own greenlet context, where
+    # Django would open a second database connection; reuse this one instead.
+    main_connection = connections[DEFAULT_DB_ALIAS]
 
     def persist_steps() -> None:
-        with transaction.atomic():
-            for evidence, artifacts in pending_steps:
+        """Save buffered steps; whatever fails to save stays buffered for the next try."""
+        batch = list(pending_steps)
+        if not batch:
+            return
+        connections[DEFAULT_DB_ALIAS] = main_connection
+        with sync_orm_allowed(), transaction.atomic():
+            for evidence, artifacts in batch:
                 step = RunStep.objects.create(
                     run=run,
                     step_number=evidence.step_number,
@@ -90,6 +95,14 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
                         for artifact in artifacts
                     ]
                 )
+        del pending_steps[: len(batch)]
+
+    def capture_step(evidence, artifacts: list[StoredArtifact]) -> None:
+        """Save each step as it happens, so the run page shows progress live."""
+        pending_steps.append((evidence, artifacts))
+        # Saving progress must never stop the run; anything unsaved is retried at the end.
+        with suppress(Exception):
+            persist_steps()
 
     planner_config = deepcopy(run.journey.evaluation_config)
     configured_planner = planner_config.get("planner")
@@ -175,11 +188,13 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         # Settings saved against an older catalog fall back to the default preset.
         rule_set = resolve_rules({})
     axe_source = _axe_source()
+    session_state, session_note = _saved_session(run)
+    target_policy, staging_writes = _target_policy(run.journey)
     executor = KeyboardExecutor(
         run_id=run.id,
         start_url=run.journey.start_url,
         allowed_origins=run.journey.allowed_origins,
-        target_policy=run.journey.evaluation_config.get("target_policy"),
+        target_policy=target_policy,
         completion_policy=run.journey.completion_policy,
         barrier_check=run.journey.evaluation_config.get("barrier_check"),
         max_steps=settings.EVALUATOR_MAX_STEPS,
@@ -191,6 +206,7 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         rule_set=rule_set,
         axe_source=axe_source,
         run_checks=settings.EVALUATOR_RUN_CHECKS,
+        session_state=session_state,
     )
     try:
         with _fixture_site(run.journey):
@@ -206,6 +222,11 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
                 "executor": executor.runtime_metadata,
                 "rules": rule_set.to_metadata(),
                 "probe_events": executor.probe_events,
+                "session": session_note,
+                # Pages seen while signed in are shown only to the person who started it.
+                "signed_in": session_state is not None,
+                "staging_writes": staging_writes,
+                "writes_used": _writes_used(executor),
                 "journey_key": run.journey.evaluation_config.get("journey_key", ""),
                 "manifest_version": run.journey.evaluation_config.get("manifest_version", ""),
             },
@@ -226,6 +247,73 @@ def execute_configured_run(run: Run, *, user_api_key: str = "") -> EvaluationRes
         )
         run.save(update_fields=["diagnosis"])
     return result
+
+
+@contextmanager
+def sync_orm_allowed():
+    """Let the ORM run while Playwright's sync API holds an event loop in this thread.
+
+    Playwright's sync API keeps an asyncio loop on the worker thread, so Django refuses
+    database calls made between browser steps. Nothing else uses that loop while the
+    executor's own (synchronous) code runs, so a blocking save here is safe; the worker
+    runs one evaluation per process. The switch is an environment variable, so it is
+    process-wide: keep Celery on its default prefork pool, not threads or gevent.
+    """
+    previous = os.environ.get("DJANGO_ALLOW_ASYNC_UNSAFE")
+    os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DJANGO_ALLOW_ASYNC_UNSAFE", None)
+        else:
+            os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = previous
+
+
+def _writes_used(executor) -> int:
+    used = getattr(getattr(executor, "target_policy", None), "writes_used", 0)
+    return used if isinstance(used, int) else 0
+
+
+def _saved_session(run: Run) -> tuple[dict | None, str]:
+    """The journey's saved sign-in, only for runs its owner started."""
+    from apps.journeys.models import JourneySession
+    from engine.session_state import limit_to_origins, parse_storage_state
+
+    from .credentials import CredentialError, decrypt_session
+
+    session = JourneySession.objects.filter(journey=run.journey).select_related("owner").first()
+    if session is None:
+        return None, ""
+    if (run.planner_metadata or {}).get("started_by") != session.owner_id:
+        return None, "A saved sign-in exists, but only runs its owner starts use it."
+    staging = (run.journey.evaluation_config or {}).get("staging") or {}
+    if staging.get("enabled") and staging.get("confirmed_by") != session.owner.get_username():
+        # Someone else turned on form submissions: never submit them with this account.
+        return None, "Not signed in: staging writes were turned on by someone else."
+    try:
+        state = parse_storage_state(decrypt_session(session.encrypted_state))
+    except (CredentialError, ValueError):
+        return None, "The saved sign-in could not be read; save it again."
+    return limit_to_origins(state, run.journey.allowed_origins), f"Signed in ({session.summary})."
+
+
+def _target_policy(journey) -> tuple[dict | None, int]:
+    """The journey's request policy, with staging writes when its owner turned them on."""
+    policy = journey.evaluation_config.get("target_policy")
+    staging = journey.evaluation_config.get("staging") or {}
+    if not (policy and journey.is_real_site and staging.get("enabled")):
+        return policy, 0
+    parsed = urlparse(journey.start_url)
+    origin = f"{parsed.scheme}://{parsed.netloc}".lower()
+    max_writes = max(1, min(20, int(staging.get("max_writes") or 5)))
+    policy = {
+        **policy,
+        "allowed_methods": ["GET", "HEAD", "OPTIONS", "POST"],
+        "write_origins": [origin],
+        "max_writes": max_writes,
+    }
+    return policy, max_writes
 
 
 def _fixture_site(journey):

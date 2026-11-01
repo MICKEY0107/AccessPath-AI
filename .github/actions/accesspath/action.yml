@@ -1,0 +1,140 @@
+name: AccessPath AI keyboard journeys
+description: >
+  Run keyboard-only accessibility journeys, upload the findings to GitHub code scanning
+  (SARIF, pointing at the lines to fix) and keep one summary comment on the pull request.
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  journeys:
+    description: Journey files to run, separated by spaces (globs allowed), e.g. "journeys/*.json"
+    required: true
+  provider:
+    description: scripted (replay each journey's plan, no AI), groq, gemini, openrouter or ollama
+    default: scripted
+  model:
+    description: Model id for an AI provider, e.g. openai/gpt-oss-120b
+    default: ""
+  api-key:
+    description: API key for the AI provider. Pass a secret, never a literal.
+    default: ""
+  repo-path:
+    description: Checkout to map findings to (file and line)
+    default: "."
+  fail-on:
+    description: Lowest severity that fails (critical, serious, moderate, minor); default from each journey
+    default: ""
+  baseline:
+    description: Folder of earlier report.json files named <journey file name>.json; only new findings fail
+    default: ""
+  comment:
+    description: Post or update a summary comment on pull requests
+    default: "true"
+  upload-sarif:
+    description: Upload results to GitHub code scanning
+    default: "true"
+  fail:
+    description: Fail the job when a journey is blocked, failing or incomplete
+    default: "true"
+  name:
+    description: A short name for this call (letters, digits, dashes). Each call keeps its own PR comment; defaults to one derived from the journeys
+    default: ""
+
+outputs:
+  exit-code:
+    description: Highest exit code across journeys (0 passed, 1 failing, 2 blocked, 3 incomplete, 4 setup error)
+    value: ${{ steps.run.outputs.exit-code }}
+  results-dir:
+    description: Folder with each journey's report.json, summary.md and results.sarif
+    value: ${{ steps.run.outputs.results-dir }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Install the AccessPath engine and Chromium
+      shell: bash
+      run: |
+        python -m pip install --quiet "pydantic>=2.11,<3" "playwright>=1.55,<2" "google-genai>=1.0,<2" "cryptography>=44"
+        python -m playwright install --with-deps chromium
+
+    - name: Run journeys
+      id: run
+      shell: bash
+      env:
+        ACCESSPATH_ROOT: ${{ github.action_path }}/../../..
+        AP_JOURNEYS: ${{ inputs.journeys }}
+        AP_PROVIDER: ${{ inputs.provider }}
+        AP_MODEL: ${{ inputs.model }}
+        AP_API_KEY: ${{ inputs.api-key }}
+        AP_REPO: ${{ inputs.repo-path }}
+        AP_FAIL_ON: ${{ inputs.fail-on }}
+        AP_BASELINE: ${{ inputs.baseline }}
+        AP_NAME: ${{ inputs.name }}
+      run: |
+        set -u
+        status=0
+        index=0
+        name="$AP_NAME"
+        if [ -z "$name" ]; then name="journeys-$(printf '%s' "$AP_JOURNEYS" | sha1sum | cut -c1-8)"; fi
+        name="$(printf '%s' "$name" | tr -cd 'A-Za-z0-9_.-' | cut -c1-60)"
+        mkdir -p accesspath-results
+        # A fresh folder per call, so an earlier call's SARIF is never uploaded again.
+        base="$(mktemp -d "accesspath-results/${name}-XXXXXX")"
+        mkdir -p "$base/sarif"
+        comment="$base/comment.md"
+        echo "<!-- accesspath-report:${name} -->" > "$comment"
+        for journey in $AP_JOURNEYS; do
+          index=$((index + 1))
+          out="$base/$index"
+          args=(run "$journey" --provider "$AP_PROVIDER" --repo "$AP_REPO" --out "$out")
+          if [ -n "$AP_MODEL" ]; then args+=(--model "$AP_MODEL"); fi
+          if [ -n "$AP_API_KEY" ]; then args+=(--api-key-env AP_API_KEY); fi
+          if [ -n "$AP_FAIL_ON" ]; then args+=(--fail-on "$AP_FAIL_ON"); fi
+          baseline_file="$AP_BASELINE/$(basename "$journey" | sed 's/\.[^.]*$//').json"
+          if [ -n "$AP_BASELINE" ] && [ -f "$baseline_file" ]; then args+=(--baseline "$baseline_file"); fi
+          set +e
+          PYTHONPATH="$ACCESSPATH_ROOT" python -m accesspath "${args[@]}"
+          code=$?
+          set -e
+          if [ "$code" -gt "$status" ]; then status=$code; fi
+          if [ -f "$out/results.sarif" ]; then cp "$out/results.sarif" "$base/sarif/$index.sarif"; fi
+          if [ -f "$out/summary.md" ]; then grep -v "accesspath-report" "$out/summary.md" >> "$comment" || true; fi
+          echo "" >> "$comment"
+        done
+        cat "$comment" >> "$GITHUB_STEP_SUMMARY"
+        echo "exit-code=$status" >> "$GITHUB_OUTPUT"
+        echo "results-dir=$base" >> "$GITHUB_OUTPUT"
+        echo "name=$name" >> "$GITHUB_OUTPUT"
+
+    - name: Upload to code scanning
+      if: always() && inputs.upload-sarif == 'true'
+      continue-on-error: true
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.run.outputs.results-dir }}/sarif
+
+    - name: Comment on the pull request
+      if: always() && inputs.comment == 'true' && github.event_name == 'pull_request'
+      continue-on-error: true
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        ACCESSPATH_ROOT: ${{ github.action_path }}/../../..
+      run: |
+        PYTHONPATH="$ACCESSPATH_ROOT" python -m accesspath comment "${{ steps.run.outputs.results-dir }}/comment.md" \
+          --pr "${{ github.event.pull_request.number }}" --id "${{ steps.run.outputs.name }}"
+
+    - name: Gate
+      if: inputs.fail == 'true'
+      shell: bash
+      run: |
+        code="${{ steps.run.outputs.exit-code }}"
+        if [ "${code:-4}" != "0" ]; then
+          echo "AccessPath: a journey is blocked, failing or could not be judged (exit $code)."
+          exit 1
+        fi

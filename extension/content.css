@@ -1,0 +1,41 @@
+/* AccessPath Assist: only active when the extension adds a class to <html>. */
+html.ap-focus-ring *:focus-visible {
+  outline: 4px solid #ffbf47 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 7px #1d1d3b !important;
+  border-radius: 2px;
+}
+.ap-assist-panel {
+  position: fixed !important;
+  inset: 10% auto auto 50% !important;
+  transform: translateX(-50%);
+  z-index: 2147483647 !important;
+  width: min(34rem, 92vw);
+  max-height: 76vh;
+  overflow: auto;
+  background: #ffffff !important;
+  color: #14183a !important;
+  border: 3px solid #14183a !important;
+  border-radius: 12px;
+  padding: 1rem 1.2rem !important;
+  font: 16px/1.5 system-ui, sans-serif !important;
+  box-shadow: 0 18px 50px rgba(20, 24, 58, 0.35);
+}
+.ap-assist-panel h2 { font-size: 1.15rem !important; margin: 0 0 .6rem !important; color: #14183a !important; }
+.ap-assist-panel ul { margin: 0 !important; padding: 0 0 0 1.1rem !important; }
+.ap-assist-panel li { margin: .2rem 0 !important; }
+.ap-assist-panel a, .ap-assist-panel button { color: #3b2fb8 !important; font: inherit !important; }
+.ap-assist-panel button { background: #f1f0ff !important; border: 2px solid #3b2fb8 !important; border-radius: 6px; padding: .3rem .7rem !important; cursor: pointer; }
+.ap-assist-status {
+  position: fixed !important;
+  right: 16px !important;
+  bottom: 16px !important;
+  z-index: 2147483647 !important;
+  max-width: 22rem;
+  background: #14183a !important;
+  color: #ffffff !important;
+  border-radius: 999px;
+  padding: .45rem .9rem !important;
+  font: 15px/1.4 system-ui, sans-serif !important;
+}
+.ap-assist-status[hidden] { display: none !important; }

@@ -1,6 +1,6 @@
 # AccessPath AI — Project Handoff
 
-**Updated:** 29 October 2026, night IST (stages 1–7 done; stage 8 product pass done: team rules, one-command offline demo, Status page, scripts, CI, guides; live runs and the course matrix still need the owner's machine and keys)
+**Updated:** 2 November 2026 IST (release 1.0.0: stages 1–8 plus every future-scope item — CLI, GitHub Action, MCP server, signed-in journeys, record and replay, staging writes, baselines, live progress, Chrome extension; live runs and the course matrix still need the owner's machine and keys; pitch deck paused)
 **Read this first in a new chat.** It is the single source of truth for where the project stands. Times in this file are IST unless marked UTC; the app's database stores UTC (IST = UTC + 5:30).
 
 ## 1. What the project is
@@ -39,7 +39,7 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 - **CodeImpact reference:** the owner wants its repo-clone and code-mapping code used as a reference. `C:\code\RepoPilot` is not connected to the AccessPath chat (an access request was blocked); the owner can add the folder in the desktop app or attach its files. Read only; never modify it.
 - **Benchmark:** 12 fixture journeys exist with known results; which live public sites to add, if any (owner has none in mind).
 - **When to push** the local commits and update PR #1. The demo's Code page binding of `MICKEY0107/AccessPath-AI` only sees the benchmark pages once they are pushed (the clinic pages are already on GitHub).
-- **Release tag:** create it after the live course matrix, e.g. `git tag -a v1.0.0 -m "Phase 1 web product"` (not created yet).
+- **Release tag:** local tag `v1.0.0` exists (not pushed).
 
 ## 4. Git state
 
@@ -69,6 +69,8 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | `ef40c57` Stage 6 | 29 Oct | Where to fix (`engine/code_locator.py`), policy-bound AI search (`engine/locator_ai.py`), fix verification (`engine/fix_verify.py`) |
 | Stage 7 | 29 Oct | Security review fixes (`tests/test_security_review.py`), README, runbook, presentation outline, architecture, backlog and this handoff |
 | Stage 8 | 29 Oct | Product pass: team rules (`CustomRuleV1`, Rules page), `demo_setup` and the bundled demo repository (`RepoBinding.source`, migration codebase 0002), demo-site fallback server (`engine/fixture_site.py`), Status page and `check_setup`, overview checklist, WebSocket policy, `scripts/dev.ps1`/`dev.sh`, CI workflow, `docs/QUICKSTART.md`, `docs/USER_GUIDE.md`, `docs/ADAPTING.md`; ruff clean |
+| `3c7526a` Run fixes | 2 Nov | Fixes found while running everything end to end in the build workspace (benchmark ignores team rules, labels) |
+| Stage 10 (1.0.0) | 2 Nov | Everything from the future-scope list: `accesspath` CLI (journey files, JSON/Markdown/SARIF, exit codes, baselines, `login`, `record`), GitHub Action and example workflow, MCP server, signed-in journeys (encrypted saved sessions), record and replay, staging writes, baselines in reports, live run progress, prompt-cache usage, repeated-action stop, AccessPath Assist Chrome extension, `docs/CLI_AND_CI.md`, version 1.0.0 |
 
 Development note: these stages were built in a cloud workspace with copies of the project's `.venv` packages, tested there (Playwright Chromium, SQLite test settings), and copied back here before each commit. `ruff` was not available there; run it locally.
 
@@ -102,11 +104,11 @@ Development note: these stages were built in a cloud workspace with copies of th
 | Where to fix, patches, AI search, fix verification | Done (stage 6) | Verification only for the bundled fixture pages |
 | Team rules from a fixed set of checks | Done (stage 8) | Four checks: reachable with Tab, has a name, reached within N Tab presses, must not appear |
 | One-command offline demo, Status page, getting-started checklist | Done (stage 8) | `./scripts/dev.ps1 setup`; `demo_setup`; `/status/`; `check_setup` |
-| Cut planner cost further: prompt caching | Planned | Not done |
-| Stop early when the model repeats actions | Planned | Not done; today only the focus-cycle detector (`no_progress_limit`) and the policy rule exist |
-| Staging writes, saved-session logins, baselines | Future scope | |
-| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future scope (29 Oct) | Replaces the VS Code assistant idea |
-| Chrome voice extension for motor-disabled users | Postponed (research only) | Acts with the user's own accounts, so it needs a different trust model and user research; OS voice control already exists |
+| Cut planner cost further: prompt caching | Done (1.0.0) | Fixed instruction prefix; cached tokens shown on the reasoning tab |
+| Stop early when the model repeats actions | Done (1.0.0) | `REPEATED_ACTION_NO_PROGRESS` after 3 identical keys on the same control with no change |
+| Staging writes, saved-session logins, baselines | Done (1.0.0) | Journey settings page; sessions encrypted, owner-only, cut to the journey's sites; POST only to write origins within a budget, never during probes |
+| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Done (1.0.0) | `python -m accesspath`, `.github/actions/accesspath`, `python -m accesspath mcp`; see `docs/CLI_AND_CI.md` |
+| Chrome voice extension for motor-disabled users | Done (1.0.0), assistive only | `extension/` (AccessPath Assist): focus ring, skip link, landmarks, keyboard fixes, names, voice commands, page check. It changes the page in the user's own browser only and sends nothing to AccessPath; user research still recommended |
 | Paid default model for benchmarks | Dropped | Owner has free tiers only |
 | Deterministic fixture fallback in demo journeys | Dropped for demos | Owner wants AI only; the clinic fixtures still keep their scripted fallback |
 | Opening a new PR | Dropped for now | Owner asked for local-only work |
@@ -141,7 +143,7 @@ Times are from the run records (UTC) with IST in brackets.
 - **TodoMVC:** the new-todo input is focused on load; the first Tab from the top goes to an `http://todomvc.com` link (a different origin from the `https` start, so following it is a safety stop). Per-item checkboxes have no accessible name. The page posts analytics, which policy blocks without stopping the run.
 - **Wikipedia:** posts telemetry (`/ins-502b/v2/events`, `intake-analytics.wikimedia.org`); blocked as non-fatal policy events.
 - **GOV.UK** was probed (cookie banner first, then skip link, search at the 7th–8th Tab) but not used: search results need many Tabs, which is slow on free tiers.
-- **Steps are saved only when a run ends**, so the run page shows no steps while running.
+- **Live progress (fixed in 1.0.0):** steps are saved as they happen. Inside Playwright's greenlet Django hands out a different database connection, so `services.persist_steps` re-points the default alias to the run's own connection.
 - **Security review (29 Oct, fixed in the stage 7 commit):** an independent review of the code side found 8 issues. All are fixed with tests in `tests/test_security_review.py`. Fixed: another person's journey could be re-linked; verification served fixture files from the clone; code locations were visible to everyone; multi-line private keys slipped past redaction; index snippets were not redacted; bad ports caused a 500; size was only checked after checkout; and page line numbers were not clamped. Hardening added: no git redirects, and the whole process group is killed on time-out. WebSockets are now under the same origin policy (stage 8): a socket to another origin is never connected, and the step's policy events record it.
 - **Stage 8 review (29 Oct, fixed in the stage 8 commit):** a second independent review found 13 issues. All are fixed, with tests in `tests/test_custom_rules.py` and `tests/test_product.py`:
   - team-rule Tab checks now compare elements by a marker set during the Tab walk, not by CSS path (focus classes broke the paths)
@@ -155,6 +157,17 @@ Times are from the run records (UTC) with IST in brackets.
   - "Load the demo" never rewrites existing journeys for non-staff and never takes journeys linked to another repository, and each person can have only one demo copy
   - `dev.ps1` passes `-v` and other flags through and tolerates stderr on Windows PowerShell 5.1
   - `tasks.verify_fix` falls back to the default rules
+- **1.0.0 review (2 Nov, fixed in the 1.0.0 commit):** a third independent review of the CLI, CI action, MCP server, extension, sessions and staging found 18 issues; 17 are fixed with tests (`tests/test_cli.py`, `test_mcp.py`, `test_extension.py`, `test_sessions_replay_staging.py`):
+  - a staging POST could be redirected (307) to another site; writes are now fetched with redirects off and checked
+  - each journey gets its own SARIF category; SARIF paths are from the git root
+  - `record` saved passwords; it now skips password and card fields and records each field's final value
+  - another user could turn on staging writes for someone's signed-in journey; signed-in runs were visible to everyone
+  - POSTs skipped the path check; background POSTs could stop a run
+  - setup errors exited 1 instead of 4; bad run ids gave a 500
+  - the extension changed deliberate `tabindex="-1"` patterns, could not undo its fixes, missed single-page-app content, and voice restarted in a tight loop
+  - MCP: tool failures were protocol errors, private URLs were allowed, batches and client responses were mishandled
+  - the PR comment could update a quoted copy, and several action calls shared one comment
+  - Not changed (documented): `sync_orm_allowed` sets `DJANGO_ALLOW_ASYNC_UNSAFE` process-wide while steps are saved; keep Celery on its default prefork pool.
 - **Demo journeys linked to someone else:** a journey links to one repository. When a second person loads the demo, their demo copy is not linked, and those reports show code only to the first person.
 - **Checks change focus briefly:** focus checks blur and re-focus the control once, and page checks run a Tab walk, then restore focus exactly (verified by the scripted clinic plan). On real sites a blur handler (for example form validation) could react; the walk reloads the page if Tab itself navigates.
 - **axe-core is not vendored:** neither PyPI nor npm was reachable from the build workspace. Run `install_axe_core` once (it downloads the pinned version from jsDelivr into `vendor/`, which git ignores).
@@ -165,13 +178,14 @@ Times are from the run records (UTC) with IST in brackets.
 
 ## 8. What I was in the middle of, and the exact next step
 
-Nothing is half-done in code: stages 1–8 are committed and the suite passes in the build workspace (see section 9 for the count). Everything below needs the owner's machine, Docker and API keys:
+Nothing is half-done in code: stages 1–8 and release 1.0.0 are committed and the suite passes in the build workspace (see section 9 for the count). Everything below needs the owner's machine, Docker and API keys:
 
 1. `./scripts/dev.ps1 setup` (rebuilds the image with git and the test tools, migrates, installs axe-core, runs `demo_setup`, prints the status check). Note the demo password it prints. `createsuperuser` is still needed for the admin.
 2. `./scripts/dev.ps1 test` and `./scripts/dev.ps1 lint` in the container.
 3. Live Gate 1 numbers: `docker compose exec worker python manage.py run_benchmark --provider groq --model openai/gpt-oss-120b --repeat 3`.
 4. Course matrix: `run_fixture_matrix --provider groq --accessible-count 3 --broken-count 5`.
-5. Rehearse `docs/DEMONSTRATION_RUNBOOK.md`; push when ready so the Code page can bind the benchmark pages; tag the release.
+5. Try the 1.0.0 additions: `python -m accesspath run journeys/clinic-broken.json --repo .` (see `docs/CLI_AND_CI.md`), Journey settings, and the extension (`extension/README.md`).
+6. Rehearse `docs/DEMONSTRATION_RUNBOOK.md`; push when ready so the Code page can bind the benchmark pages and the GitHub Action runs.
 
 ## 9. Run it locally
 
@@ -191,7 +205,7 @@ docker compose exec web python manage.py install_axe_core       # optional
   `services: { web: { ports: !override ["127.0.0.1:8010:8000"] } }`, then open http://127.0.0.1:8010/runs/.
 - Restart the worker after engine changes: `docker compose restart worker`.
 - `.env` holds `GEMINI_*`, `OPENROUTER_*`, `GROQ_*` keys and models (currently `models/gemini-3.5-flash-lite`, `openrouter/free`, `openai/gpt-oss-20b`). Never print or commit it.
-- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **236 passed, 9 skipped** in the build workspace (`./scripts/dev.ps1 test`) (live-site tests are opt-in).
+- **Tests (in the container):** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` → **276 passed, 9 skipped** in the build workspace (`./scripts/dev.ps1 test`) (live-site tests are opt-in).
 - Host lint: `UV_CACHE_DIR=.uv-cache uv run ruff check .`
 
 ## 10. Where the code is
@@ -219,4 +233,4 @@ Team split: Engine (1 catalog, 2, 3) · Web UI (1 Rules page, 4, model settings 
 
 Gate 1 targets: 80% of live runs end in a trustworthy outcome; 90% of reported barriers confirmed real.
 
-**Future scope:** CLI, MCP server for coding assistants, CI with SARIF and PR comments, record-and-replay, the Chrome voice extension for disabled users (research only).
+**Future scope (all done in 1.0.0, 2 Nov):** CLI, MCP server for coding assistants, CI with SARIF and PR comments, record-and-replay, the Chrome extension for keyboard and voice users, signed-in journeys, staging writes, baselines.

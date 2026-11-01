@@ -178,3 +178,39 @@ def test_collector_merges_repeats_and_applies_ignores() -> None:
     assert results["name-role-value"] == "failed"
     assert results["focus-visible"] == "not_checked"
     assert "focus-appearance" not in results
+
+
+class StuckPlanner:
+    """Presses Enter on the same plain text control forever."""
+
+    stop_reason = ""
+    stop_detail = ""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def propose_next_action(self, observation: PlannerObservationV1):
+        self.calls += 1
+        if self.calls == 1:
+            return ProposedActionV1(action=ActionKind.TAB, target_hint="Notes")
+        return ProposedActionV1(action=ActionKind.ENTER, target_hint="Notes")
+
+    def record_outcome(self, *args) -> None:
+        return None
+
+    def runtime_metadata(self) -> dict[str, object]:
+        return {}
+
+
+def test_a_stuck_ai_stops_early_without_blaming_the_site(tmp_path: Path) -> None:
+    page = PAGE.format("<a href='#' onclick='return false'>Notes</a>")
+    planner = StuckPlanner()
+    with serve_pages({"/": page}) as origin:
+        result = executor_for(
+            origin, tmp_path, max_steps=12, no_progress_limit=10
+        ).run_with_planner(planner, goal="Open the notes")
+    assert result.outcome == "agent_error"
+    assert result.terminal_reason == "REPEATED_ACTION_NO_PROGRESS"
+    assert result.failure_kind == "agent_failure"
+    assert planner.calls == 4  # one Tab, then three identical Enters
+    assert not [finding for finding in result.findings if finding.status == "confirmed"]

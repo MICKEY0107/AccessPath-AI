@@ -281,11 +281,15 @@ class TargetPolicyV1(BaseModel):
     navigation_origins: list[str] = Field(min_length=1, max_length=10)
     resource_origins: list[str] = Field(min_length=1, max_length=20)
     navigation_path_prefixes: list[str] = Field(min_length=1, max_length=20)
-    allowed_methods: list[Literal["GET", "HEAD", "OPTIONS"]] = Field(
+    allowed_methods: list[Literal["GET", "HEAD", "OPTIONS", "POST"]] = Field(
         default_factory=lambda: ["GET", "HEAD", "OPTIONS"],
         min_length=1,
-        max_length=3,
+        max_length=4,
     )
+    # Staging only: POST (form submissions) is allowed solely to these origins, which
+    # must also be navigation origins, and at most ``max_writes`` times per run.
+    write_origins: list[str] = Field(default_factory=list, max_length=3)
+    max_writes: int = Field(default=0, ge=0, le=20)
     allow_popups: Literal[False] = False
     allow_downloads: Literal[False] = False
     # Real sites load images, fonts, and scripts from many CDNs. When true, read-only
@@ -331,6 +335,17 @@ class TargetPolicyV1(BaseModel):
         if any(not value.startswith("/") or "?" in value or "#" in value for value in values):
             raise ValueError("navigation path prefixes must be absolute paths")
         return list(dict.fromkeys(values))
+
+    @model_validator(mode="after")
+    def writes_are_bounded(self) -> TargetPolicyV1:
+        if "POST" in self.allowed_methods:
+            if not self.write_origins or self.max_writes < 1:
+                raise ValueError("POST needs write_origins and max_writes (staging only)")
+            if not set(self.write_origins) <= set(self.navigation_origins):
+                raise ValueError("write_origins must be navigation origins")
+        elif self.write_origins or self.max_writes:
+            raise ValueError("write_origins and max_writes need POST in allowed_methods")
+        return self
 
 
 class ElementDetailsV1(BaseModel):

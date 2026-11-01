@@ -19,6 +19,7 @@ from .gemini import SYSTEM_INSTRUCTION
 from .groq import STRICT_ACTION_SCHEMA
 from .planner import OllamaTimeoutError, OllamaTransientError, OllamaUnavailableError
 from .provider_http import completion_hint, provider_error_message
+from .provider_usage import TokenUsage
 
 RETRY_TEMPERATURE = 0.4
 
@@ -39,6 +40,7 @@ class OllamaActionClient:
         self.timeout_seconds = timeout_seconds
         self.opener = opener
         self.last_response_model = ""
+        self.usage = TokenUsage()
         self._retrying_invalid = False
 
     def generate_action(self, *, model: str, observation) -> object:
@@ -93,6 +95,7 @@ class OllamaActionClient:
             raise unreachable from error
         try:
             document = json.loads(body)
+            self.usage.add_ollama(document)
             if isinstance(document.get("model"), str):
                 self.last_response_model = document["model"]
             content = document["message"]["content"]

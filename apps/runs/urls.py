@@ -1,5 +1,13 @@
 from django.urls import path
 
+from .journey_tools import (
+    export_journey_file,
+    journey_settings,
+    save_baseline,
+    save_replay_plan,
+    save_session,
+    save_staging,
+)
 from .model_settings import forget_key, list_provider_models, model_settings, save_model_settings
 from .rule_views import rules_page, save_journey_rules
 from .views import (
@@ -27,6 +35,12 @@ urlpatterns = [
     path("models/forget/", forget_key, name="forget_key"),
     path("models/list/", list_provider_models, name="list_models"),
     path("journeys/<int:journey_id>/rules/", save_journey_rules, name="save_rules"),
+    path("journeys/<int:journey_id>/settings/", journey_settings, name="journey_settings"),
+    path("journeys/<int:journey_id>/session/", save_session, name="save_session"),
+    path("journeys/<int:journey_id>/replay/", save_replay_plan, name="save_replay"),
+    path("journeys/<int:journey_id>/staging/", save_staging, name="save_staging"),
+    path("journeys/<int:journey_id>/baseline/", save_baseline, name="save_baseline"),
+    path("journeys/<int:journey_id>/journey.json", export_journey_file, name="journey_file"),
     path("<uuid:run_id>/", run_detail, name="detail"),
     path("<uuid:run_id>/report.json", export_report_json, name="report_json"),
     path("<uuid:run_id>/report.html", export_report_html, name="report_html"),

@@ -1,0 +1,14 @@
+{
+  "schema_version": "accesspath_journey.v1",
+  "name": "TodoMVC add and complete",
+  "goal": "In the TodoMVC app, use only the keyboard to add two to-do items, 'Buy milk' and 'Call the clinic', then mark 'Buy milk' as completed so exactly one item is left.",
+  "start_url": "https://todomvc.com/examples/react/dist/",
+  "success": {
+    "text_present": "1 item left"
+  },
+  "type_values": {
+    "first_item": "Buy milk",
+    "second_item": "Call the clinic"
+  },
+  "max_steps": 30
+}

@@ -10,6 +10,9 @@ apps/            Django: pages, models, background tasks
   journeys/      Journey model, rule settings form, real-site form
   runs/          runs, findings, report, Models page, rules page, code mapping, commands
   codebase/      repository bindings, demo repository, clone task
+accesspath/      command line, CI reports (JSON, Markdown, SARIF), GitHub comment, MCP server, recorder
+extension/       AccessPath Assist, the Chrome extension for keyboard and voice users
+journeys/        example journey files for the command line and CI
 engine/          no Django: the browser, planners, rules and code tools
   executor.py    the keyboard loop and request policy (incl. WebSockets)
   checks.py      focus, page and team-rule checks
@@ -20,7 +23,8 @@ engine/          no Django: the browser, planners, rules and code tools
   repo_clone.py  safe clone · code_index.py index · secret_scan.py redaction
   code_locator.py where-to-fix and patches · locator_ai.py policy-bound AI search
   fix_verify.py  verify a patch on a copy of the demo site
-  fixture_site.py fallback server for the demo site
+  fixture_site.py fallback server for the demo site; serves a site folder for the CLI
+  session_state.py saved sign-ins (filtered to a journey's sites)
 rules/catalog.json   the reviewed rule catalog
 fixtures/            the demo site (clinic + benchmark pages) and journey manifests
 tests/               pytest; page_server.py serves throwaway pages to a real browser

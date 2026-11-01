@@ -4,6 +4,7 @@
     {% if finding.wcag_criterion %}<a class="tag tag-neutral" href="{{ finding.help_url|default:'#' }}">WCAG {{ finding.wcag_criterion }}{% if finding.wcag_level %} · {{ finding.wcag_level }}{% endif %}</a>{% endif %}
     {% if finding.ignored %}<span class="tag tag-neutral">Ignored</span>{% elif finding.status == "confirmed" %}<span class="tag tag-issue">Confirmed</span>{% else %}<span class="tag">Needs review</span>{% endif %}
     {% if finding.source == "axe" %}<span class="tag tag-neutral">axe-core</span>{% endif %}
+    {% if finding.baseline_new %}<span class="tag tag-issue">New since baseline</span>{% endif %}
   </div>
   <h3>{{ finding.rule_title }}</h3>
   <p>{{ finding.summary }}</p>

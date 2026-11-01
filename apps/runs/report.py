@@ -66,6 +66,14 @@ def _rule_index(run: Run) -> dict[str, Any]:
     return rules_for_metadata((run.planner_metadata or {}).get("rules"))
 
 
+def can_view_run(run: Run, viewer: Any) -> bool:
+    """A run that used a saved sign-in shows signed-in pages, so only its starter sees it."""
+    metadata = run.planner_metadata or {}
+    if not metadata.get("signed_in"):
+        return True
+    return viewer is not None and getattr(viewer, "pk", None) == metadata.get("started_by")
+
+
 def can_view_code(run: Run, viewer: Any) -> bool:
     """Code from a linked repository is shown only to the person who linked it."""
     binding = run.journey.repo_binding
@@ -256,10 +264,31 @@ def _repository(run: Run, show_code: bool = False) -> dict[str, Any] | None:
     }
 
 
+def _baseline(run: Run, findings: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Compare with the journey's baseline run: which findings are new, which were fixed."""
+    baseline_id = (run.journey.evaluation_config or {}).get("baseline_run")
+    if not baseline_id or str(run.id) == str(baseline_id):
+        return None
+    baseline = Run.objects.filter(pk=baseline_id).first()
+    if baseline is None:
+        return None
+    known = {item.finding_id: item.title for item in baseline.findings.all()}
+    current = {row["id"] for row in findings}
+    for row in findings:
+        row["baseline_new"] = row["id"] not in known
+    return {
+        "run": str(baseline.id),
+        "created_at": baseline.created_at,
+        "new": sum(1 for row in findings if row["baseline_new"] and not row["ignored"]),
+        "fixed": [title for finding_id, title in known.items() if finding_id not in current],
+    }
+
+
 def build_report(run: Run, viewer: Any = None) -> dict[str, Any]:
     """The report as ``viewer`` may see it; code locations only for the repository owner."""
     show_code = can_view_code(run, viewer)
     findings = _finding_rows(run, show_code)
+    baseline = _baseline(run, findings)
     rules_meta = (run.planner_metadata or {}).get("rules") or {}
     fail_on = rules_meta.get("fail_on", "serious")
     verdict = _verdict_key(run, findings, fail_on)
@@ -324,10 +353,12 @@ def build_report(run: Run, viewer: Any = None) -> dict[str, Any]:
         },
         "axe": (metadata.get("executor") or {}).get("axe") or {},
         "repository": _repository(run, show_code),
+        "baseline": baseline,
         "planner": {
             "provider": run.planner_provider,
             "model": metadata.get("model") or run.planner_model,
             "fallback_used": bool(metadata.get("fallback_used")),
+            "usage": metadata.get("usage") if isinstance(metadata.get("usage"), dict) else None,
         },
         "ai_steps": _ai_reasoning(run),
         "probe_events": metadata.get("probe_events") or [],

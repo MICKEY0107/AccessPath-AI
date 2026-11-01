@@ -35,6 +35,8 @@ class TargetPolicy:
         self._navigation_origins = set(config.navigation_origins)
         self._resource_origins = set(config.resource_origins)
         self._allowed_methods = set(config.allowed_methods)
+        self._write_origins = set(config.write_origins)
+        self.writes_used = 0
 
     def validate_start_url(self, url: str) -> None:
         decision = self.decide_request(url, method="GET", is_navigation=True)
@@ -59,14 +61,22 @@ class TargetPolicy:
         if not is_navigation and parsed.scheme in {"about", "blob", "data"}:
             return TargetPolicyDecision(True, "REQUEST_ALLOWED")
         origin = f"{parsed.scheme}://{parsed.netloc}"
+        if method.upper() == "POST":
+            # Staging writes: only to the declared origins and paths, and only a few per
+            # run. Every POST counts (background ones too); once the budget is spent a
+            # form submission stops the run, while a background POST is just blocked.
+            if origin not in self._write_origins:
+                return TargetPolicyDecision(False, "WRITE_ORIGIN_NOT_ALLOWED", fatal=is_navigation)
+            if not self._path_allowed(parsed.path):
+                return TargetPolicyDecision(False, "WRITE_PATH_NOT_ALLOWED", fatal=is_navigation)
+            if self.writes_used >= self.config.max_writes:
+                return TargetPolicyDecision(False, "WRITE_BUDGET_EXCEEDED", fatal=is_navigation)
+            self.writes_used += 1
+            return TargetPolicyDecision(True, "WRITE_ALLOWED")
         if is_navigation:
             if origin not in self._navigation_origins:
                 return TargetPolicyDecision(False, "NAVIGATION_ORIGIN_NOT_ALLOWED", fatal=True)
-            path = parsed.path or "/"
-            if not any(
-                path.startswith(prefix)
-                for prefix in self.config.navigation_path_prefixes
-            ):
+            if not self._path_allowed(parsed.path):
                 return TargetPolicyDecision(False, "NAVIGATION_PATH_NOT_ALLOWED", fatal=True)
             return TargetPolicyDecision(True, "REQUEST_ALLOWED")
 
@@ -77,6 +87,10 @@ class TargetPolicy:
                 return TargetPolicyDecision(False, "RESOURCE_PRIVATE_HOST_BLOCKED", fatal=False)
             return TargetPolicyDecision(True, "REQUEST_ALLOWED")
         return TargetPolicyDecision(False, "RESOURCE_ORIGIN_NOT_ALLOWED", fatal=False)
+
+    def _path_allowed(self, path: str) -> bool:
+        path = path or "/"
+        return any(path.startswith(prefix) for prefix in self.config.navigation_path_prefixes)
 
     def decide_popup(self) -> TargetPolicyDecision:
         if self.config.allow_popups:

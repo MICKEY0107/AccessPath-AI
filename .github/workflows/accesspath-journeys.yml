@@ -1,0 +1,42 @@
+name: Keyboard journeys
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # The gate: the accessible clinic journey must keep passing.
+      - name: Gate on the accessible journey
+        uses: ./.github/actions/accesspath
+        with:
+          journeys: journeys/clinic-accessible.json
+          name: gate
+          comment: "false"
+
+      # A demonstration report: these demo pages have known barriers, so they are
+      # reported on the pull request and in code scanning but do not fail the job.
+      - name: Report on the demo barriers
+        uses: ./.github/actions/accesspath
+        with:
+          journeys: journeys/clinic-broken.json journeys/no-focus-style.json
+          name: demo-barriers
+          fail: "false"
+
+      # With a Groq key saved as a repository secret, the same action plans live:
+      # - uses: ./.github/actions/accesspath
+      #   with:
+      #     journeys: journeys/wikipedia-search.json
+      #     provider: groq
+      #     model: openai/gpt-oss-120b
+      #     api-key: ${{ secrets.GROQ_API_KEY }}

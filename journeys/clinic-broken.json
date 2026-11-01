@@ -1,0 +1,49 @@
+{
+  "schema_version": "accesspath_journey.v1",
+  "name": "Clinic appointment booking — keyboard barrier control",
+  "goal": "Attempt the same appointment-booking journey and record evidence when the keyboard cannot reach or operate the appointment time-slot control.",
+  "site_dir": "../fixtures/clinic",
+  "start_path": "/broken/index.html",
+  "completion_policy": {
+    "schema_version": "completion_policy.v1",
+    "mode": "all",
+    "signals": [
+      {
+        "id": "unreachable_completion",
+        "type": "url_path_equals",
+        "expected": "/broken/confirmation.html"
+      }
+    ],
+    "stability": {
+      "consecutive_observations": 2,
+      "interval_ms": 500
+    }
+  },
+  "plan": [
+    {
+      "action": "tab",
+      "purpose": "focus the declared journey entry link"
+    },
+    {
+      "action": "enter",
+      "purpose": "open service selection"
+    },
+    {
+      "action": "tab",
+      "purpose": "focus the available service"
+    },
+    {
+      "action": "enter",
+      "purpose": "choose the service"
+    },
+    {
+      "action": "tab",
+      "target_hint": "appointment-slot",
+      "purpose": "attempt to focus an appointment time; the control is intentionally skipped by keyboard focus"
+    }
+  ],
+  "barrier_check": {
+    "required_focus_test_id": "appointment-slot",
+    "max_keyboard_actions": 5
+  }
+}

@@ -16,6 +16,8 @@ Then open <http://127.0.0.1:8000/> and sign in as **demo** with the password the
 |---|---|
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | Setup, a five-minute tour, everyday commands, fixing common problems |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Reading a report (product managers) and setting up journeys, rules, code and models (developers) |
+| [docs/CLI_AND_CI.md](docs/CLI_AND_CI.md) | The command line, journey files, GitHub Actions (SARIF, PR comments, baselines), the MCP server for coding assistants |
+| [extension/README.md](extension/README.md) | AccessPath Assist, the Chrome extension for keyboard and voice users |
 | [docs/ADAPTING.md](docs/ADAPTING.md) | Settings, extension points (rules, checks, providers, code patterns, hosts), testing |
 | [docs/DEMONSTRATION_RUNBOOK.md](docs/DEMONSTRATION_RUNBOOK.md) | The 10-minute presentation demo |
 
@@ -29,6 +31,17 @@ AccessPath runs a declared task on a website using only the keyboard and returns
 4. **Report.** The run page is an accessibility report: verdict, plain-language summary for product managers, findings mapped to WCAG rules from a reviewed catalog, fixes, the AI's reasoning, and the full keyboard evidence. Export it as HTML or JSON.
 5. **Point to the code.** Link the site's repository on the **Code** page. AccessPath clones it read-only, indexes the front end, and shows each finding's exact file and line, likely causes and other affected places, with a reviewable patch. Fixes to the bundled fixture pages can be verified on a temporary copy.
 
+## Four ways to use it
+
+| | For | Start with |
+|---|---|---|
+| **Web app** | Product managers and developers: run journeys, read reports, link code | `./scripts/dev.ps1 setup` |
+| **Command line** | Developers: run a journey file anywhere, reports in JSON, Markdown and SARIF | `python -m accesspath run journeys/clinic-broken.json --repo .` |
+| **CI gate** | Teams: every pull request runs the journeys; findings appear at the line to fix, with one summary comment | `.github/actions/accesspath` |
+| **MCP server** | Coding assistants: run journeys and check pages while editing | `python -m accesspath mcp` |
+
+AccessPath Assist, a Chrome extension in `extension/`, helps people who use a keyboard or voice get past the same barriers on sites that have not fixed them yet.
+
 ## Pages
 
 | Tab | What it is for |
@@ -39,6 +52,7 @@ AccessPath runs a declared task on a website using only the keyboard and returns
 | Active codebase | Bind a GitHub, GitLab or Bitbucket repository and branch to a live site, or use the bundled demo repository; see code patterns that often break keyboard access |
 | Models | Choose provider and model, list the provider's models, optionally remember an encrypted key; see which providers may read private code |
 | Report (per run) | Findings map with where-to-fix, fixes and re-checks, AI reasoning, evidence, exports |
+| Journey settings (per journey) | Saved sign-in for pages behind a login, record and replay, baseline (new vs fixed findings), staging writes, download as a CLI journey file |
 | Status | What is set up (database, worker, browser, demo site, axe-core, git, AI providers) and the exact fix for anything that is not; `python manage.py check_setup` in a terminal |
 
 ## Local setup (step by step)

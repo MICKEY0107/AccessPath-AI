@@ -41,3 +41,10 @@ Thumbs.db
 
 # Third-party scripts downloaded by manage.py commands
 vendor/
+
+# Local Compose overrides (see docker-compose.override.example.yml)
+docker-compose.override.yml
+
+# CLI and MCP output
+.accesspath/
+accesspath-results/

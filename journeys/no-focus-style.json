@@ -1,0 +1,34 @@
+{
+  "schema_version": "accesspath_journey.v1",
+  "name": "Benchmark — order confirmation without a focus outline",
+  "goal": "Confirm the order.",
+  "site_dir": "../fixtures/clinic",
+  "start_path": "/benchmark/no-focus-style.html",
+  "completion_policy": {
+    "schema_version": "completion_policy.v1",
+    "mode": "all",
+    "signals": [
+      {
+        "id": "done_page",
+        "type": "url_path_equals",
+        "expected": "/benchmark/done.html"
+      }
+    ],
+    "stability": {
+      "consecutive_observations": 2,
+      "interval_ms": 500
+    }
+  },
+  "plan": [
+    {
+      "action": "tab",
+      "target_hint": "Confirm order",
+      "purpose": "focus Confirm order"
+    },
+    {
+      "action": "enter",
+      "target_hint": "Confirm order",
+      "purpose": "confirm"
+    }
+  ]
+}

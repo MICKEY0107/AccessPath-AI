@@ -145,6 +145,17 @@ For common patterns there is a patch, for example:
 
 AccessPath never changes your repository: you copy the patch.
 
+### Journey settings
+
+Open **Journey settings** from a journey on Evaluation runs:
+
+- **Signed-in pages:** upload a session saved with `python -m accesspath login <start page>`, and runs you start begin signed in. The password is never seen. The session is encrypted, cut down to the journey's own sites, never shown back, and used only by its owner's runs. While it is saved, only its owner can change the journey's replay plan and staging writes, and the reports of signed-in runs (with their screenshots) are visible only to the person who started them.
+- **Record and replay:** save the keys of a run that completed the journey as its replay plan. **Scripted plan (no AI)** then repeats them exactly, as a quick regression test with no AI calls. **Download as a journey file** takes the same journey to the command line and CI ([CLI_AND_CI.md](CLI_AND_CI.md)).
+- **Baseline:** pick a run as the baseline. Later reports mark findings that are **New since baseline** and list what was fixed, so a team can stop new barriers before fixing every old one.
+- **Staging writes:** off by default. On a staging copy of a site you added, you can allow a few form submissions per run, to your site's own address and paths only, so sign-up or checkout journeys can finish. A submission that redirects to another site is stopped before it is re-sent. You must confirm that the site is yours and not production. The demo journeys always stay read-only.
+
+While a run is going, its report page fills in step by step.
+
 ### Models and keys
 
 On **Models**:

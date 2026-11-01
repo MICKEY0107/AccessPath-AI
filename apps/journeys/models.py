@@ -6,6 +6,7 @@ not live in view logic or browser code.
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.validators import MinLengthValidator
 from django.db import models
 
@@ -62,3 +63,22 @@ class Journey(models.Model):
             return True
         fallback = planner.get("fallback")
         return isinstance(fallback, dict) and fallback.get("kind") == "fixture_plan.v1"
+
+
+class JourneySession(models.Model):
+    """A saved sign-in (browser storage state) for a journey behind a login.
+
+    Encrypted at rest, cut down to the journey's own sites, never shown back, and used
+    only by runs that its owner starts.
+    """
+
+    journey = models.OneToOneField(Journey, on_delete=models.CASCADE, related_name="session")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="journey_sessions"
+    )
+    encrypted_state = models.TextField()
+    summary = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return f"Saved sign-in for {self.journey}"

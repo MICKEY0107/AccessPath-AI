@@ -127,3 +127,25 @@ def copy_bundled_site(base_dir: Path, destination: Path) -> tuple[int, int]:
     )
     files = [path for path in destination.rglob("*") if path.is_file()]
     return len(files), sum(path.stat().st_size for path in files)
+
+
+@contextmanager
+def serve_directory(root: Path) -> Iterator[str]:
+    """Serve a local static site (read-only, no hidden files) on a free loopback port.
+
+    Used by the CLI for journeys on a site folder in a repository, so CI can evaluate a
+    static build without deploying it. Yields the origin, e.g. ``http://127.0.0.1:53817``.
+    """
+    root = root.resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"site folder not found: {root}")
+    handler = functools.partial(_FixtureHandler, directory=str(root))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

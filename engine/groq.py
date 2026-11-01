@@ -26,6 +26,7 @@ from .planner import (
     GeminiUnavailableError,
 )
 from .provider_http import completion_hint, provider_error_message, retry_after_seconds
+from .provider_usage import TokenUsage
 
 GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -63,6 +64,14 @@ def response_format_for(model: str) -> dict[str, object]:
             },
         }
     return {"type": "json_object"}
+
+
+GROQ_SYSTEM_PROMPT = (
+    SYSTEM_INSTRUCTION
+    + "\n\nYou must output a JSON object matching exactly this schema:\n"
+    + json.dumps(ProposedActionV1.model_json_schema())
+)
+
 
 class GroqQuotaError(GeminiQuotaError):
     code = "GROQ_QUOTA_FAILURE"
@@ -107,16 +116,14 @@ class GroqActionClient:
         self.sleep = sleep
         self.monotonic = monotonic
         self.last_response_model = ""
+        self.usage = TokenUsage()
         # At temperature 0 a retry repeats the same malformed answer, so the call after
         # a retryable failure samples a little more freely.
         self._retrying_invalid = False
 
     def generate_action(self, *, model: str, observation: PlannerObservationV1) -> object:
-        system_prompt = (
-            SYSTEM_INSTRUCTION
-            + "\n\nYou must output a JSON object matching exactly this schema:\n"
-            + json.dumps(ProposedActionV1.model_json_schema())
-        )
+        # Identical on every call and sent first, so Groq's prompt cache can reuse it.
+        system_prompt = GROQ_SYSTEM_PROMPT
         payload = {
             "model": model,
             "messages": [
@@ -167,6 +174,7 @@ class GroqActionClient:
 
         try:
             document = json.loads(response_body)
+            self.usage.add_openai(document.get("usage"))
             resolved_model = document.get("model")
             if isinstance(resolved_model, str):
                 self.last_response_model = resolved_model

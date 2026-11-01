@@ -58,10 +58,9 @@ class Command(BaseCommand):
             )
 
         journeys = self._journeys_by_manifest_key()
-        cases = (
-            [("clinic-accessible-booking", "completed")] * accessible_count
-            + [("clinic-keyboard-trap-control", "blocked")] * broken_count
-        )
+        cases = [("clinic-accessible-booking", "completed")] * accessible_count + [
+            ("clinic-keyboard-trap-control", "blocked")
+        ] * broken_count
         evidence: list[str] = []
 
         for index, (journey_key, expected_result) in enumerate(cases, start=1):

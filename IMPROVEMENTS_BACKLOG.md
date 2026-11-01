@@ -30,8 +30,16 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 | One-command offline demo (`demo_setup`, bundled demo repository, demo-site fallback) | 8 | done | No AI key or GitHub needed |
 | Status page, `check_setup`, getting-started checklist | 8 | done | Every item says how to fix it |
 | `scripts/dev.ps1` / `dev.sh`, CI workflow, Quickstart / User guide / Adapting guide | 8 | done | Dev image now includes pytest and ruff |
+| Stop a run early when the AI repeats the same key with no effect | 1.0 | done | `REPEATED_ACTION_NO_PROGRESS`, never blamed on the site |
+| Prompt caching and token-use reporting | 1.0 | done | Identical instruction prefix; cached tokens on the AI reasoning tab |
+| Port override example | 1.0 | done | `docker-compose.override.example.yml` |
+| Release 1.0.0 | 1.0 | done | `CHANGELOG.md`, local tag `v1.0.0` |
+| Pitch deck | 1.0 | paused | Owner asked to finish the product first (2 Nov) |
+| Live AI benchmark and 3 + 5 course matrix | — | ready, not run | Needs a provider reachable from the owner's machine |
 | Use CodeImpact (`C:\code\RepoPilot`) as a read-only reference for cloning and code mapping | 5-6 | no reply | Built without it; still blocked on access |
-| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | Future | postponed | Replaces the VS Code assistant idea |
+| CLI, MCP server, CI with SARIF and PR comments, record-and-replay | 1.0 | done | `python -m accesspath`, `.github/actions/accesspath`, `python -m accesspath mcp`; `docs/CLI_AND_CI.md` |
+| Signed-in journeys, staging writes, baselines, live run progress | 1.0 | done | Journey settings page |
+| AccessPath Assist Chrome extension | 1.0 | done | `extension/`; assistive only, sends nothing to AccessPath |
 
 ## Planner and models
 
@@ -122,14 +130,14 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 ### Prompt caching
 - **What:** Reuse the long system prompt across calls where the provider supports caching.
 - **Why:** Further cuts token use on free tiers.
-- **Status:** agreed, not started.
-- **Code:** `engine/gemini.py`, `engine/groq.py`, `engine/openrouter.py`.
-- **Effort:** medium. Unconfirmed which free tiers support caching.
+- **Status:** done (1.0): the fixed instructions are one identical prefix on every call, so provider-side caching applies; cached prompt tokens are recorded per run (`engine/provider_usage.py`) and shown on the AI reasoning tab.
+- **Code:** `engine/gemini.py`, `engine/groq.py`, `engine/openrouter.py`, `engine/ollama.py`, `engine/provider_usage.py`.
+- **Effort:** medium.
 
 ### Stop early when the model repeats itself
 - **What:** End or redirect a run when the planner proposes the same action on the same control several times without progress.
 - **Why:** Run `e1106f6a` (28 Sep) used all 40 calls; run `c510c273` toured 18 Tabs through the TodoMVC footer.
-- **Status:** agreed, not started (only the focus-cycle detector `no_progress_limit` and `COMMIT_TYPED_VALUE_FIRST` exist).
+- **Status:** done (1.0): three identical keys on the same control with no effect end the run as `REPEATED_ACTION_NO_PROGRESS` (an agent failure; the site is still probed before anything is blamed).
 - **Code:** `engine/executor.py`, `engine/planner.py`.
 - **Effort:** small.
 
@@ -192,12 +200,13 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 ### Staging-only writes with test data
 - **What:** Allow POST only to allowlisted staging hosts, with test data from a fixture file.
 - **Why:** Most keyboard barriers are in forms, sign-up and checkout.
-- **Status:** postponed (Phase 2 of the plan).
+- **Status:** done (1.0): the owner confirms on Journey settings; POST only to write origins, up to `max_writes` per run (1–20), never during re-check probes. CLI: `staging_writes: true`. Test data comes from the journey's typed values.
+- **Code:** `engine/contracts.py` (`TargetPolicyV1`), `engine/target_policy.py`, `apps/runs/journey_tools.py`.
 - **Effort:** medium.
 
 ### Authenticated journeys via saved session state
 - **What:** Upload a Playwright storage state per site; never type passwords.
-- **Status:** postponed (Phase 2).
+- **Status:** done (1.0): `python -m accesspath login` captures it; upload on Journey settings. Encrypted, owner-only, cut to the journey's sites (`engine/session_state.py`).
 - **Effort:** medium.
 
 ## Checks and WCAG findings
@@ -205,30 +214,30 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 ### Confirm before blaming
 - **What:** Before reporting a barrier, re-focus the target the planner was aiming for and test focusability and Enter/Space activation deterministically; otherwise report an agent failure.
 - **Why:** A tool that blames the site for its own planner mistakes will not be trusted.
-- **Status:** agreed, not started (exact next step in `PROJECT_HANDOFF.md`).
+- **Status:** done (stage 2, `87e8476`).
 - **Code:** `engine/executor.py` (`_execute_actions` terminal branches), tests in `tests/test_browser_fixture_flow.py`.
 - **Effort:** medium.
 
 ### Map findings to WCAG with severity
 - **What:** Each finding names its criterion (2.1.1, 2.1.2, 2.4.1, 2.4.3, 2.4.7, 2.4.11, 3.2.1; 2.4.13 advisory), severity, step and screenshot.
-- **Status:** agreed, not started.
+- **Status:** done (stages 1–3).
 - **Effort:** medium.
 
 ### Focus visible, focus obscured, skip link, focus order checks
 - **What:** Compare focused vs unfocused screenshots for an indicator, detect sticky elements covering focus, test the first Tab for a skip link, compare tab order with visual position.
-- **Status:** agreed, not started.
+- **Status:** done (stage 3, `25db171`).
 - **Effort:** large.
 
 ### Flag unnamed controls
 - **What:** Report focusable controls with no accessible name.
 - **Why:** TodoMVC's per-item checkboxes have no accessible name (seen in every TodoMVC run).
-- **Status:** agreed, not started (part of the checks item).
+- **Status:** done (stage 3, checked against Chromium's accessibility tree).
 - **Effort:** small.
 
 ### axe-core at each new page state
 - **What:** Run axe-core when the page changes and attach results.
 - **Why:** Deque's report says automated rules catch 57.38% of issues; combining gives journey and page findings.
-- **Status:** agreed, not started.
+- **Status:** done (stage 3; optional, `install_axe_core`).
 - **Effort:** medium.
 
 ## Evidence and reports
@@ -241,18 +250,17 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 ### Save steps while the run is in progress
 - **What:** Persist each step as it happens instead of at the end.
 - **Why:** The run page shows no steps while a run is going; long free-tier runs look stuck.
-- **Status:** no reply (noticed, not proposed before).
-- **Code:** `apps/runs/services.py` (`pending_steps` buffer exists because Playwright callbacks run inside its event loop).
+- **Status:** done (1.0): steps are written as they happen (`persist_steps` in `apps/runs/services.py`).
 - **Effort:** medium.
 
 ### Shareable reports
 - **What:** HTML/PDF page and JSON per run.
-- **Status:** postponed (Phase 2).
+- **Status:** done (stage 4): HTML and JSON export; PDF via the browser's print.
 - **Effort:** medium.
 
 ### Baselines, run-to-run diff and flake rate
 - **What:** Store a passing run's focus path, flag changes later, repeat each run 3 times.
-- **Status:** postponed (Phase 2).
+- **Status:** done (1.0) for findings: a journey's baseline run marks findings as new or fixed; CLI `--baseline` fails only on new findings. Repeats: `run_benchmark --repeat`. Focus-path diff not done.
 - **Effort:** medium.
 
 ## UI and dashboard
@@ -301,17 +309,17 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 - **Status:** no reply (considered but not proposed to you; unconfirmed fit).
 
 ### Grow the benchmark to about 10 journeys
-- **Status:** agreed, not started.
+- **Status:** done (stage 4): 12 journeys; scripted plans match 36/36 with every Gate 1 target met.
 
 ### Final course matrix (from project chat)
 - **What:** 3 accessible + 5 broken clinic runs on one provider.
-- **Status:** agreed, not started. Any one provider is acceptable (decided 29 Oct).
+- **Status:** ready to run, not run: needs a live provider from the owner's machine (`run_fixture_matrix --provider groq --accessible-count 3 --broken-count 5`). Any one provider is acceptable (decided 29 Oct).
 
 ## Developer workflow (CLI, CI, tests, Docker)
 
 ### CLI and CI gate
 - **What:** `accesspath run journey.yaml` with exit codes and a GitHub Action.
-- **Status:** postponed to future scope (29 Oct: web only).
+- **Status:** done (1.0): `python -m accesspath run`, exit codes 0–4, SARIF, PR comment, `.github/actions/accesspath`.
 - **Effort:** medium.
 
 ### Run the test suite in the container
@@ -321,7 +329,7 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 
 ### Port 8010 override
 - **What:** Map web to 8010 because another local app holds port 8000.
-- **Status:** partly done: documented in the handoff; the override file is not in the repo. Adding a `docker-compose.override.example.yml` is not started.
+- **Status:** done (1.0): `docker-compose.override.example.yml`; copy it to `docker-compose.override.yml`.
 - **Effort:** small.
 
 ### `uv` cache workaround (from project chat)
@@ -363,12 +371,12 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 
 ### VS Code developer assistant
 - **What:** Extension that flags keyboard problems while coding and runs a journey against localhost through the CLI, showing results in the Problems panel.
-- **Status:** replaced (29 Oct) by a future MCP server, which works inside Claude Code, Cursor and Copilot agent mode.
+- **Status:** replaced (29 Oct) by the MCP server, done in 1.0 (`python -m accesspath mcp`), which works inside Claude Code, Cursor and Copilot agent mode.
 - **Effort:** medium (about 3–4 weeks once the CLI exists; estimate).
 
 ### Chrome voice extension for motor-disabled users
 - **What:** User speaks a goal; the agent operates the page in their own tab.
-- **Status:** postponed (research only).
+- **Status:** done (1.0) as an assistive extension, AccessPath Assist (`extension/`): voice commands (next, previous, click, skip, landmarks, scroll), focus ring, keyboard fixes, names, page check. No AI and no autonomous submits, so the concerns below are avoided; user research is still recommended.
 - **Why postponed:** It acts with the user's accounts, so it needs confirmation before submits or payments, privacy handling, user research, and comparison with OS voice control (Voice Access, Voice Control).
 - **Effort:** large.
 
@@ -395,7 +403,6 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 - Groq 429 messages include the organisation id, which is saved in local evidence.
 - `openrouter/free` remains the `.env` default and is unreliable.
 - Gemini untested since the fixes; last known result `GEMINI_TIMEOUT`.
-- Steps are saved only when a run ends.
 - Celery worker does not reload code; restart after engine changes.
 - DNS rebinding between the host check and navigation is not prevented.
 - `COMMIT_TYPED_VALUE_FIRST` can confuse two unnamed fields (edge case).

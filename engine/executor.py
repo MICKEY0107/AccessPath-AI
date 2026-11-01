@@ -10,7 +10,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from uuid import UUID
 
 from playwright.sync_api import BrowserContext, Download, Page, Route, sync_playwright
@@ -60,6 +60,9 @@ class EvaluationResult:
 OBSERVATION_ELEMENTS_AFTER_FOCUS = 18
 OBSERVATION_ELEMENTS_BEFORE_FOCUS = 4
 OBSERVATION_VISIBLE_TEXT_CHARS = 1500
+# A live planner proposing the same key on the same control this many times in a row,
+# with nothing changing, is stuck: stop early (an agent failure, never a site barrier).
+REPEATED_ACTION_LIMIT = 3
 
 
 class KeyboardExecutor:
@@ -95,6 +98,7 @@ class KeyboardExecutor:
         rule_set: ActiveRuleSet | None = None,
         axe_source: str | None = None,
         run_checks: bool = True,
+        session_state: dict[str, Any] | None = None,
     ) -> None:
         self.run_id = run_id
         self.start_url = start_url
@@ -125,6 +129,8 @@ class KeyboardExecutor:
         self.findings = FindingCollector(self.rule_set)
         self.axe_source = axe_source
         self.run_checks = run_checks
+        # A saved sign-in (Playwright storage state), already limited to allowed origins.
+        self.session_state = session_state
         self.checks = CheckRunner(self.findings, axe_source, self.rule_set.axe_tags)
         self._history: list[PlannerHistoryEntryV1] = []
         # While a probe re-checks a suspected barrier, blocked requests are counted as
@@ -217,6 +223,7 @@ class KeyboardExecutor:
             user_agent=self.target_policy.config.user_agent,
             service_workers=service_workers,
             accept_downloads=False,
+            storage_state=self.session_state,
         )
         context.route("**/*", self._route_request)
         # WebSockets bypass context.route, so they get the same origin policy here.
@@ -228,7 +235,9 @@ class KeyboardExecutor:
         http_url = "http" + url[2:] if url.startswith("ws") else url
         decision = self.target_policy.decide_request(http_url, method="GET", is_navigation=False)
         if self._probing:
+            # A re-check never talks to the server over a socket (it could write).
             self._probe_requests += 1
+            return
         if decision.allowed:
             socket_route.connect_to_server()
             return
@@ -243,6 +252,11 @@ class KeyboardExecutor:
 
     def _route_request(self, route: Route) -> None:
         request = route.request
+        if self._probing and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+            # A re-check never writes, even on a staging journey that may.
+            self._probe_requests += 1
+            route.abort("blockedbyclient")
+            return
         decision = self.target_policy.decide_request(
             request.url,
             method=request.method,
@@ -257,6 +271,9 @@ class KeyboardExecutor:
                     )
                 route.abort("blockedbyclient")
                 return
+        if decision.allowed and request.method.upper() == "POST":
+            self._continue_write(route)
+            return
         if decision.allowed:
             route.continue_()
             return
@@ -264,6 +281,36 @@ class KeyboardExecutor:
         if decision.fatal:
             self._record_safety_violation(decision.code, request.url)
         route.abort("blockedbyclient")
+
+    def _continue_write(self, route: Route) -> None:
+        """Send an approved staging write without letting a redirect carry it elsewhere.
+
+        The browser follows redirects without asking the route handler again, so a 307
+        could re-send the form to another site. The write is fetched here with redirects
+        off: a 307/308 (which repeats the POST) is refused, and a 301/302/303 is allowed
+        only when its target passes the navigation policy.
+        """
+        request = route.request
+        try:
+            response = route.fetch(max_redirects=0)
+        except Exception:  # noqa: BLE001 - network errors look like a failed request
+            route.abort("failed")
+            return
+        if 300 <= response.status < 400:
+            target = urljoin(request.url, response.headers.get("location") or "")
+            if response.status in {307, 308}:
+                code = "WRITE_REDIRECT_NOT_ALLOWED"
+            else:
+                redirect = self.target_policy.decide_request(
+                    target, method="GET", is_navigation=True
+                )
+                code = None if redirect.allowed else f"WRITE_REDIRECT_{redirect.code}"
+            if code:
+                self._record_policy_event(code, request.method, target)
+                self._record_safety_violation(code, target)
+                route.abort("blockedbyclient")
+                return
+        route.fulfill(response=response)
 
     def _handle_popup(self, page: Page) -> None:
         if self._probing:
@@ -523,6 +570,9 @@ class KeyboardExecutor:
         history: list[PlannerHistoryEntryV1] = self._history
         self._safe_check("page", lambda: self.checks.check_page(page, None))
         state_visit_counts: dict[str, int] = {}
+        # (action, value, control) of the last step that changed nothing, and how often in a row.
+        repeat_key: tuple[str, str, str] | None = None
+        repeat_count = 0
         action_iterator = iter(actions) if actions is not None else None
         while True:
             elapsed_ms = int((time.monotonic() - self._started_monotonic) * 1000)
@@ -716,6 +766,32 @@ class KeyboardExecutor:
                 )
             if repeated_focus_cycle:
                 return EvaluationResult("agent_error", "REPEATED_FOCUS_CYCLE", step_number)
+            if planner is not None:
+                key = (
+                    str(action.action),
+                    action.value or "",
+                    before_focus.fingerprint if before_focus is not None else "",
+                )
+                if action_result.meaningful_progress:
+                    repeat_key, repeat_count = None, 0
+                elif key == repeat_key:
+                    repeat_count += 1
+                else:
+                    repeat_key, repeat_count = key, 1
+                if repeat_count >= REPEATED_ACTION_LIMIT:
+                    control = (
+                        (before_focus.name or before_focus.role or before_focus.tag)
+                        if before_focus is not None
+                        else "the page"
+                    )
+                    return EvaluationResult(
+                        "agent_error",
+                        "REPEATED_ACTION_NO_PROGRESS",
+                        step_number,
+                        f"The AI proposed {action.action.value.upper()} on “{control}” "
+                        f"{repeat_count} times in a row and nothing changed, so the run stopped "
+                        "early to save calls.",
+                    )
             if not self._origin_is_allowed(page.url):
                 return EvaluationResult(
                     "safety_stopped", "NAVIGATION_ORIGIN_NOT_ALLOWED", step_number

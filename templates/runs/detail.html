@@ -17,8 +17,9 @@
       <p class="eyebrow">Accessibility report</p>
       <h1 id="run-title">{{ run.journey.name }} <span class="verdict verdict-{{ report.verdict.tone }}">{{ report.verdict.label }}</span></h1>
       <p class="report-summary">{{ report.summary_line }}</p>
+      {% if report.baseline %}<p class="small report-baseline">Compared with the <a href="{% url 'runs:detail' report.baseline.run %}">baseline of {{ report.baseline.created_at|date:"j M" }}</a>: {{ report.baseline.new }} new · {{ report.baseline.fixed|length }} fixed{% if report.baseline.fixed %} ({{ report.baseline.fixed|join:", "|truncatechars:160 }}){% endif %}.</p>{% endif %}
       <p class="muted small report-meta">
-        {% if run.planner_provider == "fixture" %}Deterministic fixture planner{% else %}AI: {{ report.planner.model|default:"model not recorded" }} ({{ run.get_planner_provider_display }}){% endif %}
+        {% if run.planner_provider == "fixture" %}Scripted plan (no AI){% endif %}{% if run.planner_provider != "fixture" %}AI: {{ report.planner.model|default:"model not recorded" }} ({{ run.get_planner_provider_display }}){% endif %}
         {% if report.rules.preset %} · Rules: {{ report.rules.preset }} (catalog {{ report.rules.catalog_version }}){% endif %}
         {% if run.started_at %} · {{ run.started_at|date:"j M Y, H:i" }}{% endif %}
         {% if report.repository %} · Repository: {{ report.repository.name }}{% if report.repository.commit %} @ {{ report.repository.commit|slice:":8" }}{% endif %}{% endif %}
@@ -177,6 +178,9 @@
         <h2>How the run went</h2>
         {% if run.diagnosis %}<p class="diagnosis">{{ run.diagnosis }}</p>{% endif %}
         <p class="muted small">Planner used: {{ run.get_planner_provider_display }}{% if report.planner.model %} · {{ report.planner.model }}{% endif %}. The AI proposes each keyboard action; a deterministic policy approves it before the browser presses the key.</p>
+        {% with usage=report.planner.usage %}{% if usage and usage.calls %}
+          <p class="muted small">AI use: {{ usage.calls }} call{{ usage.calls|pluralize }} · {{ usage.prompt_tokens }} prompt tokens{% if usage.cached_prompt_tokens %} ({{ usage.cached_prompt_tokens }} reused from the provider's prompt cache){% endif %} · {{ usage.completion_tokens }} output tokens. The fixed instructions are sent first and unchanged on every call, so providers that cache prompts reuse them.</p>
+        {% endif %}{% endwith %}
         {% if report.ai_steps %}
           <table class="reasoning-table">
             <caption class="visually-hidden">Each proposed action and what happened</caption>
@@ -266,7 +270,7 @@
                 <span class="muted">{{ run.get_planner_provider_display }} fallback · {{ run.planner_metadata.fallback_reason }}{% if run.planner_model %} · tried {{ run.planner_model }}{% endif %}</span>
                 {% if run.planner_metadata.fallback_detail %}<span class="muted">· Why: {{ run.planner_metadata.fallback_detail }}</span>{% endif %}
               {% elif run.planner_provider == "fixture" %}
-                <span class="tag">Deterministic fixture planner</span>
+                <span class="tag">Scripted plan (no AI)</span>
               {% else %}
                 <span class="tag tag-success">Live {{ run.planner_metadata.provider_label|default:run.get_planner_provider_display }}</span>
                 <span class="muted">{{ run.planner_metadata.model|default:run.planner_model }} · {{ run.planner_metadata.calls|default:"0" }} calls</span>

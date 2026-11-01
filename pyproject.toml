@@ -1,6 +1,6 @@
 [project]
 name = "accesspath-ai"
-version = "0.1.0"
+version = "1.0.0"
 description = "Evidence-driven keyboard accessibility journey evaluation"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"

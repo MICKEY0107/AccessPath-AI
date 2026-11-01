@@ -110,9 +110,7 @@ class GeminiActionClient(Protocol):
 
 
 class Planner(Protocol):
-    def propose_next_action(
-        self, observation: PlannerObservationV1
-    ) -> ProposedActionV1 | None: ...
+    def propose_next_action(self, observation: PlannerObservationV1) -> ProposedActionV1 | None: ...
 
     def record_outcome(
         self,
@@ -260,10 +258,7 @@ class GeminiPlanner:
             except (GeminiTransientError, GeminiTimeoutError) as error:
                 self.transient_failures += 1
                 self._note_error(error)
-                if (
-                    transient_attempts >= self.max_transient_retries
-                    or self.calls >= self.max_calls
-                ):
+                if transient_attempts >= self.max_transient_retries or self.calls >= self.max_calls:
                     raise
                 transient_attempts += 1
                 self.sleep(self.transient_backoff_seconds)
@@ -326,6 +321,8 @@ class GeminiPlanner:
             "invalid_responses": self.invalid_responses,
             "last_error": self.last_error,
             "fallback_used": False,
+            "usage": _usage_of(self.client),
+            "prompt_prefix": _prompt_prefix(),
         }
 
 
@@ -391,9 +388,7 @@ class ResilientPlanner:
         self._fallback_restarted = True
         return True
 
-    def propose_next_action(
-        self, observation: PlannerObservationV1
-    ) -> ProposedActionV1 | None:
+    def propose_next_action(self, observation: PlannerObservationV1) -> ProposedActionV1 | None:
         if self.stop_reason:
             return None
         if self._fallback_used and self.fallback is not None:
@@ -676,3 +671,18 @@ def planner_from_config(
                 )
         return ResilientPlanner(primary=primary, fallback=fallback)
     raise ValueError(f"Unsupported planner kind: {kind!r}")
+
+
+def _usage_of(client: object) -> dict[str, object] | None:
+    from .provider_usage import TokenUsage
+
+    usage = getattr(client, "usage", None)
+    return usage.as_dict() if isinstance(usage, TokenUsage) else None
+
+
+def _prompt_prefix() -> str:
+    """Fingerprint of the fixed instructions every live call starts with."""
+    from .gemini import SYSTEM_INSTRUCTION  # gemini imports this module
+    from .provider_usage import prefix_fingerprint
+
+    return prefix_fingerprint(SYSTEM_INSTRUCTION)

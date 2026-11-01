@@ -104,3 +104,22 @@ def decrypt_saved_key(token: str) -> str:
     except InvalidToken as error:
         # Happens if DJANGO_SECRET_KEY changed; the person must save the key again.
         raise CredentialError("SAVED_CREDENTIAL_UNREADABLE") from error
+
+
+def _session_fernet() -> Fernet:
+    # Its own context: a saved sign-in can never be read as a key, nor a key as a sign-in.
+    digest = hashlib.sha256(
+        f"accesspath.journey-session.v1:{settings.SECRET_KEY}".encode()
+    ).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def encrypt_session(state_json: str) -> str:
+    return _session_fernet().encrypt(state_json.encode()).decode()
+
+
+def decrypt_session(token: str) -> str:
+    try:
+        return _session_fernet().decrypt(token.encode()).decode()
+    except InvalidToken as error:
+        raise CredentialError("SAVED_SESSION_UNREADABLE") from error

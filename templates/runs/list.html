@@ -74,7 +74,7 @@
                     </summary>
                     <div class="journey-body">
                       <p>{{ journey.goal }}</p>
-                      <p class="muted small">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }}</p>
+                      <p class="muted small">Mode: {{ journey.get_execution_mode_display }} · Approved origin: {{ journey.allowed_origins|join:", " }} · <a href="{% url 'runs:journey_settings' journey.id %}">Journey settings</a> (sign-in, replay, staging, baseline, CLI file)</p>
                       <form class="planner-picker" method="post" action="{% url 'runs:start' journey.id %}" autocomplete="off">
                         {% csrf_token %}
                         <label for="planner-provider-{{ journey.id }}">Planner provider</label>
@@ -181,7 +181,7 @@
                         Deterministic contingency
                         <span class="muted">({{ run.get_planner_provider_display }} fallback)</span>
                       {% elif run.planner_provider == "fixture" %}
-                        Deterministic fixture
+                        Scripted plan (no AI)
                       {% else %}
                         {{ run.get_planner_provider_display }}
                         {% if run.planner_model %}<span class="muted">— {{ run.planner_model }}</span>{% endif %}

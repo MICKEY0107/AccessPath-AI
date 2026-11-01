@@ -1,0 +1,17 @@
+{
+  "schema_version": "accesspath_journey.v1",
+  "name": "Wikipedia search",
+  "goal": "Starting from the Wikipedia Main Page, use the site search to find and open the Web accessibility article, using only the keyboard.",
+  "start_url": "https://en.wikipedia.org/wiki/Main_Page",
+  "success": {
+    "url_contains": "/wiki/Web_accessibility"
+  },
+  "type_values": {
+    "text_to_type": "Web accessibility"
+  },
+  "rules": {
+    "preset": "wcag22-aa",
+    "fail_on": "serious"
+  },
+  "max_steps": 30
+}

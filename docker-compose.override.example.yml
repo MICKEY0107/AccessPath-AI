@@ -1,0 +1,10 @@
+# Copy this file to docker-compose.override.yml to change local settings without
+# editing docker-compose.yml. Compose reads the override automatically.
+#
+# Example: another app already uses port 8000, so serve AccessPath on 8010 instead.
+# Then open http://127.0.0.1:8010/ and set DEMO_SITE_URL=http://127.0.0.1:8010 in .env
+# so the links printed by demo_setup match.
+services:
+  web:
+    ports: !override
+      - "127.0.0.1:8010:8000"

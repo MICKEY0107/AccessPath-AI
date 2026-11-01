@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AccessPath Assist</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>AccessPath Assist</h1>
+    <p class="muted">Use this site by keyboard or voice.</p>
+    <fieldset>
+      <legend>On every site</legend>
+      <label><input type="checkbox" id="focusRing"> Strong focus ring</label>
+      <label><input type="checkbox" id="keyboardFixes"> Make click-only controls work with the keyboard</label>
+      <label><input type="checkbox" id="nameControls"> Name unnamed buttons</label>
+      <label><input type="checkbox" id="voice"> Voice commands</label>
+    </fieldset>
+    <div class="actions">
+      <button type="button" id="check">Check this page</button>
+      <button type="button" id="landmarks">Landmarks</button>
+      <button type="button" id="main">Skip to main</button>
+    </div>
+    <section id="result" aria-live="polite"></section>
+    <details>
+      <summary>Shortcuts and voice commands</summary>
+      <ul class="muted">
+        <li>Alt+Shift+M: skip to main · Alt+Shift+L: landmarks · Alt+Shift+V: voice · Alt+Shift+C: check page</li>
+        <li>Say “next”, “previous”, “click”, “click Sign in”, “go to search”, “go to main”, “scroll down”, “landmarks”, “stop listening”.</li>
+      </ul>
+    </details>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

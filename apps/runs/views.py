@@ -1,13 +1,21 @@
 import base64
+from uuid import UUID
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseNotAllowed,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.debug import sensitive_post_parameters
+from django.views.static import serve as static_serve
 
 from apps.journeys.models import Journey
 from apps.journeys.real_sites import RealSiteJourneyForm
@@ -15,7 +23,7 @@ from apps.journeys.real_sites import RealSiteJourneyForm
 from .credentials import scrub, seal_api_key, validate_api_key, validate_model
 from .model_settings import saved_for, saved_key
 from .models import JourneyOutcome, PlannerProvider, Run
-from .report import build_report, report_json
+from .report import build_report, can_view_run, report_json
 from .tasks import execute_run
 
 ISSUE_OUTCOMES = {
@@ -34,6 +42,10 @@ TERMINAL_REASON_LABELS = {
     "BARRIER_NOT_CONFIRMED": "A suspected barrier was re-checked and not confirmed.",
     "COMPLETION_POLICY_SATISFIED": "The declared booking confirmation was verified.",
     "REPEATED_FOCUS_CYCLE": "The evaluator stopped after the configured focus cycle repeated.",
+    "REPEATED_ACTION_NO_PROGRESS": (
+        "The AI kept pressing the same key on the same control with no effect, so the run "
+        "stopped early."
+    ),
     "REQUEST_METHOD_NOT_ALLOWED": "A prohibited request method was blocked.",
     "NAVIGATION_ORIGIN_NOT_ALLOWED": "Navigation outside the approved origin was blocked.",
     "NAVIGATION_PATH_NOT_ALLOWED": "Navigation outside the approved path was blocked.",
@@ -383,17 +395,34 @@ FAILURE_KIND_LABELS = {
 }
 
 
-def _load_run(run_id) -> Run:
-    return get_object_or_404(
+def _load_run(run_id, viewer=None) -> Run:
+    run = get_object_or_404(
         Run.objects.select_related("journey").prefetch_related(
             "steps", "artifacts__step", "findings"
         ),
         pk=run_id,
     )
+    if not can_view_run(run, viewer):
+        raise Http404("This run used a saved sign-in; only the person who started it can see it.")
+    return run
+
+
+def evidence_file(request: HttpRequest, path: str) -> HttpResponse:
+    """Screenshots and other evidence, with the same visibility as their run."""
+    parts = path.split("/")
+    if len(parts) >= 2 and parts[0] == "runs":
+        try:
+            run_id = UUID(parts[1])
+        except ValueError:
+            raise Http404 from None
+        run = Run.objects.filter(pk=run_id).only("planner_metadata").first()
+        if run is not None and not can_view_run(run, request.user):
+            raise Http404
+    return static_serve(request, path, document_root=settings.MEDIA_ROOT)
 
 
 def run_detail(request: HttpRequest, run_id) -> HttpResponse:
-    run = _load_run(run_id)
+    run = _load_run(run_id, request.user)
     return render(
         request,
         "runs/detail.html",
@@ -410,7 +439,7 @@ def run_detail(request: HttpRequest, run_id) -> HttpResponse:
 
 def export_report_json(request: HttpRequest, run_id) -> HttpResponse:
     """Download the report as JSON for other tools."""
-    run = _load_run(run_id)
+    run = _load_run(run_id, request.user)
     response = JsonResponse(
         report_json(build_report(run, request.user)), json_dumps_params={"indent": 2}
     )
@@ -449,7 +478,7 @@ def _embedded_screenshots(run: Run, steps: set[int]) -> list[dict[str, str]]:
 
 def export_report_html(request: HttpRequest, run_id) -> HttpResponse:
     """Download a standalone HTML report a product manager can open or forward."""
-    run = _load_run(run_id)
+    run = _load_run(run_id, request.user)
     report = build_report(run, request.user)
     steps = {row["step_number"] for row in report["findings"] if row["step_number"]}
     html = render_to_string(
@@ -472,7 +501,7 @@ def map_to_code(request: HttpRequest, run_id) -> HttpResponse:
         return HttpResponseNotAllowed(["POST"])
     from .code_mapping import map_run_findings
 
-    run = _load_run(run_id)
+    run = _load_run(run_id, request.user)
     binding = run.journey.repo_binding
     if binding is not None and binding.owner_id != request.user.pk:
         messages.error(

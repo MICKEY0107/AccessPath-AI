@@ -13,9 +13,7 @@ if not SECRET_KEY:
 
 DEBUG = False
 ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
-    if host.strip()
+    host.strip() for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if host.strip()
 ]
 
 INSTALLED_APPS = [
@@ -124,17 +122,11 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "")
 PLANNER_MAX_CALLS_PER_RUN = int(os.environ.get("PLANNER_MAX_CALLS_PER_RUN", "40"))
 PLANNER_CALL_TIMEOUT_SECONDS = float(os.environ.get("PLANNER_CALL_TIMEOUT_SECONDS", "30"))
-PLANNER_MIN_CALL_INTERVAL_SECONDS = float(
-    os.environ.get("PLANNER_MIN_CALL_INTERVAL_SECONDS", "15")
-)
+PLANNER_MIN_CALL_INTERVAL_SECONDS = float(os.environ.get("PLANNER_MIN_CALL_INTERVAL_SECONDS", "15"))
 PLANNER_MAX_429_RETRIES = int(os.environ.get("PLANNER_MAX_429_RETRIES", "1"))
 PLANNER_429_BACKOFF_SECONDS = float(os.environ.get("PLANNER_429_BACKOFF_SECONDS", "30"))
-PLANNER_MAX_TRANSIENT_RETRIES = int(
-    os.environ.get("PLANNER_MAX_TRANSIENT_RETRIES", "5")
-)
-PLANNER_TRANSIENT_BACKOFF_SECONDS = float(
-    os.environ.get("PLANNER_TRANSIENT_BACKOFF_SECONDS", "15")
-)
+PLANNER_MAX_TRANSIENT_RETRIES = int(os.environ.get("PLANNER_MAX_TRANSIENT_RETRIES", "5"))
+PLANNER_TRANSIENT_BACKOFF_SECONDS = float(os.environ.get("PLANNER_TRANSIENT_BACKOFF_SECONDS", "15"))
 # Retries for a one-off bad answer (empty, truncated, or unroutable) before fallback.
 PLANNER_MAX_INVALID_RETRIES = int(os.environ.get("PLANNER_MAX_INVALID_RETRIES", "3"))
 

@@ -196,7 +196,7 @@ def test_run_list_identifies_the_planner_used_for_each_run(client, db) -> None:
     assert "Gemini" in content
     assert "OpenRouter" in content
     assert "Groq" in content
-    assert "Deterministic fixture" in content
+    assert "Scripted plan (no AI)" in content
 
 
 def test_run_detail_labels_a_deterministic_gemini_contingency(client, db) -> None:
@@ -255,4 +255,4 @@ def test_run_detail_labels_a_live_groq_run(client, db) -> None:
 
     assert response.status_code == 200
     assert "Live Groq" in content
-    assert "Deterministic fixture planner" not in content
+    assert "Scripted plan (no AI)" not in content

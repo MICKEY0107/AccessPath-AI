@@ -20,11 +20,13 @@ from .planner import (
     OpenRouterUnavailableError,
 )
 from .provider_http import completion_hint, provider_error_message, retry_after_seconds
+from .provider_usage import TokenUsage
 
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
 RETRY_TEMPERATURE = 0.4
+
 
 class OpenRouterActionClient:
     """Call one OpenRouter structured completion with bounded, paced requests."""
@@ -48,6 +50,7 @@ class OpenRouterActionClient:
         self.sleep = sleep
         self.monotonic = monotonic
         self.last_response_model = ""
+        self.usage = TokenUsage()
         # At temperature 0 a retry repeats the same malformed answer, so the call after
         # a retryable failure samples a little more freely.
         self._retrying_invalid = False
@@ -111,6 +114,7 @@ class OpenRouterActionClient:
 
         try:
             document = json.loads(response_body)
+            self.usage.add_openai(document.get("usage"))
             resolved_model = document.get("model")
             if isinstance(resolved_model, str):
                 self.last_response_model = resolved_model

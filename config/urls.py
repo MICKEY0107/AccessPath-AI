@@ -1,8 +1,8 @@
-from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import include, path
+from django.urls import include, path, re_path
+
+from apps.runs.views import evidence_file
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -15,7 +15,7 @@ urlpatterns = [
     path("", include("apps.core.urls")),
     path("runs/", include("apps.runs.urls")),
     path("code/", include("apps.codebase.urls")),
+    # Evidence (screenshots) is served by a view, so runs that used a saved sign-in
+    # stay visible only to the person who started them.
+    re_path(r"^evidence/(?P<path>.+)$", evidence_file, name="evidence"),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
