@@ -1,7 +1,7 @@
 # AccessPath AI demonstration runbook
 
 **Rehearsal target:** 10 minutes
-**Updated:** 29 October 2026, for the web product (rules, team rules, confirmed findings, report, where to fix, one-command demo). The September runbook is in git history.
+**Updated:** 2 November 2026, for release 1.0.0 (web product, plus the command line, MCP server and Chrome extension as optional extras). The September runbook is in git history.
 
 ## Before the room
 
@@ -31,7 +31,13 @@
 | 6:15–7:00 | AI reasoning tab | "The AI only proposes keys; a deterministic policy approves each one. If a run fails and the target turns out to be reachable, the report says agent failure, not site barrier." | Separation of AI and verdict |
 | 7:00–8:00 | Terminal: run_benchmark | "Twelve journeys with known barriers. With scripted plans every run matches its expected result; the live run measures the AI planner." | Gate 1 measures |
 | 8:00–9:00 | Code and Models | "Repositories are cloned read-only and never run; secrets are redacted. Providers are labelled for whether they may read private code: Ollama and Groq yes, Gemini's free tier no." | Security model |
-| 9:00–10:00 | Limitations | Keyboard profile only; read-only on real sites (no form submission yet); code mapping is strongest for static and React/Vue development builds; free-tier limits affect live runs. | Honest scope |
+| 9:00–10:00 | Limitations | Keyboard profile only; read-only on real sites unless the owner turns on staging writes for a staging site; code mapping is strongest for static and React/Vue development builds; free-tier limits affect live runs. | Honest scope |
+
+## Optional extras (if time allows)
+
+- **Command line:** `python -m accesspath run journeys/clinic-broken.json --repo .` prints the Blocked finding with `fixtures/clinic/broken/slots.html` and exits with code 2, which is what a CI gate uses.
+- **Coding assistant:** with `python -m accesspath mcp` added to Claude Code, ask it to run the clinic-broken journey and show the patch.
+- **Chrome extension:** load `extension/` unpacked, open the broken clinic page, and show the focus ring, Alt+Shift+L landmarks and the page check.
 
 ## If a live provider is slow or rate limited
 

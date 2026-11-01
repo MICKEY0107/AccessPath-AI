@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.codebase.demo import ensure_demo_binding
-from apps.journeys.models import Journey
+from apps.journeys.models import ExecutionMode, Journey
 from apps.runs.models import PlannerProvider, Run
 from apps.runs.report import build_report
 from apps.runs.services import execute_configured_run, fail_run
@@ -66,7 +66,10 @@ class Command(BaseCommand):
         call_command("seed_fixture_journeys", stdout=StringIO())
         journeys = {
             journey.evaluation_config.get("journey_key"): journey
-            for journey in Journey.objects.filter(is_active=True)
+            # Only the bundled demo-site journeys: public journeys reach live websites.
+            for journey in Journey.objects.filter(
+                is_active=True, execution_mode=ExecutionMode.FIXTURE
+            )
             if journey.evaluation_config.get("journey_key")
         }
         if not journeys:

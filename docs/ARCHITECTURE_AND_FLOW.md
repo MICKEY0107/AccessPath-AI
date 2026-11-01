@@ -2,53 +2,53 @@
 
 ## What the system evaluates
 
-AccessPath AI checks whether a declared appointment-booking journey can reach its declared completion state through keyboard-only input. The current Phase 1 scope covers motor accessibility on controlled fixture sites. A planner may propose one action at a time, but deterministic policy and the keyboard executor retain control of what can execute and whether the journey truly completed.
+AccessPath AI checks whether a declared journey, on the bundled demo site or a real website, can reach its declared completion state through keyboard-only input. The profile is motor accessibility. A planner (an AI provider, or a reviewed scripted plan) proposes one action at a time; deterministic policy and the keyboard executor keep control of what can execute and whether the journey truly completed. The same engine runs behind the web app, the command line, the GitHub Action and the MCP server.
 
-## User flow
+## User flow (web app)
 
 ```mermaid
 flowchart LR
-    A[Evaluator opens Evaluation runs] --> B[Choose journey]
-    B --> C[Choose provider dropdown]
-    C --> D{Provider}
-    D -->|Gemini| E[Live Gemini plan]
-    D -->|OpenRouter| F[Live OpenRouter plan]
-    D -->|Deterministic| G[Fixture plan]
+    A[Evaluation runs] --> B[Choose journey]
+    B --> C[Choose planner]
+    C --> D{Planner}
+    D -->|Groq, Gemini, OpenRouter, Ollama| E[Live AI plan]
+    D -->|Scripted plan, no AI| G[Reviewed or replayed plan]
     E --> H[Queue evaluation]
-    F --> H
     G --> H
-    H --> I[Run detail and evidence]
+    H --> I[Report fills in live]
     I --> J{Verified outcome}
     J -->|Completion signal observed| K[Completed]
-    J -->|Keyboard barrier observed| L[Blocked]
-    J -->|Provider or environment failure| M[Clearly labelled issue]
+    J -->|Barrier confirmed by a re-check| L[Blocked]
+    J -->|Agent, provider or environment failure| M[Clearly labelled, site not blamed]
 ```
 
-## Backend architecture
+## Architecture
 
 ```mermaid
 flowchart TB
-    Browser[Evaluator browser] --> Web[Django web application]
-    Web --> Runs[Run creation view]
-    Runs --> Postgres[(PostgreSQL: journeys, runs, steps, artifacts)]
-    Runs --> Queue[(Redis/Celery queue)]
-    Queue --> Worker[Single-concurrency Celery worker]
-    Worker --> Service[Run application service]
-    Service --> Config[Versioned journey and completion policy]
-    Service --> Planner[Bounded planner]
-    Planner --> Gate[Process-wide provider pacing gate]
-    Gate --> Gemini[Google Gemini API]
-    Gate --> OpenRouter[OpenRouter API]
-    Planner --> Fixture[Deterministic fixture planner]
-    Planner --> Policy[Action policy]
-    Policy -->|Approved keyboard action only| Executor[Playwright keyboard executor]
-    Policy -->|Rejected| Planner
-    Executor --> FixtureSite[Controlled accessible or broken site]
-    Executor --> Evidence[Step observations and screenshots]
-    Evidence --> Postgres
-    Evidence --> Storage[Run-output evidence storage]
-    Postgres --> Detail[Run-detail evidence page]
-    Storage --> Detail
+    Browser[Person's browser] --> Web[Django web app]
+    CLI[Command line] --> Engine
+    Action[GitHub Action] --> CLI
+    MCP[MCP server] --> Engine
+    Web --> Postgres[(PostgreSQL: journeys, sessions, runs, steps, artifacts, findings, repositories, saved keys)]
+    Web --> Queue[(Redis / Celery queue)]
+    Queue --> Worker[Celery worker, one run at a time]
+    Worker --> Service[Run service]
+    Service --> Engine
+    subgraph Engine[Engine, no Django]
+        Planner[Planner] --> Gate[Provider pacing gate]
+        Gate --> Providers[Groq / Gemini / OpenRouter / Ollama]
+        Planner --> Policy[Action policy]
+        Policy -->|approved key only| Executor[Playwright keyboard executor]
+        Policy -->|rejected| Planner
+        Executor --> Checks[Checks and rule catalog]
+        Executor -->|run failed| Probes[Confirm before blaming]
+        Checks --> Findings[Findings]
+        Probes --> Findings
+    end
+    Executor --> Site[Site under test, request policy applied]
+    Findings --> Postgres
+    Findings --> Outputs[Report, JSON/Markdown/SARIF, where to fix]
 ```
 
 ## One evaluation run
@@ -76,7 +76,7 @@ flowchart TD
 
 - The UI records the selected provider and model with every run. A run never silently changes provider.
 - The worker runs at one task at a time. The pacing gate also applies the configured interval across newly constructed clients, so a new run cannot immediately start another request to the same provider.
-- Gemini and OpenRouter outcomes remain separate evidence sets. Deterministic runs are useful repeatable demonstrations but never count as live-model evidence.
+- Each provider's results are separate evidence. Scripted runs are useful repeatable demonstrations but never count as live-model evidence.
 - Completion requires the declared completion signal. A broken site with a keyboard barrier must remain `blocked`; it must never be reported as a completion.
 - `openrouter/free` is suitable for smoke testing only because it can choose different upstream models. Repeatable evidence should use a preflight-verified, fixed model.
 
@@ -122,3 +122,19 @@ flowchart LR
 | `apps/runs/management/commands/demo_setup.py` | One command: demo account, journeys, demo repository, a team rule, scripted runs |
 | `apps/core/setup_checks.py` | Shared by the Status page and `check_setup`: database, worker, browser, demo site, axe-core, git, storage, providers, secret key |
 | `engine/executor.py` (`_route_web_socket`) | WebSockets follow the same origin policy as requests; a blocked socket is never connected |
+
+### Release 1.0.0 (2 November 2026)
+
+| Module | Role |
+|---|---|
+| `accesspath/cli.py`, `runner.py`, `report.py`, `journey_file.py` | Command line: journey files, runs without Django, JSON/Markdown/SARIF reports, exit codes, baselines |
+| `accesspath/github.py`, `.github/actions/accesspath` | Pull-request comment and the composite GitHub Action |
+| `accesspath/mcp_server.py` | MCP server over stdio for coding assistants |
+| `accesspath/recorder.py` | `login` (save a signed-in session) and `record` (keys as a scripted plan) |
+| `engine/session_state.py`, `apps/journeys/models.py` (`JourneySession`) | Saved sign-ins, encrypted, owner-only, cut to the journey's sites |
+| `engine/target_policy.py` | Staging writes: POST only to the start site's origin and paths, within a budget, never redirected elsewhere |
+| `apps/runs/services.py` (`persist_steps`) | Live progress: steps saved as they happen |
+| `engine/provider_usage.py` | Token and prompt-cache use per run |
+| `apps/runs/journey_tools.py` | Journey settings: sign-in, replay plan, baseline, staging writes, journey file |
+| `extension/` | AccessPath Assist, the Chrome extension for keyboard and voice users |
+

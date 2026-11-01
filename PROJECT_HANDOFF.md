@@ -5,9 +5,9 @@
 
 ## 1. What the project is
 
-AccessPath AI checks whether a person using only a keyboard can finish a real task on a website. A live LLM planner proposes one keyboard action at a time (Tab, Shift+Tab, Enter, Space, arrows, Escape, or Type a permitted value). A deterministic policy approves each action before Playwright presses the key. Every step is saved with focus evidence and before/after screenshots, and the run ends in an evidence-backed outcome: completed, blocked, inconclusive, agent error, safety stopped, or environment blocked.
+AccessPath AI checks whether a person using only a keyboard can finish a real task on a website. A live LLM planner proposes one keyboard action at a time (Tab, Shift+Tab, Enter, Space, arrows, Escape, or Type a permitted value). A deterministic policy approves each action before Playwright presses the key. Every step is saved with focus evidence and before/after screenshots, and the run ends in an evidence-backed outcome: completed, blocked, inconclusive, agent error, safety stopped, environment blocked, or system error.
 
-**Product today:** a signed-in web app that runs a journey by keyboard, checks focus, names, skip links and focus order at every step, confirms any barrier with deterministic probes before blaming the site, maps findings to WCAG rules from a reviewed catalog, shows an accessibility report (with HTML/JSON export), and — when the site's repository is linked — points to the exact file and line with a reviewable patch.
+**Product today:** a signed-in web app that runs a journey by keyboard, checks focus, names, skip links and focus order at every step, confirms any barrier with deterministic probes before blaming the site, maps findings to WCAG rules from a reviewed catalog, shows an accessibility report (with HTML/JSON export), and — when the site's repository is linked — points to the exact file and line with a reviewable patch. Release 1.0.0 adds a command line and GitHub Action (SARIF, PR comment, exit codes), an MCP server for coding assistants, signed-in journeys, record and replay, baselines, staging writes, and the AccessPath Assist Chrome extension. The complete guide: https://claude.ai/artifact/CmVXs9XySbDSnRXCnJBvzF; the pitch deck: https://claude.ai/artifact/F6g5F4wb2azcrXg5zeSjr6.
 
 It is a 5-credit college project (three-member team per the progress log). First users are **developers and product managers**. Goal statement (from the plan doc): run a declared task on a live site keyboard-only and return a verdict a developer or PM can act on — completed, or blocked at a named step with the WCAG criterion, a screenshot and a reproduction path.
 
@@ -20,12 +20,12 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | Decision | Why |
 |---|---|
 | Free model tiers only: Gemini, OpenRouter, Groq, plus local Ollama (added 29 Oct) | College project; no paid API access. Ollama keeps private code on the machine |
-| Web interface only; CLI and MCP server are future scope (29 Oct) | One interface to build well; it serves product managers directly |
+| Web interface first; CLI and MCP server were future scope (29 Oct). Superseded 2 Nov: the owner asked for everything, and the CLI, GitHub Action, MCP server and Chrome extension shipped in 1.0.0 | One interface to build well first; it serves product managers directly |
 | API keys may be remembered, encrypted and opt-in (29 Oct) | Replaces "never stored" for users who tick "Remember on this computer"; one-run keys keep the 1 h sealed path |
 | The repo `MICKEY0107/AccessPath-AI` stays public (29 Oct) | Owner's answer |
 | Course evidence may use any one provider (29 Oct) | Gemini was only the first choice; no Gemini-only requirement |
 | Product shape: find, confirm, map to WCAG, point to the code (29 Oct) | Screens follow CodeImpact's layout (active codebase panel, model settings, report with tabs); see section 11 |
-| AI only: demo journeys use a live planner, no deterministic or scripted steps | The point of the demo is AI planning on live or public-repo sites |
+| AI only: the two public demo journeys (Wikipedia, TodoMVC) use a live planner, no scripted steps. The offline demo (`demo_setup`) uses scripted plans so it works with no key | The point of the public demos is AI planning on live sites |
 | Demo journeys: one simple, one complex, easy to understand | Owner had no specific sites in mind; asked for one of each |
 | First users: developers and product managers | Owner's answer on 25 Oct |
 | Local only: commit on the local branch; no pushes and no PRs until asked | Owner said "don't create a PR, change everything locally first" (after the picker branch had already been pushed). Owner then opened PR #1 themselves |
@@ -71,6 +71,7 @@ Full list of every idea, suggestion and warning with status, effort and code loc
 | Stage 8 | 29 Oct | Product pass: team rules (`CustomRuleV1`, Rules page), `demo_setup` and the bundled demo repository (`RepoBinding.source`, migration codebase 0002), demo-site fallback server (`engine/fixture_site.py`), Status page and `check_setup`, overview checklist, WebSocket policy, `scripts/dev.ps1`/`dev.sh`, CI workflow, `docs/QUICKSTART.md`, `docs/USER_GUIDE.md`, `docs/ADAPTING.md`; ruff clean |
 | `3c7526a` Run fixes | 2 Nov | Fixes found while running everything end to end in the build workspace (benchmark ignores team rules, labels) |
 | Stage 10 (1.0.0) | 2 Nov | Everything from the future-scope list: `accesspath` CLI (journey files, JSON/Markdown/SARIF, exit codes, baselines, `login`, `record`), GitHub Action and example workflow, MCP server, signed-in journeys (encrypted saved sessions), record and replay, staging writes, baselines in reports, live run progress, prompt-cache usage, repeated-action stop, AccessPath Assist Chrome extension, `docs/CLI_AND_CI.md`, version 1.0.0 |
+| Stage 11 | 2 Nov | Docs checked against the code by an independent audit and corrected; `demo_setup` limited to demo-site journeys; same attribute on another page moved to Also affected; the complete guide (Claude Doc), the pitch deck and the architecture page published as artifacts |
 
 Development note: these stages were built in a cloud workspace with copies of the project's `.venv` packages, tested there (Playwright Chromium, SQLite test settings), and copied back here before each commit. `ruff` was not available there; run it locally.
 
@@ -174,7 +175,7 @@ Times are from the run records (UTC) with IST in brackets.
 - **Changing `DJANGO_SECRET_KEY` makes saved keys unreadable**; people must save them again.
 - **Code mapping** is strongest for static HTML and React/Vue development builds (source hints). Minified production bundles fall back to text and class search.
 - **Worker does not reload code:** restart it after engine changes.
-- **Environment:** port 8000 is taken by another local app (`orchestrator_api` uvicorn from a Codex runtime); `uv` needs `UV_CACHE_DIR=.uv-cache`; the host has no Playwright browsers (11 browser tests fail on the host, pass in the container); Python file I/O defaults to cp1252 on this machine. Docker was down at the start of 25 Oct and is now running.
+- **Environment:** port 8000 is taken by another local app (`orchestrator_api` uvicorn from a Codex runtime); `uv` needs `UV_CACHE_DIR=.uv-cache`; the host has no Playwright browsers (the browser tests fail on the host and pass in the container; 11 as of October, re-measure); Python file I/O defaults to cp1252 on this machine. Docker was down at the start of 25 Oct and is now running.
 
 ## 8. What I was in the middle of, and the exact next step
 
@@ -216,6 +217,7 @@ docker compose exec web python manage.py install_axe_core       # optional
 - `fixtures/public/journey-manifest.json` — demo journeys (`demo-simple-wikipedia-search`, `demo-complex-todomvc`) and the older reviewed pilots.
 - `templates/` — `base.html` (theme), `runs/list.html`, `runs/detail.html` (report), `runs/rules.html`, `runs/model_settings.html`, `runs/report_export.html`, `codebase/code.html`, `registration/login.html`.
 - New in October: `rules/catalog.json`, `engine/rules.py`, `engine/probes.py`, `engine/findings.py`, `engine/checks.py`, `engine/dom.py`, `engine/ollama.py`, `engine/provider_models.py`, `engine/code_safety.py`, `engine/repo_clone.py`, `engine/code_index.py`, `engine/secret_scan.py`, `engine/code_locator.py`, `engine/locator_ai.py`, `engine/fix_verify.py`; `apps/codebase/` (repo bindings); `apps/runs/report.py`, `benchmark.py`, `code_mapping.py`, `model_settings.py`, `rule_views.py`; `fixtures/benchmark/journey-manifest.json` and `fixtures/clinic/benchmark/`. Architecture: `docs/ARCHITECTURE_AND_FLOW.md` (October section).
+- New in 1.0.0 (2 Nov): `accesspath/` (CLI, runner, reports, MCP server, recorder, GitHub comment), `journeys/` (example journey files), `.github/actions/accesspath` and `.github/workflows/accesspath-journeys.yml`, `extension/` (AccessPath Assist), `apps/core/` (overview, Status, setup checks), `apps/runs/journey_tools.py` and `templates/runs/journey_settings.html`, `engine/session_state.py`, `engine/provider_usage.py`, `engine/fixture_site.py`, `engine/pacing.py`, `scripts/dev.ps1` and `dev.sh`, `docs/CLI_AND_CI.md`.
 
 ## 11. Web implementation plan (agreed 29 October 2026) — stages 1–6 done, stage 7 docs done
 

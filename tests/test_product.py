@@ -108,9 +108,12 @@ def test_demo_setup_builds_a_working_demo(settings, tmp_path) -> None:
     settings.REPO_STORAGE_ROOT = tmp_path / "repos"
     settings.MEDIA_ROOT = tmp_path / "output"
     settings.FIXTURE_ALLOWED_ORIGINS = (f"http://127.0.0.1:{_free_port()}",)
+    # Public journeys reach live sites, so the demo never counts or runs them.
+    call_command("seed_public_journeys", stdout=StringIO())
     out = StringIO()
     call_command("demo_setup", "--password", "demo-pass-1", "--runs", "none", stdout=out)
     assert "The demo is ready." in out.getvalue() and "demo-pass-1" in out.getvalue()
+    assert "Journeys: 12 demo journeys" in out.getvalue()
     library = Journey.objects.get(evaluation_config__journey_key="bench-nav-no-skip")
     assert library.rule_config["custom"][0]["id"] == "custom-apply-button-reached-quickly"
 

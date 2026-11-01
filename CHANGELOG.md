@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (after 1.0.0)
+
+- `demo_setup` counts and runs only the bundled demo-site journeys, never the public journeys that reach live websites.
+- Where to fix: the same attribute on a page other than the one tested is listed under **Also affected**, not as an exact match.
+- The "no scripted plan" message names every AI provider, Local Ollama included.
+- Docs checked against the code: README, User guide, Adapting guide, Architecture, Demonstration runbook, extension README, handoff and backlog corrected.
+
 ## 1.0.0 — 2 November 2026
 
 The first complete release of the web product: it finds keyboard barriers on a journey, confirms them, maps them to WCAG 2.2, and points developers to the line of code to fix.
@@ -18,7 +25,7 @@ The first complete release of the web product: it finds keyboard barriers on a j
 - Stops early when the AI repeats the same key on the same control with no effect.
 
 ### Rules
-- A reviewed catalog of 9 rules, each linked to WCAG 2.2 and W3C ACT rules, with Essential, WCAG 2.2 AA and Strict presets.
+- A reviewed catalog of 9 rules, each linked to WCAG 2.2 and, where one exists, to W3C ACT rules (5 of 9), with Essential, WCAG 2.2 AA and Strict presets.
 - Per journey, a team can:
   - turn rules off (a reason is required)
   - set each rule's severity
@@ -75,7 +82,7 @@ The first complete release of the web product: it finds keyboard barriers on a j
 - CI workflow, Quickstart, User guide and Adapting guide, and `docker-compose.override.example.yml`.
 
 ### Security
-- Three independent reviews: 38 issues found; 37 fixed with tests, 1 documented (the worker must keep Celery's default prefork pool).
+- Three independent reviews: 39 issues found; 38 fixed with tests, 1 documented (the worker must keep Celery's default prefork pool).
 - Staging writes cannot be redirected to another site, respect the journey's paths, and are never sent during a re-check (WebSockets included).
 - Recording never saves password or card fields; session files are created owner-only.
 - Signed-in runs and their screenshots are visible only to the person who started them; only the sign-in's owner can change replay plans or staging writes.

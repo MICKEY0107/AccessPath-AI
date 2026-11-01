@@ -6,7 +6,7 @@ Status keys: **done** · **partly done** · **agreed, not started** · **postpon
 
 ## Web product plan (agreed 29 October 2026)
 
-The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.md` and the plan doc. Status as of 29 October 2026 (late evening): stages 1–6 **done** (commits `dc91e99` … `ef40c57`), stage 7 docs and the security review fixes **done**. Live AI measurements still need the owner's machine.
+Stage numbers refer to section 11 of `PROJECT_HANDOFF.md` and the plan doc. Status as of 2 November 2026: release 1.0.0 (web app, CLI, GitHub Action, MCP server, Chrome extension) **done**; stages 1–8 and the three security reviews **done**. Live AI measurements still need the owner's machine.
 
 | Item | Stage | Status | Notes |
 |---|---|---|---|
@@ -324,7 +324,7 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 
 ### Run the test suite in the container
 - **What:** `docker compose exec -e DJANGO_SETTINGS_MODULE=config.settings.test web python -m pytest -q` (112 passed, 9 skipped).
-- **Why:** The host has no Playwright browsers; 11 browser tests fail on the host.
+- **Why:** The host has no Playwright browsers; the browser tests fail on the host (11 as of October; re-measure).
 - **Status:** done (workaround documented).
 
 ### Port 8010 override
@@ -372,12 +372,12 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 ### VS Code developer assistant
 - **What:** Extension that flags keyboard problems while coding and runs a journey against localhost through the CLI, showing results in the Problems panel.
 - **Status:** replaced (29 Oct) by the MCP server, done in 1.0 (`python -m accesspath mcp`), which works inside Claude Code, Cursor and Copilot agent mode.
-- **Effort:** medium (about 3–4 weeks once the CLI exists; estimate).
+- **Effort:** obsolete: replaced by the MCP server (done in 1.0).
 
 ### Chrome voice extension for motor-disabled users
 - **What:** User speaks a goal; the agent operates the page in their own tab.
-- **Status:** done (1.0) as an assistive extension, AccessPath Assist (`extension/`): voice commands (next, previous, click, skip, landmarks, scroll), focus ring, keyboard fixes, names, page check. No AI and no autonomous submits, so the concerns below are avoided; user research is still recommended.
-- **Why postponed:** It acts with the user's accounts, so it needs confirmation before submits or payments, privacy handling, user research, and comparison with OS voice control (Voice Access, Voice Control).
+- **Status:** done (1.0) as an assistive extension, AccessPath Assist (`extension/`): voice commands (next, previous, click, go to main, landmarks, scroll), focus ring, keyboard fixes, names, page check. No AI and no autonomous submits, so the concerns below are avoided; user research is still recommended.
+- **Earlier concerns:** It acts with the user's accounts, so it needs confirmation before submits or payments, privacy handling, user research, and comparison with OS voice control (Voice Access, Voice Control).
 - **Effort:** large.
 
 ## Other
@@ -412,10 +412,11 @@ The product is web only. Stage numbers refer to section 11 of `PROJECT_HANDOFF.m
 - The older seeded pilots (original Wikipedia pilot, W3C smoke) still use scripted fallbacks; `run_public_pilot` depends on them.
 - `apps/runs/tasks.py` sometimes shows line-ending-only changes.
 
-## Recommended order for the next 5 items
+## Recommended next items
 
-1. **Confirm before blaming** — every later metric depends on not blaming the site for planner mistakes.
-2. **Stop early on repeats** — saves free-tier tokens and ends looping runs with a clear reason.
-3. **WCAG mapping plus unnamed-control and focus checks** — turns runs into findings developers and PMs can act on; TodoMVC gives a ready example.
-4. **Retest Gemini and a pinned OpenRouter model on both demos** — gives a fallback provider when Groq caps hit and informs the mentor question.
-5. **Final 3 accessible + 5 broken matrix and course write-up** — closes the open course items once the provider question is answered.
+Confirm before blaming, the stop on repeats, and the WCAG checks (the first three items of the earlier list) are done. What remains:
+
+1. **Retest Gemini and a pinned OpenRouter model on both demos** — gives a fallback provider when Groq caps hit and informs the mentor question.
+2. **Final 3 accessible + 5 broken matrix, the live-AI benchmark and the course write-up** — closes the open course items; needs a provider key on the owner's machine.
+3. **Push and let the GitHub Action run once** — the only part of 1.0.0 not yet run where it lives.
+4. **User research with keyboard, switch and voice users** — especially for AccessPath Assist.

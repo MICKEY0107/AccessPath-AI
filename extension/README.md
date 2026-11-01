@@ -25,8 +25,10 @@ site; Assist works around the most common ones for the people who visit it.
 
 ## Privacy
 
-The extension asks only for `storage` (your settings) and `activeTab`, and it sends
-nothing anywhere itself: the fixes and the page check run in the page on your computer.
+The extension asks for `storage` (your settings) and `activeTab`. Its content script runs
+on every http and https page so the fixes can apply, which Chrome shows at install as
+access to the sites you visit. It sends nothing anywhere itself: the fixes and the page
+check run in the page on your computer.
 Voice commands (off by default) use Chrome's built-in speech recognition, which asks for
 the microphone on each site the first time and may process speech on Google's servers;
 leave voice off if that is a concern.

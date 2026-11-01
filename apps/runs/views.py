@@ -220,7 +220,8 @@ def start_run(request: HttpRequest, journey_id: int) -> HttpResponse:
     if selected_provider == PlannerProvider.FIXTURE and not journey.has_fixture_plan:
         messages.error(
             request,
-            "This journey has no scripted plan to replay. Choose Gemini, OpenRouter, or Groq.",
+            "This journey has no scripted plan to replay. Choose an AI provider: Groq, Gemini, "
+            "OpenRouter or Local Ollama.",
         )
         return redirect(reverse("runs:list"))
 

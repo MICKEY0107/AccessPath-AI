@@ -34,10 +34,10 @@ The flow is described in `docs/ARCHITECTURE_AND_FLOW.md`.
 
 ## Settings (`.env`)
 
-| Setting | Default | What it changes |
+| Setting | Default (from `.env.example`) | What it changes |
 |---|---|---|
 | `DJANGO_SECRET_KEY` | — (required) | Signs sessions and encrypts saved keys. Changing it makes saved keys unreadable. |
-| `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS` | `true`, `127.0.0.1,localhost` | Set debug off, and set the host names, before sharing the app |
+| `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS` | `true`, `127.0.0.1,localhost` (code defaults: false, empty) | Set debug off, and set the host names, before sharing the app |
 | `POSTGRES_*`, `REDIS_URL`, `CELERY_RESULT_BACKEND` | local | Database and queue (Compose sets the service names for you) |
 | `GROQ_*`, `GEMINI_*`, `OPENROUTER_*` (`_API_KEY`, `_MODEL`) | empty | Server-wide default keys and models; people can also save their own |
 | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | empty | Local models (Docker: `http://host.docker.internal:11434`) |
@@ -71,7 +71,7 @@ Use **Rules → Your team's rules**. If none of the four checks fits, add one, a
 ### A new team-rule check
 
 1. Add it to `CustomCheck` and `CUSTOM_CHECKS` in `engine/rules.py`: label, help text, suggested WCAG criterion and default fix.
-2. Handle it in `CheckRunner._run_custom` in `engine/checks.py`. It receives the visible matches (up to 10) and the page's Tab walk.
+2. Handle it in `CheckRunner._run_custom` in `engine/checks.py`. It checks every visible match and receives up to 10 failing elements (with the total) and the page's Tab walk.
 3. Add a case to `tests/test_custom_rules.py`.
 
 Keep checks declarative: a selector and numbers, never user-supplied code.

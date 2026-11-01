@@ -232,12 +232,16 @@ def locate_rule_based(
 
     ranked = sorted(candidates, key=lambda item: -item[0])
     best = ranked[0][0] if ranked else 0
+    elsewhere: list[CodeLocation] = []
     for value, location in ranked:
+        location.snippet = location.snippet or reader.snippet(location.path, location.line)
         if best >= 2 and value < best:
-            # The same attribute on a page other than the one tested: weaker evidence.
+            # The same attribute on a page other than the one tested is not an exact
+            # match for this finding; it is listed under "Also affected" instead.
             location.confidence = "medium"
             location.reason += " (on a different page from the one tested)"
-        location.snippet = location.snippet or reader.snippet(location.path, location.line)
+            elsewhere.append(location)
+            continue
         _add(result.exact, location)
         seen_paths.add(location.path)
 
@@ -298,6 +302,8 @@ def locate_rule_based(
                         ),
                     )
 
+    for location in elsewhere:
+        _add(result.related, location)
     anchor_paths = [item.path for item in result.exact] or [item.path for item in result.likely[:1]]
     components = index.get("components", {})
     for name, entry in components.items():

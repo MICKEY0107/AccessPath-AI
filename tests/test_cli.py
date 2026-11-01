@@ -31,6 +31,9 @@ def test_a_blocked_journey_exits_2_and_points_at_the_code(tmp_path: Path, capsys
     location = result["locations"][0]["physicalLocation"]
     assert location["artifactLocation"]["uri"] == "fixtures/clinic/broken/slots.html"
     assert location["region"]["startLine"] == 6
+    exact = report["findings"][0]["locations"]["exact"]
+    # The same test id on the accessible page is "also affected", never an exact match.
+    assert {item["path"] for item in exact} == {"fixtures/clinic/broken/slots.html"}
     summary = (tmp_path / "summary.md").read_text()
     assert summary.startswith(COMMENT_MARKER)
     assert "`fixtures/clinic/broken/slots.html:6`" in summary and "```diff" in summary

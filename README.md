@@ -75,7 +75,7 @@ AccessPath Assist, a Chrome extension in `extension/`, helps people who use a ke
 
 5. Open `http://127.0.0.1:8000/runs/` and sign in. Start the accessible clinic journey, then the keyboard-barrier control.
 
-Every page requires sign-in because the app stores repositories and saved API keys. Journeys and runs are shared by everyone signed in; repositories and saved keys belong to each person. Code locations, snippets and patches from a linked repository are shown (and exported) only to the person who linked it, only they can map or verify fixes, and the AI code search runs only on runs that person started. Linking a repository never takes over a journey someone else has linked.
+Every page requires sign-in because the app stores repositories and saved API keys. Journeys and runs are shared by everyone signed in (except runs that used a saved sign-in, which only the person who started them can see); repositories, saved keys and saved sign-ins belong to each person. Code locations, snippets and patches from a linked repository are shown (and exported) only to the person who linked it, only they can map or verify fixes, and the AI code search runs only on runs that person started. Linking a repository never takes over a journey someone else has linked.
 
 ## Benchmark (Gate 1)
 
@@ -108,18 +108,18 @@ boundary, deterministic five-run proof, and live-provider three-run proof.
 
 ## Choosing the provider, model, and API key per run
 
-Each journey's run form lets you pick Gemini, OpenRouter, Groq, or the deterministic fixture. For a live provider you can also type:
+Each journey's run form lets you pick Groq, Gemini, OpenRouter, Local Ollama, or **Scripted plan (no AI)** where the journey has one. For a live provider you can also type:
 
-- **Model**: the exact model id for this run. Leave it blank to use `GEMINI_MODEL`, `OPENROUTER_MODEL`, or `GROQ_MODEL` from `.env`.
+- **Model**: the exact model id for this run. Leave it blank to use your saved default model from **Models**, then `GROQ_MODEL`, `GEMINI_MODEL`, `OPENROUTER_MODEL` or `OLLAMA_MODEL` from `.env`.
 - **API key**: a key used for this run only. Leave it blank to use the provider key from `.env`.
 
 To reuse a key, save it on the **Models** page with “Remember on this computer (encrypted)”: it is stored as Fernet ciphertext with its own key context, shown only as `••••abcd`, and used only for your own runs. A run uses the typed key first, then your saved key, then the server key. A typed key is never saved. The web process encrypts it with a key derived from `DJANGO_SECRET_KEY` and passes only the ciphertext to the worker through the task (it expires after an hour). The worker decrypts it in memory and scrubs it from step evidence, planner metadata, error detail, and any re-raised error. The run page shows only whether your key or the server key was used, plus its last four characters.
 
 ## Evaluating a real website
 
-On the runs page, open **Evaluate a real website** and add a journey: a start page, a plain-language goal, at least one success check (the address contains some text, or the page shows some text), and optionally a value the evaluator may type, such as a search term. Then start it with Gemini, OpenRouter, or Groq.
+On the runs page, open **Evaluate a real website** and add a journey: a start page, a plain-language goal, at least one success check (the address contains some text, or the page shows some text), and optionally a value the evaluator may type, such as a search term. Then start it with Groq, Gemini, OpenRouter or Local Ollama.
 
-These runs reuse the public pilot's fail-closed policy. Only GET, HEAD, and OPTIONS requests are allowed, so nothing is ever submitted. Navigation stays on the site's own address and any extra addresses you list. Popups and downloads stop the run. Images, fonts, and scripts may load from any public CDN, but private and local hosts are blocked, and the start page must resolve to a public address (set `ALLOW_PRIVATE_NETWORKS=true` only for your own local test sites). Real-site journeys have no scripted replay, so a provider failure ends the run as an agent error with the provider's reason. Remove a journey from the dashboard when you are done; its past runs are kept.
+These runs reuse the public pilot's fail-closed policy. By default only GET, HEAD, and OPTIONS requests are sent, so nothing is submitted; form submissions happen only when the owner turns on staging writes for a staging site they control (**Journey settings**). Navigation stays on the site's own address and any extra addresses you list. Popups and downloads stop the run. Images, fonts, and scripts may load from any public CDN, but private and local hosts are blocked, and the start page must resolve to a public address (set `ALLOW_PRIVATE_NETWORKS=true` only for your own local test sites). A real-site journey has no scripted plan until you save a completed run as its replay plan (**Journey settings**), so a provider failure ends the run as an agent error with the provider's reason. Remove a journey from the dashboard when you are done; its past runs are kept.
 
 ## Why live runs fall back, and what the planner does about it
 
@@ -163,6 +163,8 @@ docker compose exec web python manage.py run_fixture_matrix --provider openroute
 ```
 
 OpenRouter results are OpenRouter evidence, not Gemini evidence. Never switch providers inside a matrix or call an OpenRouter result “Gemini-only.”
+
+Gemini strict matrix (Gemini is the matrix's default provider):
 
 ```powershell
 docker compose up -d --force-recreate web worker

@@ -80,7 +80,7 @@ A journey is one task: a start page, a goal in plain language, and how to tell i
 
 Pick a journey and a planner, then press **Run**:
 
-- **Scripted plan (no AI)** replays a reviewed plan. It is only available for the demo journeys and is never counted as AI evidence.
+- **Scripted plan (no AI)** replays a reviewed plan. It is available for the demo journeys and for any journey with a saved replay plan, and is never counted as AI evidence.
 - **Groq**, **Gemini**, **OpenRouter** and **Local Ollama** plan live, one key press at a time.
 
 For a live provider, leave the model and key blank to use the saved or server defaults, or type them for this run only. A typed key is used once and never stored.
@@ -90,7 +90,7 @@ For a live provider, leave the model and key blank to use the saved or server de
 Rules are set per journey on **Rules**:
 
 1. **Preset**
-   - *Essential*: the Level A keyboard blockers.
+   - *Essential*: four Level A blockers: keyboard, no trap, focus order and names.
    - *WCAG 2.2 AA*: the default, and the legal target most teams have.
    - *Strict*: adds advisory focus-appearance checks and axe-core best practices.
 2. **Turn a rule off** by unticking it. A reason is required and shows in every report.
@@ -111,7 +111,7 @@ Rules are set per journey on **Rules**:
    - "Reachable with Tab" skips the items inside tab lists, menus and grids, because those widgets use one Tab stop plus the arrow keys.
    - An invalid selector shows as "not checked", never as passed.
 
-The catalog behind the WCAG rules (`rules/catalog.json`) ships with AccessPath and names each rule's WCAG 2.2 criterion and W3C ACT rules. It is never fetched while a run is going.
+The catalog behind the WCAG rules (`rules/catalog.json`) ships with AccessPath and names each rule's WCAG 2.2 criterion and, where one exists, its W3C ACT rules (5 of the 9 rules). It is never fetched while a run is going.
 
 ### Linking the code
 
