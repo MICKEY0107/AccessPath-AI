@@ -42,7 +42,8 @@
 
 - [ ] In Google Chrome, load `extension/`, allow microphone permission and manually confirm voice commands. This cannot be proved by a headless browser test.
 - [ ] Re-run the three-run Groq proof after the provider quota resets, or preflight and use another approved provider. Do not describe a scripted run as live-AI evidence.
-- [ ] Authenticate to GitHub, create a demonstration branch and pull request, then confirm the existing GitHub Action's summary comment and SARIF upload.
+- [x] Published the verified release branch: `codex/release-demo-readiness-20261121`.
+- [ ] Open its pull request and confirm the existing GitHub Action's summary comment and SARIF upload.
 - [ ] Connect `python -m accesspath mcp --journeys journeys --repo .` to the intended coding assistant and perform one interactive tool call.
 - [ ] Have a second person perform the demo checklist and record their feedback.
 - [ ] Finalise team/institution details, rehearse to the assigned presentation duration and create the release tag after the demonstrated commit is committed.
