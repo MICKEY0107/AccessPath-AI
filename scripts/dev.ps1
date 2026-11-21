@@ -74,6 +74,7 @@ switch ($Command) {
     }
   }
   "lint" { Invoke-Step "Ruff" { docker compose exec -T web python -m ruff check . @Rest } }
+  "type" { Invoke-Step "Pyright" { docker compose exec -T web python -m pyright @Rest } }
   "check" { Invoke-Step "Check the setup" { docker compose exec -T web python manage.py check_setup } }
   "benchmark" {
     $arguments = if ($Rest.Count) { $Rest } else { @("--provider", "fixture", "--repeat", "1") }
@@ -82,11 +83,12 @@ switch ($Command) {
   "logs" { docker compose logs -f worker }
   "stop" { Invoke-Step "Stop the containers" { docker compose stop } }
   default {
-    Write-Host "Usage: ./scripts/dev.ps1 <setup|start|demo|test|lint|check|benchmark|logs|stop> [arguments]"
+    Write-Host "Usage: ./scripts/dev.ps1 <setup|start|demo|test|lint|type|check|benchmark|logs|stop> [arguments]"
     Write-Host "  setup      first time: .env, containers, database, axe-core, demo"
     Write-Host "  demo       refresh the demo account, journeys and reports (demo --password <p>)"
     Write-Host "  test       full test suite in the container (test tests/test_rules.py -k preset)"
     Write-Host "  lint       ruff"
+    Write-Host "  type       pyright"
     Write-Host "  check      what is set up and what is not"
     Write-Host "  benchmark  Gate 1 benchmark (default: scripted plans)"
     Write-Host "  logs/stop  follow the worker log / stop the containers"

@@ -34,6 +34,6 @@ Read-only clone that is never run, token never stored, secrets redacted, AI code
 
 Benchmark of twelve journeys with known results and the Gate 1 measures. Report offline (checks) and live (AI planner) numbers separately.
 
-## Slide 9: Limits and future scope
+## Slide 9: Limits, shipped interfaces, and next scope
 
-Keyboard profile only; read-only on real sites; code mapping strongest for static pages and React/Vue development builds. Future: CLI, MCP server for coding assistants, CI with SARIF and PR comments, record-and-replay, the voice Chrome extension (research).
+Keyboard profile only; read-only on real sites; code mapping strongest for static pages and React/Vue development builds. The CLI, GitHub CI with SARIF and PR comments, MCP server, record-and-replay, and Chrome extension are already included as optional interfaces. Future work can broaden the accessibility profiles and framework-aware code mapping.

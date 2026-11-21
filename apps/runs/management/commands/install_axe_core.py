@@ -15,13 +15,13 @@ class Command(BaseCommand):
     help = "Download axe-core (MPL-2.0) to AXE_CORE_PATH so runs can include its page rules."
 
     def add_arguments(self, parser) -> None:
-        parser.add_argument("--version", default=settings.AXE_CORE_VERSION)
+        parser.add_argument("--axe-version", default=settings.AXE_CORE_VERSION)
         parser.add_argument(
             "--sha256", default="", help="Refuse the download unless it has this SHA-256 hash."
         )
 
     def handle(self, *args, **options) -> None:
-        version = options["version"]
+        version = options["axe_version"]
         url = SOURCE.format(version=version)
         request = Request(url, headers={"User-Agent": "AccessPathAI/1.0"})
         try:

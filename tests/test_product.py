@@ -56,6 +56,10 @@ def test_fixture_fallback_serves_only_the_bundled_site() -> None:
 @pytest.mark.django_db
 def test_home_checklist_and_load_demo(client, user, settings, tmp_path) -> None:
     settings.REPO_STORAGE_ROOT = tmp_path / "repos"
+    settings.GROQ_API_KEY = ""
+    settings.GEMINI_API_KEY = ""
+    settings.OPENROUTER_API_KEY = ""
+    settings.OLLAMA_BASE_URL = ""
     page = client.get(reverse("core:home")).content.decode()
     assert "0 of 5 done" in page and "Load the demo" in page
     response = client.post(reverse("core:load_demo"))
@@ -66,6 +70,29 @@ def test_home_checklist_and_load_demo(client, user, settings, tmp_path) -> None:
     assert Journey.objects.filter(repo_binding=binding).count() == 12
     page = client.get(reverse("core:home")).content.decode()
     assert "2 of 5 done" in page and "Reload demo" in page
+
+
+def test_install_axe_core_uses_a_non_conflicting_version_option(
+    settings, tmp_path, monkeypatch
+) -> None:
+    from apps.runs.management.commands import install_axe_core
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b"/*! axe v4.10.3 */\nwindow.axe = {};"
+
+    settings.AXE_CORE_PATH = tmp_path / "axe.min.js"
+    monkeypatch.setattr(install_axe_core, "urlopen", lambda *args, **kwargs: Response())
+    output = StringIO()
+    call_command("install_axe_core", "--axe-version", "4.10.3", stdout=output)
+    assert settings.AXE_CORE_PATH.is_file()
+    assert "Saved axe-core 4.10.3" in output.getvalue()
 
 
 @pytest.mark.django_db

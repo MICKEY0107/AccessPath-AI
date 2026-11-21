@@ -64,8 +64,9 @@ After changing `.env`, restart with `docker compose up -d`.
 |---|---|
 | `./scripts/dev.ps1 start` / `stop` | Start or stop the containers. Your data is kept. |
 | `./scripts/dev.ps1 demo` | Refresh the demo: new reports, nothing deleted |
-| `./scripts/dev.ps1 test` | The full test suite (about two minutes) |
+| `./scripts/dev.ps1 test` | The full test suite (allow about 12 minutes in Docker) |
 | `./scripts/dev.ps1 lint` | ruff |
+| `./scripts/dev.ps1 type` | pyright type checking |
 | `./scripts/dev.ps1 check` | The system check in the terminal |
 | `./scripts/dev.ps1 benchmark` | Gate 1 benchmark with the scripted plans. Add `--provider groq --model openai/gpt-oss-120b --repeat 3` to measure an AI planner. |
 | `./scripts/dev.ps1 logs` | Follow the worker's log |

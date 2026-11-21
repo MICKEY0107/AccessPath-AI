@@ -548,5 +548,12 @@ def verify_fix_view(request: HttpRequest, finding_id: int) -> HttpResponse:
         try:
             verify_fix.delay(finding.pk)
         except Exception:
+            locations["verification"] = {
+                "status": "error",
+                "detail": "The worker is not running, so the fix could not be verified.",
+            }
+            data["locations"] = locations
+            finding.data = data
+            finding.save(update_fields=["data"])
             messages.error(request, "The worker is not running, so the fix could not be verified.")
     return redirect(f"{reverse('runs:detail', kwargs={'run_id': finding.run_id})}#panel-fixes")

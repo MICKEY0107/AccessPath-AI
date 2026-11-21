@@ -157,7 +157,7 @@
                     <form method="post" action="{% url 'runs:verify_fix' finding.pk %}" class="verify-form">{% csrf_token %}<button type="submit" class="secondary">Verify on a temporary copy</button></form>
                   {% endif %}
                   {% if finding.locations.verification %}
-                    <p class="verification verification-{{ finding.locations.verification.status }}" role="status"><strong>{% if finding.locations.verification.status == "resolved" %}Fix verified.{% elif finding.locations.verification.status == "still_failing" %}Not fixed yet.{% elif finding.locations.verification.status == "running" %}Verifying…{% else %}Could not verify.{% endif %}</strong> {{ finding.locations.verification.detail }}</p>
+                    <p class="verification verification-{{ finding.locations.verification.status }}" data-verification-status="{{ finding.locations.verification.status }}" role="status"><strong>{% if finding.locations.verification.status == "resolved" %}Fix verified.{% elif finding.locations.verification.status == "still_failing" %}Not fixed yet.{% elif finding.locations.verification.status == "running" %}Verifying…{% else %}Could not verify.{% endif %}</strong> {{ finding.locations.verification.detail }}</p>
                   {% endif %}
                 {% else %}
                   {% if finding.element.css_path %}<p class="small"><code>{{ finding.element.css_path }}</code></p>{% endif %}
@@ -407,6 +407,17 @@
       document.querySelector("[data-recent-reports]")?.addEventListener("change", (event) => {
         window.location.href = event.target.value;
       });
+      const verificationKey = `accesspath:verification-refresh:${location.pathname}`;
+      const runningVerification = document.querySelector('[data-verification-status="running"]');
+      if (runningVerification) {
+        const refreshCount = Number(sessionStorage.getItem(verificationKey) || "0");
+        if (refreshCount < 120) {
+          sessionStorage.setItem(verificationKey, String(refreshCount + 1));
+          window.setTimeout(() => window.location.reload(), 2000);
+        }
+      } else {
+        sessionStorage.removeItem(verificationKey);
+      }
     })();
   </script>
 {% endblock %}

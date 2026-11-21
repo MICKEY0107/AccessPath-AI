@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -184,11 +185,29 @@ def _index_styles(index: CodeIndex, path: str, text: str) -> None:
             _pattern(index, "outline_removed_on_focus", path, line, snippet)
 
 
+def _source_paths(root: Path):
+    """Yield files deterministically without descending into blocked directories."""
+    for current, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
+        allowed_directories = []
+        for name in sorted(directories):
+            candidate = current_path / name
+            if candidate.is_symlink():
+                continue
+            relative = candidate.relative_to(root).as_posix()
+            if is_blocked_path(f"{relative}/_"):
+                continue
+            allowed_directories.append(name)
+        directories[:] = allowed_directories
+        for name in sorted(filenames):
+            yield current_path / name
+
+
 def build_index(root: Path) -> CodeIndex:
     """Index every readable front-end source file under ``root``."""
     index = CodeIndex()
     root = root.resolve()
-    for path in sorted(root.rglob("*")):
+    for path in _source_paths(root):
         if path.is_symlink() or not path.is_file():
             continue
         try:

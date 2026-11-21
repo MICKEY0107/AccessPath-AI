@@ -20,6 +20,7 @@ Then open <http://127.0.0.1:8000/> and sign in as **demo** with the password the
 | [extension/README.md](extension/README.md) | AccessPath Assist, the Chrome extension for keyboard and voice users |
 | [docs/ADAPTING.md](docs/ADAPTING.md) | Settings, extension points (rules, checks, providers, code patterns, hosts), testing |
 | [docs/DEMONSTRATION_RUNBOOK.md](docs/DEMONSTRATION_RUNBOOK.md) | The 10-minute presentation demo |
+| [docs/FINAL_DEMO_READINESS.md](docs/FINAL_DEMO_READINESS.md) | Current release evidence, remaining external checks and presentation fallback |
 
 ## What it does
 
@@ -182,7 +183,7 @@ Preflight uses the same configured transient and quota retry limits as runtime. 
 ```powershell
 uv run pytest -q
 uv run ruff check .
-uv run pyright
+uv run python -m pyright
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 docker compose exec web python manage.py check

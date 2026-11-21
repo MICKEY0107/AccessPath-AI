@@ -397,12 +397,13 @@ def suggest_fix(
             _diff(path, lines, edits),
             edits,
         )
+    clickable_tag = _CLICKABLE_TAG.search(original)
     if (
         rule_id == "keyboard-operable"
-        and _CLICKABLE_TAG.search(original)
+        and clickable_tag is not None
         and re.search(r"on[Cc]lick|@click|\(click\)", original)
     ):
-        tag = _CLICKABLE_TAG.search(original).group(1)
+        tag = clickable_tag.group(1)
         new = _CLICKABLE_TAG.sub('<button type="button"', original, count=1)
         new = re.sub(rf"</{tag}>", "</button>", new, count=1)
         new = re.sub(r"""\s+role\s*=\s*["']button["']""", "", new, count=1)

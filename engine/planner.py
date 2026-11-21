@@ -677,7 +677,9 @@ def _usage_of(client: object) -> dict[str, object] | None:
     from .provider_usage import TokenUsage
 
     usage = getattr(client, "usage", None)
-    return usage.as_dict() if isinstance(usage, TokenUsage) else None
+    if not isinstance(usage, TokenUsage):
+        return None
+    return {key: value for key, value in usage.as_dict().items()}
 
 
 def _prompt_prefix() -> str:

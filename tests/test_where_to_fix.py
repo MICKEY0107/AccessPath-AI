@@ -104,6 +104,19 @@ def test_snippets_never_contain_secrets(tmp_path) -> None:
     assert "sk-live" not in json.dumps(result.to_dict())
 
 
+def test_index_prunes_runtime_repository_copies(tmp_path) -> None:
+    source = tmp_path / "fixtures" / "clinic" / "broken" / "slots.html"
+    duplicate = tmp_path / ".runtime" / "repos" / "1" / "src" / source.relative_to(tmp_path)
+    source.parent.mkdir(parents=True)
+    duplicate.parent.mkdir(parents=True)
+    source.write_text('<button data-testid="appointment-slot">09:00</button>', encoding="utf-8")
+    duplicate.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    index = build_index(tmp_path).to_json()
+    paths = [item["path"] for item in index["files"]]
+    assert paths == ["fixtures/clinic/broken/slots.html"]
+
+
 class FakeChat:
     def __init__(self, replies: list[dict]) -> None:
         self.replies = list(replies)
@@ -373,3 +386,7 @@ def test_verify_button_queues_the_check_and_refuses_non_fixture_fixes(client, us
     delay.assert_called_once_with(good.pk)
     good.refresh_from_db()
     assert good.data["locations"]["verification"]["status"] == "running"
+    response = client.get(reverse("runs:detail", args=[run.pk]))
+    content = response.content.decode()
+    assert 'data-verification-status="running"' in content
+    assert "window.setTimeout(() => window.location.reload(), 2000)" in content

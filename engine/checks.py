@@ -15,7 +15,7 @@ from typing import Any
 
 from playwright.sync_api import Page
 
-from .contracts import FindingConfirmationV1, FindingV1
+from .contracts import ElementDetailsV1, FindingConfirmationV1, FindingV1
 from .dom import script
 from .findings import FindingCollector, element_signature
 from .probes import CLEAR_STOP_MARKS, TabWalk, tab_walk
@@ -730,7 +730,9 @@ def axe_finding(violation: dict[str, Any], url: str, step_number: int | None) ->
         ).strip()[:800],
         step_number=step_number,
         url=url[:1000],
-        element={"css_path": selector, "html_snippet": html} if selector or html else None,
+        element=(
+            ElementDetailsV1(css_path=selector, html_snippet=html) if selector or html else None
+        ),
         occurrences=max(1, len(nodes)),
         confirmation=FindingConfirmationV1(
             method="axe", confirmed=True, detail=f"axe-core rule {violation.get('id')}"

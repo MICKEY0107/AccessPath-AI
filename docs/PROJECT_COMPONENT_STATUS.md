@@ -1,5 +1,7 @@
 # AccessPath AI project component status
 
+> **Historical baseline:** This document records the 28 September 2026 Phase-1 assessment. It is not the current release status. For the verified 21 November 2026 demo-readiness status, see [FINAL_DEMO_READINESS.md](FINAL_DEMO_READINESS.md).
+
 **As of:** 28 September 2026  
 **Basis:** Repository inspection plus the decision-grade evidence in `ACCESSPATH_AI_PROGRESS_LOG.md`  
 **Progress basis:** Keyboard-first course delivery, not the larger lifetime multi-disability product vision

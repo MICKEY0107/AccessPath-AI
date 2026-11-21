@@ -22,8 +22,25 @@ BLOCKED_NAME_PATTERNS = [
     )
 ]
 BLOCKED_DIRECTORIES = {
-    ".git", "node_modules", "dist", "build", ".next", ".nuxt", "out", "coverage", "vendor",
-    "venv", ".venv", "__pycache__", "target", ".cache", ".turbo", "secrets", ".idea", ".vscode",
+    ".git",
+    ".runtime",
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    "out",
+    "coverage",
+    "vendor",
+    "venv",
+    ".venv",
+    "__pycache__",
+    "target",
+    ".cache",
+    ".turbo",
+    "secrets",
+    ".idea",
+    ".vscode",
 }
 
 SECRET_PATTERNS = [
