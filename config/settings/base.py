@@ -47,6 +47,11 @@ LOGIN_REDIRECT_URL = "runs:list"
 LOGOUT_REDIRECT_URL = "login"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -98,6 +103,22 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
 CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_TASK_ROUTES = {
+    "accesspath.execute_run": {"queue": "evaluation"},
+    "accesspath.verify_fix": {"queue": "evaluation"},
+    "accesspath.analyze_repository": {"queue": "repository"},
+}
+# Browser jobs are long-running and memory-heavy. One reserved task per worker keeps
+# short jobs from sitting behind a browser evaluation, while recycling limits memory
+# retained by Chromium and Python after a task completes.
+CELERY_WORKER_PREFETCH_MULTIPLIER = int(os.environ.get("CELERY_WORKER_PREFETCH_MULTIPLIER", "1"))
+CELERY_TASK_ACKS_LATE = os.environ.get("CELERY_TASK_ACKS_LATE", "true").lower() == "true"
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_MAX_TASKS_PER_CHILD = int(os.environ.get("CELERY_WORKER_MAX_TASKS_PER_CHILD", "10"))
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = int(
+    os.environ.get("CELERY_WORKER_MAX_MEMORY_PER_CHILD", "1500000")
+)
 # Live journeys on real sites can need many paced model calls; the target policy
 # caps a run at 15 minutes, so the worker limit sits just above that.
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "960"))

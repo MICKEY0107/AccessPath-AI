@@ -1,0 +1,88 @@
+# Production-style local reference. A cloud deployment should use managed Postgres,
+# Redis, object storage and a secret manager rather than publishing these services.
+# Copy .env.example to a non-versioned production secret source; never commit it.
+services:
+  web:
+    build:
+      context: .
+      target: production
+    command: >-
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --threads 4
+      --timeout 60 --max-requests 1000 --max-requests-jitter 100
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production.example}
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+      - /home/app:rw,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 1g
+    volumes:
+      - run_output:/app/output:rw
+      - repo_storage:/app/.runtime/repos:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  browser-worker:
+    build:
+      context: .
+      target: production
+    command: celery -A config worker --loglevel=INFO --concurrency=1 -Q default,evaluation
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production.example}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /home/app:rw,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Chromium is deliberately isolated and capped. Scale out with more workers
+    # rather than raising per-container browser concurrency.
+    cpus: 2.0
+    mem_limit: 4g
+    shm_size: 1g
+    volumes:
+      - run_output:/app/output:rw
+      - repo_storage:/app/.runtime/repos:ro
+    restart: unless-stopped
+
+  repository-worker:
+    build:
+      context: .
+      target: production
+    command: celery -A config worker --loglevel=INFO --concurrency=1 -Q repository
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production.example}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /home/app:rw,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cpus: 1.0
+    mem_limit: 1g
+    volumes:
+      - repo_storage:/app/.runtime/repos:rw
+    restart: unless-stopped
+
+volumes:
+  run_output:
+  repo_storage:

@@ -12,6 +12,7 @@ dependencies = [
   "playwright>=1.55,<2",
   "google-genai>=1.0,<2",
   "cryptography>=44",
+  "gunicorn>=23,<24",
 ]
 
 [dependency-groups]

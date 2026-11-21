@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS development
+FROM python:3.13-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -15,10 +15,12 @@ RUN apt-get update \
 RUN pip install --no-cache-dir "uv==0.8.22"
 
 COPY pyproject.toml uv.lock README.md ./
+
+FROM base AS development
+
 # The development image includes the test and lint tools (pytest, ruff), so
 # `docker compose exec web python -m pytest` works without installing anything.
 RUN uv sync --locked --no-install-project
-
 COPY . .
 RUN uv sync --locked --no-install-project \
     && .venv/bin/python -m playwright install --with-deps chromium \
@@ -30,3 +32,19 @@ RUN uv sync --locked --no-install-project \
 USER app
 
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+FROM base AS production
+
+# Production contains only runtime dependencies and no source bind mount.
+RUN uv sync --locked --no-dev --no-install-project
+COPY . .
+RUN uv sync --locked --no-dev --no-install-project \
+    && .venv/bin/python -m playwright install --with-deps chromium \
+    && mkdir -p /app/output/runs /app/.runtime/repos \
+    && groupadd --system app \
+    && useradd --system --gid app --create-home app \
+    && chown -R app:app /app /ms-playwright
+
+USER app
+
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--timeout", "60", "--max-requests", "1000", "--max-requests-jitter", "100"]

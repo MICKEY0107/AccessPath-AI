@@ -17,7 +17,7 @@ def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@shared_task(bind=True, name="accesspath.execute_run")
+@shared_task(bind=True, name="accesspath.execute_run", queue="evaluation")
 def execute_run(self, run_id: str, credential_token: str = "") -> dict[str, str | int]:
     """Execute a configured journey away from the web-request process.
 
@@ -74,7 +74,7 @@ def execute_run(self, run_id: str, credential_token: str = "") -> dict[str, str 
         raise
 
 
-@shared_task(name="accesspath.verify_fix")
+@shared_task(name="accesspath.verify_fix", queue="evaluation")
 def verify_fix(finding_pk: int) -> str:
     """Apply a suggested fix to a temporary copy of a fixture site and re-run the journey."""
     from django.conf import settings

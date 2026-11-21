@@ -1,0 +1,6 @@
+# Keep executable source and configuration files stable across Windows and Linux.
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+Dockerfile text eol=lf

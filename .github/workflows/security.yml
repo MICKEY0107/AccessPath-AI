@@ -1,0 +1,44 @@
+name: Security and deployment checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install locked dependencies
+        run: uv sync --locked --all-groups
+      - name: Static checks
+        run: |
+          uv run ruff check .
+          uv run python -m pyright
+      - name: Dependency audit
+        run: uvx pip-audit --strict
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Production settings check
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          DJANGO_SECRET_KEY: ci-not-a-production-secret-but-long-enough-0123456789
+          DJANGO_ALLOWED_HOSTS: accesspath.example.invalid
+          SECURE_HSTS_SECONDS: "31536000"
+          POSTGRES_PASSWORD: ci-only
+        run: uv run python manage.py check --deploy
+      - name: Validate production compose syntax
+        run: docker compose -f docker-compose.production.yml config --quiet

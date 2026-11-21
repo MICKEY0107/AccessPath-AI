@@ -21,6 +21,7 @@ Then open <http://127.0.0.1:8000/> and sign in as **demo** with the password the
 | [docs/ADAPTING.md](docs/ADAPTING.md) | Settings, extension points (rules, checks, providers, code patterns, hosts), testing |
 | [docs/DEMONSTRATION_RUNBOOK.md](docs/DEMONSTRATION_RUNBOOK.md) | The 10-minute presentation demo |
 | [docs/FINAL_DEMO_READINESS.md](docs/FINAL_DEMO_READINESS.md) | Current release evidence, remaining external checks and presentation fallback |
+| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | Secure cloud deployment architecture, resource limits and production release checklist |
 
 ## What it does
 

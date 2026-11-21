@@ -1,6 +1,8 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.core.management import call_command
-from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed
+from django.db import connection
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
@@ -112,3 +114,20 @@ def status(request: HttpRequest) -> HttpResponse:
         "core/status.html",
         {"groups": groups, "overall": summary(checks)},
     )
+
+
+@login_not_required
+def healthz(request: HttpRequest) -> JsonResponse:
+    """Unauthenticated liveness probe; deliberately reveals no deployment details."""
+    return JsonResponse({"status": "ok"})
+
+
+@login_not_required
+def readyz(request: HttpRequest) -> JsonResponse:
+    """Readiness probe used by a load balancer before sending user traffic."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception:
+        return JsonResponse({"status": "unavailable"}, status=503)
+    return JsonResponse({"status": "ready"})
