@@ -64,7 +64,9 @@ services:
     build:
       context: .
       target: development
-    command: celery -A config worker --loglevel=INFO --concurrency=1
+    # Keep local development aligned with production queue routing. One worker
+    # consumes all queues here; production splits browser and repository workers.
+    command: celery -A config worker --loglevel=INFO --concurrency=1 -Q celery,default,evaluation,repository
     env_file: .env
     environment:
       # Inside Compose the database and queue are reached by service name, whatever
