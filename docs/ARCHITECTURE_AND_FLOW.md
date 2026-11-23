@@ -22,34 +22,87 @@ flowchart LR
     J -->|Agent, provider or environment failure| M[Clearly labelled, site not blamed]
 ```
 
-## Architecture
+## Current architecture
+
+The diagram below is the current release and demo architecture. The web product is a
+single Django application, while browser and repository work run in separate worker
+processes. The command line, GitHub Action and MCP server use the same evaluation
+engine, so a finding has the same meaning whichever interface starts it.
 
 ```mermaid
 flowchart TB
-    Browser[Person's browser] --> Web[Django web app]
-    CLI[Command line] --> Engine
-    Action[GitHub Action] --> CLI
-    MCP[MCP server] --> Engine
-    Web --> Postgres[(PostgreSQL: journeys, sessions, runs, steps, artifacts, findings, repositories, saved keys)]
-    Web --> Queue[(Redis / Celery queue)]
-    Queue --> Worker[Celery worker, one run at a time]
-    Worker --> Service[Run service]
-    Service --> Engine
-    subgraph Engine[Engine, no Django]
-        Planner[Planner] --> Gate[Provider pacing gate]
-        Gate --> Providers[Groq / Gemini / OpenRouter / Ollama]
-        Planner --> Policy[Action policy]
-        Policy -->|approved key only| Executor[Playwright keyboard executor]
-        Policy -->|rejected| Planner
-        Executor --> Checks[Checks and rule catalog]
-        Executor -->|run failed| Probes[Confirm before blaming]
-        Checks --> Findings[Findings]
+    Evaluator[Evaluator in a browser] --> Web[Django web app\njourneys, runs, evidence and reports]
+    KeyboardUser[Keyboard or voice user] --> Extension[AccessPath Assist Chrome extension\nlocal page assistance]
+    Extension --> VisitedSite[Visited website]
+
+    CLI[CLI] --> Engine
+    GitHub[GitHub Action] --> CLI
+    CodingAssistant[Coding assistant] --> MCP[MCP server over stdio]
+    MCP --> Engine
+
+    Web --> DB[(PostgreSQL\naccounts, journeys, sessions, runs, steps, findings)]
+    Web --> Redis[(Redis\nCelery broker and result backend)]
+    Web --> Evidence[(Evidence storage\nscreenshots and exported reports)]
+    Redis --> BrowserWorker[Browser worker\ndefault and evaluation queues\none Chromium run at a time]
+    Redis --> RepoWorker[Repository worker\nrepository queue]
+    BrowserWorker --> RunService[Run orchestration and persistence]
+    RepoWorker --> Repository[Read-only repository clone and front-end index]
+    RunService --> Engine
+
+    subgraph Engine[Shared evaluation engine]
+        Planner[Planner\nlive AI or reviewed scripted plan] --> Pace[Provider pacing gate]
+        Pace --> Providers[Groq, Gemini, OpenRouter or Ollama]
+        Planner --> Policy[Action and target policy]
+        Policy -->|approved keyboard action| Executor[Playwright keyboard executor]
+        Policy -->|rejected action| Planner
+        Executor --> Checks[Keyboard and page checks\nrule catalog and axe-core]
+        Executor -->|possible barrier| Probes[Confirmation probes\nTab walk, target and trap checks]
+        Checks --> Findings[Findings and outcome]
         Probes --> Findings
     end
-    Executor --> Site[Site under test, request policy applied]
-    Findings --> Postgres
-    Findings --> Outputs[Report, JSON/Markdown/SARIF, where to fix]
+
+    Executor --> TestedSite[Approved site under test]
+    Repository --> Locator[Code locator and reviewable patch]
+    Findings --> Locator
+    Findings --> DB
+    Findings --> Evidence
+    Findings --> Outputs[Web report, JSON, Markdown and SARIF]
 ```
+
+### Production deployment boundary
+
+The repository includes a production-style Compose profile. It is intentionally a
+reference configuration: a real cloud deployment supplies managed database, Redis,
+object storage, a secret manager, HTTPS gateway and network rules.
+
+```mermaid
+flowchart LR
+    Internet[People and approved sites] --> Gateway[Managed HTTPS gateway\nTLS and host validation]
+    Gateway --> Web[Web service\nGunicorn, non-root, read-only]
+
+    subgraph Private[Private application network]
+        Web --> DB[(Managed PostgreSQL\nbackups and recovery)]
+        Web --> Redis[(Managed Redis\nprivate broker)]
+        Web --> Store[(Private object storage\nevidence lifecycle rules)]
+        Redis --> Browser[Browser worker\n2 vCPU, 4 GB, concurrency 1]
+        Redis --> Repo[Repository worker\n1 vCPU, 1 GB, concurrency 1]
+        Browser --> Store
+        Repo --> Store
+    end
+
+    Secrets[Secret manager and KMS] --> Web
+    Secrets --> Browser
+    Secrets --> Repo
+    Browser --> Egress[Controlled HTTPS egress\napproved public sites and AI providers]
+    Repo --> GitHosts[Allowlisted Git hosts]
+    Browser -. blocks .-> PrivateTargets[Loopback, private, link-local\nand cloud metadata addresses]
+    Web --> Health[healthz and readyz\nrelease and monitoring checks]
+```
+
+The extension is deliberately separate from the evaluation service. It runs fixes,
+page checks and optional voice commands inside the person's browser and does not send
+page data to AccessPath AI. Chrome speech recognition may process audio according to
+Chrome's own permissions and policies.
 
 ## One evaluation run
 

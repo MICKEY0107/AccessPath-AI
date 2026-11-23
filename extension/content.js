@@ -4,7 +4,13 @@
 (() => {
   if (window.__accesspathAssist) return;
 
-  const DEFAULTS = { focusRing: true, keyboardFixes: true, nameControls: true, voice: false };
+  const DEFAULTS = {
+    focusRing: true,
+    keyboardFixes: true,
+    nameControls: true,
+    voice: false,
+    voiceLang: "en-IN",
+  };
   const CONTROL_SELECTOR =
     'a[href], button, input:not([type="hidden"]), select, textarea, summary, [tabindex], ' +
     '[role="button"], [role="link"], [role="checkbox"], [role="tab"], [role="menuitem"], ' +
@@ -23,6 +29,30 @@
   // Helpers ------------------------------------------------------------------
 
   const norm = (text) => (text || "").replace(/\s+/g, " ").trim();
+
+  const spokenText = (text) => norm(String(text || "")
+    .toLowerCase()
+    .replace(/[.,!?;:]+/g, " "));
+
+  const conversationalText = (text) => {
+    let cleaned = spokenText(text);
+    const starts = [
+      /^(?:hey\s+)?access\s*path\s+assist\s+/,
+      /^(?:please|kindly)\s+/,
+      /^(?:can|could|would|will)\s+you\s+/,
+      /^(?:i\s+want\s+to|i\s+would\s+like\s+to|help\s+me\s+to)\s+/,
+    ];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const pattern of starts) {
+        const next = cleaned.replace(pattern, "");
+        if (next !== cleaned) { cleaned = next; changed = true; }
+      }
+    }
+    cleaned = cleaned.replace(/\s+(?:please|for\s+me|thanks|thank\s+you)$/g, "");
+    return norm(cleaned);
+  };
 
   const isVisible = (element) => {
     if (!(element instanceof Element)) return false;
@@ -364,96 +394,228 @@
   };
 
   const findByName = (words) => {
-    const wanted = norm(words).toLowerCase();
+    const wanted = conversationalText(words)
+      .replace(/^(?:on|the)\s+/, "")
+      .replace(/\s+(?:button|link|control|field)$/, "");
     if (!wanted) return null;
-    const items = focusables();
-    return items.find((element) => accessibleName(element).toLowerCase() === wanted) ||
-      items.find((element) => accessibleName(element).toLowerCase().includes(wanted)) || null;
+    const items = focusables().map((element) => ({
+      element,
+      name: spokenText(accessibleName(element)),
+    })).filter((item) => item.name);
+    const exact = items.find((item) => item.name === wanted);
+    if (exact) return exact.element;
+    const contained = items.find((item) => item.name.includes(wanted));
+    if (contained) return contained.element;
+    const wantedTokens = wanted.split(" ").filter((word) => word.length > 1);
+    const tokenMatch = items
+      .filter((item) => wantedTokens.every((word) => item.name.split(" ").includes(word)))
+      .sort((left, right) => left.name.length - right.name.length)[0];
+    return tokenMatch?.element || null;
   };
 
-  // Turns a spoken phrase into an action; returns what happened, for the status line.
-  const runVoiceCommand = (phrase) => {
-    const text = norm(phrase).toLowerCase().replace(/[.!?]$/, "");
+  const searchBox = () => document.querySelector(
+    'input[type="search"], [role="search"] input, input[name*="search" i], ' +
+    'input[aria-label*="search" i], input[placeholder*="search" i]',
+  );
+
+  const fillSearch = (query) => {
+    const search = searchBox();
+    if (!search || !focusElement(search)) return false;
+    const prototype = search instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+    if (setter) setter.call(search, query); else search.value = query;
+    search.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: query }));
+    search.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  };
+
+  const voiceHelp = () => {
+    openPanel("Voice command examples", [
+      { label: "Try: move to the next item", action: () => moveFocus(1) },
+      { label: "Try: go to main content", action: skipToMain },
+      { label: "Try: go to the search box", action: () => focusElement(searchBox()) },
+      { label: "Show landmarks", action: showLandmarks },
+      { label: "Stop listening", action: () => stopVoice() },
+    ]);
+  };
+
+  const result = (message, performed = true, recognized = true) => ({
+    message, performed, recognized,
+  });
+
+  // Turns a spoken phrase into an action. The richer result lets speech recognition
+  // try another transcript alternative when one guess names a control that is not present.
+  const executeVoiceCommand = (phrase) => {
+    let text = conversationalText(phrase);
+    text = text
+      .replace(/^(?:take|bring|move)\s+me\s+to\s+/, "go to ")
+      .replace(/^navigate\s+to\s+/, "go to ")
+      .replace(/^(click|press|open|select|activate)\s+on\s+/, "$1 ");
     let match;
-    if (/^(next|tab|next item)$/.test(text)) return moveFocus(1) ? "Next" : "Nothing to focus";
+    if (/^(?:next|tab|next item|move to the next item|go next)$/.test(text)) {
+      return moveFocus(1) ? result("Next") : result("Nothing to focus", false);
+    }
     if (/^(previous|back|shift tab|previous item)$/.test(text)) {
-      return moveFocus(-1) ? "Previous" : "Nothing to focus";
+      return moveFocus(-1) ? result("Previous") : result("Nothing to focus", false);
     }
     if (/^(click|press|select|activate|open|enter)$/.test(text)) {
       const target = document.activeElement;
-      if (!target || target === document.body) return "Nothing is focused";
+      if (!target || target === document.body) return result("Nothing is focused", false);
       target.click();
-      return `Pressed ${accessibleName(target) || target.tagName.toLowerCase()}`;
+      return result(`Pressed ${accessibleName(target) || target.tagName.toLowerCase()}`);
+    }
+    if ((match = text.match(/^(?:search|look up|find)\s+(?:for\s+)?(.+)$/))) {
+      const query = conversationalText(match[1]);
+      if (/^(?:the\s+)?search(?:\s+box|\s+field)?$/.test(query)) {
+        return focusElement(searchBox()) ? result("Search box") : result("No search box", false);
+      }
+      return fillSearch(query)
+        ? result(`Search filled with ${query}`)
+        : result("No search box", false);
     }
     if ((match = text.match(/^(?:click|press|open|select|go to|focus) (.+)$/))) {
-      const name = match[1];
-      if (/^(main|main content|content)$/.test(name)) return skipToMain() ? "Main content" : "No main content";
-      if (/^(search|search box)$/.test(name)) {
-        const search = document.querySelector('input[type="search"], [role="search"] input, input[name*="search" i], input[aria-label*="search" i]');
-        return focusElement(search) ? "Search box" : "No search box";
+      const name = conversationalText(match[1]).replace(/^(?:the)\s+/, "");
+      if (/^(main|main content|content)$/.test(name)) {
+        return skipToMain() ? result("Main content") : result("No main content", false);
+      }
+      if (/^search(?:\s+box|\s+field)?$/.test(name)) {
+        return focusElement(searchBox()) ? result("Search box") : result("No search box", false);
       }
       const target = findByName(name);
-      if (!target) return `No control named “${name}”`;
+      if (!target) return result(`No control named “${name}”`, false);
       focusElement(target);
       if (!/^(go to|focus)/.test(text)) target.click();
-      return `${/^(go to|focus)/.test(text) ? "Focused" : "Pressed"} ${accessibleName(target)}`;
+      return result(`${/^(go to|focus)/.test(text) ? "Focused" : "Pressed"} ${accessibleName(target)}`);
     }
-    if (/^scroll down$/.test(text)) { window.scrollBy(0, innerHeight * 0.8); return "Scrolled down"; }
-    if (/^scroll up$/.test(text)) { window.scrollBy(0, -innerHeight * 0.8); return "Scrolled up"; }
-    if (/^(show )?landmarks$/.test(text)) { showLandmarks(); return "Landmarks"; }
-    if (/^(skip|skip to main|main content)$/.test(text)) return skipToMain() ? "Main content" : "No main content";
-    if (/^(stop|stop listening)$/.test(text)) { stopVoice(); return "Voice off"; }
-    return `Not a command: “${phrase}”`;
+    if (/^scroll down(?: a little| one page)?$/.test(text)) {
+      window.scrollBy(0, innerHeight * 0.8);
+      return result("Scrolled down");
+    }
+    if (/^scroll up(?: a little| one page)?$/.test(text)) {
+      window.scrollBy(0, -innerHeight * 0.8);
+      return result("Scrolled up");
+    }
+    if (/^(?:go to |scroll to )?(?:the )?top$/.test(text)) {
+      window.scrollTo(0, 0);
+      return result("Top of page");
+    }
+    if (/^(?:go to |scroll to )?(?:the )?bottom$/.test(text)) {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      return result("Bottom of page");
+    }
+    if (/^(?:show |open )?(?:the )?landmarks$/.test(text)) {
+      showLandmarks();
+      return result("Landmarks");
+    }
+    if (/^(?:help|voice help|what can i say|show commands)$/.test(text)) {
+      voiceHelp();
+      return result("Voice command examples");
+    }
+    if (/^(skip|skip to main|main content)$/.test(text)) {
+      return skipToMain() ? result("Main content") : result("No main content", false);
+    }
+    if (/^(stop|stop listening|turn off voice)$/.test(text)) {
+      stopVoice();
+      return result("Voice off");
+    }
+    return result(`Not a command: “${phrase}”`, false, false);
   };
+
+  const runVoiceCommand = (phrase) => executeVoiceCommand(phrase).message;
 
   // Voice listens only in the tab in front: it pauses when the tab is hidden, so a
   // command never acts on a page the person cannot see.
   let recognition = null;
+  let voiceRequested = false;
   let restarts = [];
   const FATAL_VOICE_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture"];
   const startVoice = () => {
+    voiceRequested = true;
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) { say("Voice commands need speech recognition (Chrome)."); return false; }
+    if (!Recognition) {
+      voiceRequested = false;
+      say("Voice commands need speech recognition in Chrome.");
+      return false;
+    }
     if (recognition) return true;
     if (document.visibilityState !== "visible") return false;
     const current = new Recognition();
     recognition = current;
     current.continuous = true;
     current.interimResults = false;
-    current.lang = "en-US"; // The commands are English.
+    current.maxAlternatives = 3;
+    current.lang = settings.voiceLang || navigator.language || document.documentElement.lang || "en-US";
     current.onresult = (event) => {
       if (document.visibilityState !== "visible") return;
-      const phrase = event.results[event.results.length - 1][0].transcript;
-      say(runVoiceCommand(phrase));
+      let fallback = null;
+      let selected = null;
+      const start = Number.isInteger(event.resultIndex) ? event.resultIndex : 0;
+      for (let resultIndex = start; resultIndex < event.results.length && !selected; resultIndex += 1) {
+        const speechResult = event.results[resultIndex];
+        if (speechResult.isFinal === false) continue;
+        for (let alternativeIndex = 0; alternativeIndex < speechResult.length; alternativeIndex += 1) {
+          const phrase = speechResult[alternativeIndex].transcript;
+          const outcome = executeVoiceCommand(phrase);
+          if (!fallback || outcome.recognized) fallback = { phrase, outcome };
+          if (outcome.performed) { selected = { phrase, outcome }; break; }
+        }
+      }
+      const chosen = selected || fallback;
+      if (!chosen) return;
+      restarts = [];
+      say(`Heard “${norm(chosen.phrase)}”. ${chosen.outcome.message}`);
     };
     current.onend = () => {
       if (recognition !== current) return;
+      if (!voiceRequested) { recognition = null; return; }
       // Restart after silence, but give up if it keeps ending at once.
       const now = Date.now();
       restarts = restarts.filter((time) => now - time < 10000).concat(now);
-      if (restarts.length > 5) { recognition = null; say("Voice stopped: it kept ending. Turn it on again to retry."); return; }
-      setTimeout(() => { if (recognition === current) current.start(); }, 300);
+      if (restarts.length > 5) {
+        recognition = null;
+        voiceRequested = false;
+        say("Voice stopped because recognition kept ending. Check the microphone and start it again.");
+        return;
+      }
+      setTimeout(() => {
+        if (recognition !== current || !voiceRequested) return;
+        try { current.start(); } catch (error) {
+          recognition = null;
+          voiceRequested = false;
+          say("Voice could not restart. Start listening again.");
+        }
+      }, 300);
     };
     current.onerror = (event) => {
       if (FATAL_VOICE_ERRORS.includes(event.error)) {
         recognition = null;
+        voiceRequested = false;
         say(event.error === "audio-capture" ? "Voice: no microphone found." : "Voice: microphone access was not allowed.");
         return;
       }
       if (event.error !== "no-speech" && event.error !== "aborted") say(`Voice: ${event.error}`);
     };
-    current.start();
-    say("Listening: say “next”, “click Sign in”, “go to main”, or “stop listening”.");
+    try {
+      current.start();
+    } catch (error) {
+      recognition = null;
+      voiceRequested = false;
+      say("Voice could not start. Check Chrome's microphone permission and try again.");
+      return false;
+    }
+    say(`Listening in ${current.lang}: say “next”, “click Sign in”, “search for…”, or “voice help”.`);
     return true;
   };
   const stopVoice = (quiet = false) => {
+    voiceRequested = false;
     const current = recognition;
     recognition = null;
     if (current) current.stop();
     if (!quiet) say("Voice commands off.");
   };
   document.addEventListener("visibilitychange", () => {
-    if (!settings.voice) return;
+    if (!voiceRequested && !settings.voice) return;
     if (document.visibilityState === "visible") startVoice(); else stopVoice(true);
   });
 
@@ -462,10 +624,19 @@
   const handle = (message) => {
     if (!message) return null;
     if (message.type === "settings") {
+      const previousLanguage = settings.voiceLang;
       settings = { ...DEFAULTS, ...message.settings };
       applySettings();
+      if (recognition && previousLanguage !== settings.voiceLang) stopVoice(true);
       if (settings.voice) startVoice(); else if (recognition) stopVoice();
       return checkPage();
+    }
+    if (message.type === "voice-status") {
+      return {
+        enabled: Boolean(settings.voice),
+        listening: Boolean(recognition && voiceRequested),
+        language: settings.voiceLang,
+      };
     }
     if (message.type === "check") return checkPage();
     if (message.type === "fix") { applyKeyboardFixes(); applyNames(); return checkPage(); }

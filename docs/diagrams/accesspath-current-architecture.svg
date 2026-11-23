@@ -1,0 +1,274 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">AccessPath AI current release architecture</title>
+  <desc id="desc">A four-part architecture diagram showing people and entry points, the Django application and Celery workers, the shared evidence-driven evaluation engine, external AI providers and websites, report outputs, and the separate AccessPath Assist Chrome extension.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,3.5 L0,7 Z" fill="#4f46e5"/></marker>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,3.5 L0,7 Z" fill="#0891b2"/></marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,3.5 L0,7 Z" fill="#16a34a"/></marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,3.5 L0,7 Z" fill="#ea580c"/></marker>
+    <marker id="arrow-gray" markerWidth="10" markerHeight="10" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,3.5 L0,7 Z" fill="#64748b"/></marker>
+    <style>
+      text { font-family: "Segoe UI", Arial, sans-serif; fill: #0f172a; }
+      .title { font-size: 38px; font-weight: 700; }
+      .subtitle { font-size: 18px; fill: #475569; }
+      .section-title { font-size: 20px; font-weight: 700; }
+      .section-subtitle { font-size: 13px; fill: #64748b; }
+      .node-title { font-size: 17px; font-weight: 700; text-anchor: middle; }
+      .node-text { font-size: 13px; fill: #475569; text-anchor: middle; }
+      .small { font-size: 12px; fill: #64748b; }
+      .edge-label { font-size: 12px; font-weight: 600; fill: #334155; text-anchor: middle; paint-order: stroke; stroke: #f8fafc; stroke-width: 5px; stroke-linejoin: round; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; rx: 18; }
+      .node { fill: #ffffff; stroke-width: 1.6; rx: 12; filter: url(#shadow); }
+      .entry { stroke: #6366f1; }
+      .app { stroke: #0891b2; }
+      .engine { stroke: #16a34a; }
+      .external { stroke: #ea580c; }
+      .store { stroke: #9333ea; }
+      .line-blue { fill: none; stroke: #4f46e5; stroke-width: 2.2; marker-end: url(#arrow-blue); }
+      .line-cyan { fill: none; stroke: #0891b2; stroke-width: 2.2; marker-end: url(#arrow-cyan); }
+      .line-green { fill: none; stroke: #16a34a; stroke-width: 2.2; marker-end: url(#arrow-green); }
+      .line-orange { fill: none; stroke: #ea580c; stroke-width: 2.2; marker-end: url(#arrow-orange); }
+      .line-gray { fill: none; stroke: #64748b; stroke-width: 2; marker-end: url(#arrow-gray); }
+      .dashed { stroke-dasharray: 9 7; }
+      .no-marker { marker-end: none; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#f8fafc"/>
+  <text class="title" x="48" y="55">AccessPath AI — Current Release Architecture</text>
+  <text class="subtitle" x="48" y="86">Evidence-backed keyboard journey evaluation · web application, developer interfaces and separate user assistance</text>
+  <g transform="translate(1490 34)">
+    <rect width="380" height="55" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="190" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#3730a3">IMPLEMENTED LOCAL / DEMO RELEASE</text>
+    <text x="190" y="42" text-anchor="middle" font-size="12" fill="#475569">Cloud services shown only in deployment documentation</text>
+  </g>
+
+  <!-- Section panels -->
+  <rect class="panel" x="40" y="125" width="340" height="860"/>
+  <rect x="40" y="125" width="340" height="8" rx="4" fill="#6366f1"/>
+  <text class="section-title" x="70" y="166" fill="#3730a3">1 · People and entry points</text>
+  <text class="section-subtitle" x="70" y="188">Who starts work and through which interface</text>
+
+  <rect class="panel" x="410" y="125" width="1000" height="860"/>
+  <rect x="410" y="125" width="1000" height="8" rx="4" fill="#0891b2"/>
+  <text class="section-title" x="440" y="166" fill="#155e75">2 · Application, workers and shared engine</text>
+  <text class="section-subtitle" x="440" y="188">One product meaning across web, terminal, CI and coding assistants</text>
+
+  <rect class="panel" x="1440" y="125" width="440" height="860"/>
+  <rect x="1440" y="125" width="440" height="8" rx="4" fill="#ea580c"/>
+  <text class="section-title" x="1470" y="166" fill="#9a3412">3 · External systems and outputs</text>
+  <text class="section-subtitle" x="1470" y="188">Controlled connections and visible evidence</text>
+
+  <!-- Entry points -->
+  <g>
+    <rect class="node entry" x="70" y="220" width="280" height="78"/>
+    <rect x="70" y="220" width="8" height="78" rx="4" fill="#6366f1"/>
+    <text class="node-title" x="210" y="251">Evaluator / project team</text>
+    <text class="node-text" x="210" y="276">Starts and reviews journeys in a browser</text>
+
+    <rect class="node entry" x="70" y="335" width="280" height="70"/>
+    <rect x="70" y="335" width="8" height="70" rx="4" fill="#6366f1"/>
+    <text class="node-title" x="210" y="365">Developer / CI / assistant</text>
+    <text class="node-text" x="210" y="388">Uses the same engine outside the web app</text>
+
+    <rect class="node entry" x="70" y="445" width="280" height="70"/>
+    <text class="node-title" x="210" y="476">AccessPath CLI</text>
+    <text class="node-text" x="210" y="498">Journey files · exit codes · reports</text>
+
+    <rect class="node entry" x="70" y="535" width="280" height="70"/>
+    <text class="node-title" x="210" y="566">GitHub Action</text>
+    <text class="node-text" x="210" y="588">Pull-request gate · SARIF · one comment</text>
+
+    <rect class="node entry" x="70" y="625" width="280" height="70"/>
+    <text class="node-title" x="210" y="656">MCP server</text>
+    <text class="node-text" x="210" y="678">Coding-assistant tools over stdio</text>
+
+    <rect class="node entry" x="70" y="755" width="280" height="70"/>
+    <rect x="70" y="755" width="8" height="70" rx="4" fill="#6366f1"/>
+    <text class="node-title" x="210" y="786">Keyboard or voice user</text>
+    <text class="node-text" x="210" y="808">Uses a website directly</text>
+
+    <rect class="node entry" x="70" y="855" width="280" height="92"/>
+    <text class="node-title" x="210" y="884">AccessPath Assist extension</text>
+    <text class="node-text" x="210" y="907">Focus · landmarks · keyboard fixes</text>
+    <text class="node-text" x="210" y="928">Optional voice commands · runs locally</text>
+
+    <path class="line-blue" d="M210 405 L210 436"/>
+    <path class="line-blue" d="M210 405 L210 526"/>
+    <path class="line-blue" d="M210 405 L210 616"/>
+    <path class="line-blue" d="M210 825 L210 846"/>
+  </g>
+
+  <!-- Application layer -->
+  <g>
+    <rect class="node app" x="460" y="220" width="370" height="105"/>
+    <rect x="460" y="220" width="10" height="105" rx="5" fill="#0891b2"/>
+    <text class="node-title" x="645" y="251">Django web application</text>
+    <text class="node-text" x="645" y="276">Accounts · journeys · run dashboard</text>
+    <text class="node-text" x="645" y="297">Evidence timeline · reports · code view</text>
+
+    <rect class="node app" x="930" y="220" width="390" height="105"/>
+    <rect x="930" y="220" width="10" height="105" rx="5" fill="#0891b2"/>
+    <text class="node-title" x="1125" y="251">Developer interface runtime</text>
+    <text class="node-text" x="1125" y="276">CLI runner · MCP tools · report generation</text>
+    <text class="node-text" x="1125" y="297">Does not require the web server or database</text>
+
+    <rect class="node store" x="460" y="375" width="255" height="92"/>
+    <text class="node-title" x="587" y="405">PostgreSQL</text>
+    <text class="node-text" x="587" y="429">Users · journeys · runs</text>
+    <text class="node-text" x="587" y="449">steps · findings · sessions</text>
+
+    <rect class="node store" x="760" y="375" width="255" height="92"/>
+    <text class="node-title" x="887" y="405">Redis</text>
+    <text class="node-text" x="887" y="429">Celery broker</text>
+    <text class="node-text" x="887" y="449">and result backend</text>
+
+    <rect class="node store" x="1060" y="375" width="300" height="92"/>
+    <text class="node-title" x="1210" y="405">Evidence storage</text>
+    <text class="node-text" x="1210" y="429">Screenshots · exported reports</text>
+    <text class="node-text" x="1210" y="449">Local volume in the demo release</text>
+
+    <rect class="node app" x="500" y="520" width="350" height="95"/>
+    <text class="node-title" x="675" y="551">Celery browser worker</text>
+    <text class="node-text" x="675" y="576">Evaluation queue · concurrency 1</text>
+    <text class="node-text" x="675" y="596">Owns Chromium and run persistence</text>
+
+    <rect class="node app" x="950" y="520" width="350" height="95"/>
+    <text class="node-title" x="1125" y="551">Celery repository worker</text>
+    <text class="node-text" x="1125" y="576">Repository queue · concurrency 1</text>
+    <text class="node-text" x="1125" y="596">Safe clone and front-end index</text>
+
+    <path class="line-cyan" d="M645 325 L645 366"/>
+    <path class="line-cyan" d="M700 325 C745 342 842 342 887 366"/>
+    <path class="line-cyan" d="M760 325 C865 350 1120 340 1210 366"/>
+    <path class="line-cyan" d="M887 467 C850 490 745 491 675 511"/>
+    <path class="line-cyan" d="M887 467 C950 490 1050 490 1125 511"/>
+    <text class="edge-label" x="815" y="349">persist and queue</text>
+    <text class="edge-label" x="883" y="499">routed jobs</text>
+  </g>
+
+  <!-- Shared evaluation engine -->
+  <g>
+    <rect x="450" y="660" width="920" height="295" rx="16" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+    <text class="section-title" x="480" y="696" fill="#166534">Shared evidence-driven evaluation engine</text>
+    <text class="section-subtitle" x="480" y="716">AI proposes one action; deterministic code decides what can execute and what the evidence proves</text>
+
+    <rect class="node engine" x="480" y="745" width="185" height="88"/>
+    <text class="node-title" x="572" y="774">Observe + plan</text>
+    <text class="node-text" x="572" y="798">Bounded page state</text>
+    <text class="node-text" x="572" y="817">live AI or scripted plan</text>
+
+    <rect class="node engine" x="695" y="745" width="185" height="88"/>
+    <text class="node-title" x="787" y="774">Safety policy</text>
+    <text class="node-text" x="787" y="798">Origins · actions</text>
+    <text class="node-text" x="787" y="817">typing values · budgets</text>
+
+    <rect class="node engine" x="910" y="745" width="185" height="88"/>
+    <text class="node-title" x="1002" y="774">Playwright</text>
+    <text class="node-text" x="1002" y="798">Chromium performs only</text>
+    <text class="node-text" x="1002" y="817">approved keyboard actions</text>
+
+    <rect class="node engine" x="1125" y="745" width="215" height="88"/>
+    <text class="node-title" x="1232" y="774">Checks + probes</text>
+    <text class="node-text" x="1232" y="798">Focus · names · axe-core</text>
+    <text class="node-text" x="1232" y="817">Tab · target · trap re-checks</text>
+
+    <rect class="node engine" x="670" y="865" width="300" height="68"/>
+    <text class="node-title" x="820" y="892">Evidence-backed result</text>
+    <text class="node-text" x="820" y="914">Completed · blocked · inconclusive · labelled error</text>
+
+    <rect class="node engine" x="1040" y="865" width="270" height="68"/>
+    <text class="node-title" x="1175" y="892">Code locator</text>
+    <text class="node-text" x="1175" y="914">File · line · reviewable patch</text>
+
+    <path class="line-green" d="M665 789 L686 789"/>
+    <path class="line-green" d="M880 789 L901 789"/>
+    <path class="line-green" d="M1095 789 L1116 789"/>
+    <path class="line-green" d="M1232 833 C1210 850 1010 850 940 879"/>
+    <path class="line-green" d="M970 899 L1031 899"/>
+    <path class="line-green dashed" d="M787 745 C790 724 660 724 595 740"/>
+    <text class="edge-label" x="893" y="775">approved</text>
+    <text class="edge-label" x="735" y="733">rejected proposal → replan</text>
+  </g>
+
+  <!-- External systems and outputs -->
+  <g>
+    <rect class="node external" x="1480" y="225" width="360" height="100"/>
+    <text class="node-title" x="1660" y="255">Selected AI provider</text>
+    <text class="node-text" x="1660" y="279">Groq · Gemini · OpenRouter</text>
+    <text class="node-text" x="1660" y="300">or local Ollama</text>
+
+    <rect class="node external" x="1480" y="375" width="360" height="105"/>
+    <text class="node-title" x="1660" y="405">Approved website under test</text>
+    <text class="node-text" x="1660" y="430">Keyboard events in an isolated browser context</text>
+    <text class="node-text" x="1660" y="452">Public runs are read-only by default</text>
+
+    <rect class="node external" x="1480" y="540" width="360" height="105"/>
+    <text class="node-title" x="1660" y="570">Linked Git repository</text>
+    <text class="node-text" x="1660" y="595">HTTPS clone · size limits · secret redaction</text>
+    <text class="node-text" x="1660" y="617">Indexed as files; never executed</text>
+
+    <rect class="node external" x="1480" y="705" width="360" height="120"/>
+    <text class="node-title" x="1660" y="735">Visible outputs</text>
+    <text class="node-text" x="1660" y="760">Web report · evidence timeline</text>
+    <text class="node-text" x="1660" y="781">JSON · Markdown · SARIF</text>
+    <text class="node-text" x="1660" y="802">PR comment · code-scanning location</text>
+
+    <rect class="node external" x="1480" y="875" width="360" height="82"/>
+    <text class="node-title" x="1660" y="906">User's active browser tab</text>
+    <text class="node-text" x="1660" y="930">Local assistive changes; optional Chrome speech</text>
+  </g>
+
+  <!-- Cross-boundary flows -->
+  <path class="line-blue" d="M350 259 L451 259"/>
+  <text class="edge-label" x="400" y="246">HTTPS</text>
+  <path class="line-blue" d="M350 480 C540 480 730 272 921 272"/>
+  <path class="line-blue" d="M350 570 C560 570 740 286 921 286"/>
+  <path class="line-blue" d="M350 660 C590 660 760 303 921 303"/>
+
+  <path class="line-cyan" d="M675 615 L610 738"/>
+  <text class="edge-label" x="617" y="661">run task</text>
+  <path class="line-cyan" d="M1125 325 C1080 430 930 575 650 738"/>
+  <text class="edge-label" x="1018" y="505">direct engine call</text>
+
+  <path class="line-orange" d="M665 765 C925 665 1200 305 1471 275"/>
+  <text class="edge-label" x="1115" y="493">one structured proposal at a time</text>
+  <path class="line-orange" d="M1095 810 C1270 760 1355 500 1471 428"/>
+  <text class="edge-label" x="1330" y="608">keyboard + page state</text>
+  <path class="line-orange" d="M1300 568 C1370 568 1410 580 1471 590"/>
+  <text class="edge-label" x="1385" y="560">read-only clone</text>
+  <path class="line-orange" d="M1480 605 C1400 650 1350 820 1310 885"/>
+  <text class="edge-label" x="1400" y="764">index feeds locator</text>
+  <path class="line-orange" d="M1310 899 C1380 865 1420 805 1471 782"/>
+  <path class="line-orange" d="M970 899 C1190 970 1360 850 1471 795"/>
+  <text class="edge-label" x="1373" y="861">findings + fixes</text>
+
+  <path class="line-gray dashed" d="M350 901 L430 901 L430 1018 L1415 1018 L1415 916 L1471 916"/>
+  <text class="edge-label" x="925" y="1038">Separate assistive path — no page content is sent to the AccessPath evaluation service</text>
+
+  <!-- Persistence from result -->
+  <path class="line-green dashed" d="M780 865 C700 795 610 620 587 476"/>
+  <path class="line-green dashed" d="M860 865 C1010 780 1160 590 1210 476"/>
+  <text class="edge-label" x="850" y="631">steps, verdict and evidence</text>
+
+  <!-- Safety footer -->
+  <g transform="translate(450 996)">
+    <circle cx="10" cy="10" r="8" fill="#16a34a"/>
+    <text x="10" y="14" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">✓</text>
+    <text class="small" x="28" y="14">Completion must be observed</text>
+    <circle cx="250" cy="10" r="8" fill="#16a34a"/>
+    <text x="250" y="14" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">✓</text>
+    <text class="small" x="268" y="14">Barriers are re-checked</text>
+    <circle cx="460" cy="10" r="8" fill="#16a34a"/>
+    <text x="460" y="14" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">✓</text>
+    <text class="small" x="478" y="14">Disallowed actions never execute</text>
+    <circle cx="725" cy="10" r="8" fill="#16a34a"/>
+    <text x="725" y="14" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">✓</text>
+    <text class="small" x="743" y="14">Provider and error causes remain labelled</text>
+  </g>
+
+  <text x="1870" y="1060" text-anchor="end" font-size="11" fill="#94a3b8">Verified against the repository · 22 November 2026</text>
+</svg>

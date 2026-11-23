@@ -1,6 +1,12 @@
 // The AccessPath Assist popup: settings, a quick page check, and navigation helpers.
-const DEFAULTS = { focusRing: true, keyboardFixes: true, nameControls: true, voice: false };
-const KEYS = Object.keys(DEFAULTS);
+const DEFAULTS = {
+  focusRing: true,
+  keyboardFixes: true,
+  nameControls: true,
+  voice: false,
+  voiceLang: "en-IN",
+};
+const TOGGLE_KEYS = ["focusRing", "keyboardFixes", "nameControls", "voice"];
 
 const send = async (message) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -46,16 +52,49 @@ const show = (result) => {
   }
 };
 
+const currentSettings = () => ({
+  ...Object.fromEntries(
+    TOGGLE_KEYS.map((name) => [name, document.getElementById(name).checked]),
+  ),
+  voiceLang: document.getElementById("voiceLang").value,
+});
+
+const showVoiceStatus = (status) => {
+  const line = document.getElementById("voiceStatus");
+  const button = document.getElementById("startVoice");
+  if (!status) {
+    line.textContent = "Voice is unavailable on this page.";
+    button.disabled = true;
+    return;
+  }
+  line.textContent = status.listening
+    ? `Listening (${status.language}). Speak after the microphone prompt.`
+    : "Not listening. Chrome may ask for microphone access when you start.";
+  button.textContent = status.listening ? "Listening" : "Start listening";
+  button.disabled = Boolean(status.listening);
+};
+
+const saveAndApply = async () => {
+  const settings = currentSettings();
+  await chrome.storage.sync.set(settings);
+  show(await send({ type: "settings", settings }));
+  showVoiceStatus(await send({ type: "voice-status" }));
+};
+
 chrome.storage.sync.get(DEFAULTS, (stored) => {
-  for (const key of KEYS) {
+  for (const key of TOGGLE_KEYS) {
     const box = document.getElementById(key);
     box.checked = Boolean(stored[key]);
-    box.addEventListener("change", async () => {
-      const settings = Object.fromEntries(KEYS.map((name) => [name, document.getElementById(name).checked]));
-      await chrome.storage.sync.set(settings);
-      show(await send({ type: "settings", settings }));
-    });
+    box.addEventListener("change", saveAndApply);
   }
+  document.getElementById("voiceLang").value = stored.voiceLang || DEFAULTS.voiceLang;
+  document.getElementById("voiceLang").addEventListener("change", saveAndApply);
+  send({ type: "voice-status" }).then(showVoiceStatus);
+});
+
+document.getElementById("startVoice").addEventListener("click", async () => {
+  document.getElementById("voice").checked = true;
+  await saveAndApply();
 });
 
 document.getElementById("check").addEventListener("click", async () => show(await send({ type: "check" })));

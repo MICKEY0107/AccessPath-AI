@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -26,7 +27,7 @@ PAGE = """<!doctype html><html lang="en"><head><title>Shop</title>
 
 
 def test_manifest_is_a_valid_mv3_extension() -> None:
-    manifest = json.loads((EXTENSION / "manifest.json").read_text())
+    manifest = json.loads((EXTENSION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == 3
     assert set(manifest["permissions"]) <= {"storage", "activeTab"}  # nothing broader
     for path in [
@@ -40,18 +41,25 @@ def test_manifest_is_a_valid_mv3_extension() -> None:
     assert {"skip-to-main", "show-landmarks", "toggle-voice", "check-page"} <= set(
         manifest["commands"]
     )
-    popup = (EXTENSION / "popup.html").read_text()
+    popup = (EXTENSION / "popup.html").read_text(encoding="utf-8")
     for control in ("focusRing", "keyboardFixes", "nameControls", "voice"):
         assert f'<label><input type="checkbox" id="{control}">' in popup  # labelled controls
+    assert 'select id="voiceLang"' in popup
+    assert 'button type="button" id="startVoice"' in popup
 
 
 def _with_script(page) -> None:
     page.add_script_tag(path=str(EXTENSION / "content.js"))
 
 
+def _launch_browser(playwright):
+    channel = os.environ.get("ACCESSPATH_BROWSER_CHANNEL")
+    return playwright.chromium.launch(**({"channel": channel} if channel else {}))
+
+
 def test_content_script_fixes_and_checks_a_page() -> None:
     with serve_pages({"/": PAGE}) as origin, sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = _launch_browser(playwright)
         page = browser.new_page()
         page.goto(origin + "/")
         before = page.evaluate("() => null")
@@ -88,7 +96,7 @@ CAREFUL = """<!doctype html><html lang="en"><head><title>Cards</title></head><bo
 
 def test_fixes_leave_deliberate_patterns_alone_undo_and_follow_new_content() -> None:
     with serve_pages({"/": CAREFUL}) as origin, sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = _launch_browser(playwright)
         page = browser.new_page()
         page.goto(origin + "/")
         _with_script(page)
@@ -118,7 +126,7 @@ def test_fixes_leave_deliberate_patterns_alone_undo_and_follow_new_content() -> 
 
 def test_voice_commands_and_landmarks() -> None:
     with serve_pages({"/": PAGE}) as origin, sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        browser = _launch_browser(playwright)
         page = browser.new_page()
         page.goto(origin + "/")
         _with_script(page)
@@ -142,13 +150,97 @@ def test_voice_commands_and_landmarks() -> None:
         browser.close()
 
 
+def test_voice_understands_common_natural_phrasing() -> None:
+    """Voice control should understand requests people naturally say, not only terse commands."""
+    with serve_pages({"/": PAGE}) as origin, sync_playwright() as playwright:
+        browser = _launch_browser(playwright)
+        page = browser.new_page()
+        page.goto(origin + "/")
+        _with_script(page)
+        run = "(text) => window.__accesspathAssist.runVoiceCommand(text)"
+
+        assert page.evaluate(run, "please take me to the search box") == "Search box"
+        assert (
+            page.evaluate(run, "could you click on the save for later button please")
+            == "Pressed Save for later"
+        )
+        assert page.title() == "Saved"
+        assert (
+            page.evaluate(run, "search for accessible mugs")
+            == "Search filled with accessible mugs"
+        )
+        assert page.locator('input[type="search"]').input_value() == "accessible mugs"
+        assert page.evaluate(run, "what can I say") == "Voice command examples"
+        assert (
+            page.locator(".ap-assist-panel").get_attribute("aria-label")
+            == "Voice command examples"
+        )
+        page.keyboard.press("Escape")
+        browser.close()
+
+
+def test_voice_uses_language_and_a_recognition_alternative() -> None:
+    with serve_pages({"/": PAGE}) as origin, sync_playwright() as playwright:
+        browser = _launch_browser(playwright)
+        page = browser.new_page()
+        page.goto(origin + "/")
+        page.evaluate(
+            """() => {
+                window.__voiceFakes = [];
+                const FakeRecognition = class {
+                    constructor() { window.__voiceFakes.push(this); }
+                    start() { this.started = true; if (this.onstart) this.onstart(); }
+                    stop() { this.stopped = true; }
+                    fail(error) { this.onerror({ error }); }
+                    emit(transcripts) {
+                        const alternatives = transcripts.map((transcript, index) => ({
+                            transcript,
+                            confidence: 1 - index * 0.1,
+                        }));
+                        this.onresult({
+                            results: [{
+                                isFinal: true,
+                                ...alternatives,
+                                length: alternatives.length,
+                            }],
+                        });
+                    }
+                };
+                window.SpeechRecognition = FakeRecognition;
+                window.webkitSpeechRecognition = FakeRecognition;
+            }"""
+        )
+        _with_script(page)
+        page.evaluate(
+            """() => window.__accesspathAssist.handle({
+                type: 'settings',
+                settings: { voice: true, voiceLang: 'en-IN' },
+            })"""
+        )
+        state = page.evaluate(
+            """() => ({
+                count: window.__voiceFakes.length,
+                started: window.__voiceFakes[0]?.started,
+                language: window.__voiceFakes[0]?.lang,
+                alternatives: window.__voiceFakes[0]?.maxAlternatives,
+            })"""
+        )
+        assert state == {"count": 1, "started": True, "language": "en-IN", "alternatives": 3}
+        page.evaluate("() => window.__voiceFakes[0].emit(['open the moon', 'go to search'])")
+        assert "Search box" in page.locator(".ap-assist-status").inner_text()
+        assert page.evaluate("document.activeElement.type") == "search"
+        page.evaluate("() => window.__voiceFakes[0].fail('not-allowed')")
+        assert "microphone access was not allowed" in page.locator(".ap-assist-status").inner_text()
+        browser.close()
+
+
 def test_the_real_extension_loads_and_answers_the_popup() -> None:
     with serve_pages({"/": PAGE}) as origin, sync_playwright() as playwright:
         try:
             context = playwright.chromium.launch_persistent_context(
                 tempfile.mkdtemp(),
                 headless=True,
-                channel="chromium",
+                channel=os.environ.get("ACCESSPATH_BROWSER_CHANNEL", "chromium"),
                 args=[f"--disable-extensions-except={EXTENSION}", f"--load-extension={EXTENSION}"],
             )
         except Exception as error:  # Extension support depends on the local Chromium build.

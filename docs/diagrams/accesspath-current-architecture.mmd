@@ -1,0 +1,90 @@
+flowchart LR
+    %% AccessPath AI — current implemented release (November 2026)
+    subgraph ENTRY["1 · People and entry points"]
+        Evaluator["Evaluator / project team"]
+        Developer["Developer / CI"]
+        Assistant["Coding assistant"]
+        EndUser["Keyboard or voice user"]
+        WebUI["Web dashboard"]
+        CLI["AccessPath CLI"]
+        GHA["GitHub Action"]
+        MCP["MCP server over stdio"]
+        Extension["AccessPath Assist\nChrome extension"]
+
+        Evaluator --> WebUI
+        Developer --> CLI
+        Developer --> GHA --> CLI
+        Assistant --> MCP
+        EndUser --> Extension
+    end
+
+    subgraph PLATFORM["2 · AccessPath application and orchestration"]
+        Django["Django web application\nJourneys · runs · evidence · reports"]
+        CLIRuntime["Developer interface runtime\nCLI · reports · MCP tools"]
+        DB[("PostgreSQL\nUsers · journeys · runs · steps · findings")]
+        Redis[("Redis\nCelery broker and result backend")]
+        Evidence[("Evidence storage\nScreenshots · HTML · JSON · Markdown · SARIF")]
+        BrowserWorker["Celery browser worker\nEvaluation queue · concurrency 1"]
+        RepoWorker["Celery repository worker\nRepository queue · concurrency 1"]
+
+        WebUI --> Django
+        CLI --> CLIRuntime
+        MCP --> CLIRuntime
+        Django --> DB
+        Django --> Redis
+        Django --> Evidence
+        Redis --> BrowserWorker
+        Redis --> RepoWorker
+    end
+
+    subgraph ENGINE["3 · Shared evaluation engine"]
+        Observe["Bounded page observation"]
+        Planner["Planner\nLive AI or reviewed scripted plan"]
+        Policy["Deterministic safety policy\nAllowed origin · keyboard actions · budgets"]
+        Playwright["Playwright + Chromium\nExecutes approved keyboard action"]
+        Checks["Accessibility checks and barrier probes\nFocus · names · skip link · axe-core · Tab/key/trap probes"]
+        Result["Evidence-backed result\nCompleted · blocked · inconclusive · labelled error"]
+        Locator["Code locator\nFile · line · reviewable patch"]
+
+        Observe --> Planner --> Policy
+        Policy -->|approved action| Playwright --> Checks --> Result
+        Policy -->|rejected proposal| Planner
+        Checks -->|next observation| Observe
+        Result --> Locator
+    end
+
+    subgraph EXTERNAL["4 · External systems and visible outputs"]
+        Providers["Selected AI provider\nGroq · Gemini · OpenRouter · local Ollama"]
+        Site["Approved website under test\nRead-only by default"]
+        Repository["Linked Git repository\nCloned and indexed; never executed"]
+        Reports["Web report · JSON · Markdown · SARIF\nPR comment and code-scanning annotations"]
+        ActiveTab["User's active browser tab"]
+        Speech["Chrome speech recognition\nOptional; browser-controlled"]
+    end
+
+    BrowserWorker --> Observe
+    CLIRuntime --> Observe
+    Planner <-->|one structured proposal at a time| Providers
+    Playwright <-->|keyboard events and page state| Site
+    RepoWorker <-->|read-only clone| Repository
+    Repository --> Locator
+    Result --> DB
+    Result --> Evidence
+    Locator --> Reports
+    Result --> Reports
+    Django --> Reports
+
+    Extension -->|local assistance only| ActiveTab
+    Extension -.->|voice commands when enabled| Speech
+    Extension -. "No page data is sent to AccessPath AI" .-> Django
+
+    classDef entry fill:#eef2ff,stroke:#4f46e5,color:#172554,stroke-width:1px;
+    classDef app fill:#ecfeff,stroke:#0891b2,color:#164e63,stroke-width:1px;
+    classDef engine fill:#f0fdf4,stroke:#16a34a,color:#14532d,stroke-width:1px;
+    classDef external fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1px;
+    classDef store fill:#faf5ff,stroke:#9333ea,color:#581c87,stroke-width:1px;
+    class Evaluator,Developer,Assistant,EndUser,WebUI,CLI,GHA,MCP,Extension entry;
+    class Django,CLIRuntime,BrowserWorker,RepoWorker app;
+    class DB,Redis,Evidence store;
+    class Observe,Planner,Policy,Playwright,Checks,Result,Locator engine;
+    class Providers,Site,Repository,Reports,ActiveTab,Speech external;

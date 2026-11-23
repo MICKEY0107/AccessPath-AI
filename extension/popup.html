@@ -15,18 +15,29 @@
       <label><input type="checkbox" id="keyboardFixes"> Make click-only controls work with the keyboard</label>
       <label><input type="checkbox" id="nameControls"> Name unnamed buttons</label>
       <label><input type="checkbox" id="voice"> Voice commands</label>
+      <label class="select-setting" for="voiceLang">
+        Voice language
+        <select id="voiceLang">
+          <option value="en-IN">English (India)</option>
+          <option value="en-US">English (United States)</option>
+          <option value="en-GB">English (United Kingdom)</option>
+          <option value="en-AU">English (Australia)</option>
+        </select>
+      </label>
     </fieldset>
     <div class="actions">
+      <button type="button" id="startVoice">Start listening</button>
       <button type="button" id="check">Check this page</button>
       <button type="button" id="landmarks">Landmarks</button>
       <button type="button" id="main">Skip to main</button>
     </div>
+    <p id="voiceStatus" class="muted" aria-live="polite"></p>
     <section id="result" aria-live="polite"></section>
     <details>
       <summary>Shortcuts and voice commands</summary>
       <ul class="muted">
         <li>Alt+Shift+M: skip to main · Alt+Shift+L: landmarks · Alt+Shift+V: voice · Alt+Shift+C: check page</li>
-        <li>Say “next”, “previous”, “click”, “click Sign in”, “go to search”, “go to main”, “scroll down”, “landmarks”, “stop listening”.</li>
+        <li>Say “next”, “previous”, “click Sign in”, “go to search”, “search for accessibility”, “go to main”, “scroll down”, “voice help”, or “stop listening”.</li>
       </ul>
     </details>
   </main>
